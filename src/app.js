@@ -87,13 +87,14 @@ const KIND={
  fiber:{n:'LWL-Panel',rack:1,types:['lc','sc','mpo'],styles:['fs','unifi','hp','lancom'],info:150,infoMin:104,maxHe:4},
  server:{n:'Server',rack:1,types:['mgmt','rj45','sfpp','sfp28','qsfp28'],styles:['hpe','dell','smc'],info:150,infoMin:112,maxHe:4},
  ups:{n:'USV',rack:1,types:['mgmt'],styles:['apc','eaton','cp'],info:210,infoMin:170,maxHe:4},
+ pdu:{n:'PDU',rack:1,types:['mgmt'],styles:['apc','eaton','cp'],info:176,infoMin:132,maxHe:2},
  ap:{n:'Access Point',rack:0,types:['rj45'],styles:['unifi','lancom','aruba']},
  host:{n:'Host',rack:0,types:['rj45','sfpp'],styles:['host']}
 };
 const OBJ={rack:{n:'Schrank'},room:{n:'Raum'}};
 const MAXC={rj45:52,sfp:48,sfpp:48,sfp28:48,qsfpp:32,qsfp28:32,mgmt:1,kj:48,lc:48,sc:48,mpo:24};
 const maxc=(d,t)=>d.kind==='ap'?2:d.kind==='host'?(t==='rj45'?4:2):d.kind==='server'&&t!=='mgmt'?8:MAXC[t];
-const minPorts=d=>d.kind==='ups'?0:1;
+const minPorts=d=>d.kind==='ups'||d.kind==='pdu'?0:1;
 const F={
  name:{l:'Name',t:'text',max:40},
  model:{l:'Modell / Typ',t:'text',max:40,ph:'z. B. 24G + 4SFP+ L2+'},
@@ -129,6 +130,15 @@ const F={
  ip:{l:'IP-Adresse',t:'text',max:40,ph:'10.0.0.2'},
  mac:{l:'MAC-Adresse',t:'text',max:20,ph:'aa:bb:cc:dd:ee:ff'},
  notes:{l:'Notizen',t:'text',max:500},
+ watt:{l:'Leistungsaufnahme (W)',t:'num',min:0,max:20000,opt:1,ph:d=>'geschätzt ca. '+estW(d)+' W'},
+ psu:{l:'Netzteile',t:'seg',o:[['1','1 Netzteil'],['2','2 (redundant)']]},
+ pa:{l:'Netzteil A an',t:'sel',o:d=>srcOpts(d)},
+ pb:{l:'Netzteil B an',t:'sel',o:d=>srcOpts(d),show:d=>d.psu==='2'},
+ uw:{l:'Wirkleistung (W)',t:'num',min:100,max:200000,opt:1,ph:d=>'Standard '+upsCap(d)+' W'},
+ bat:{l:'Akku (Wh)',t:'num',min:10,max:500000,opt:1,ph:'für die Laufzeit'},
+ o13:{l:'Steckdosen C13',t:'num',min:0,max:48},
+ o19:{l:'Steckdosen C19',t:'num',min:0,max:24},
+ amp:{l:'Absicherung',t:'sel',o:[['10','10 A · 2,3 kW'],['16','16 A · 3,7 kW'],['32','32 A · 7,4 kW'],['3x16','3 × 16 A · 11 kW']]},
  year:{l:'Kaufjahr',t:'num',min:1980,max:2100,opt:1,ph:'z. B. 2021'},
  lifeOld:{l:'Veraltet nach (Jahren)',t:'num',min:1,max:50,opt:1,ph:()=>'Standard: '+state.life.old},
  lifeEol:{l:'EOL nach (Jahren)',t:'num',min:1,max:60,opt:1,ph:()=>'Standard: '+state.life.eol},
@@ -148,6 +158,7 @@ const FORM={
  fiber:['name','model','style','size','rack',['he','rows'],'pnum','u','pc',['fg','pol'],'location'],
  server:['name','role','style','size','rack',['he','rows'],'pnum','u','pc',['bays','baysUsed'],'bayForm','bayDir','bayRows',['rj45Speed'],['model','ip'],'location'],
  ups:['name','model','style','size','rack',['he','va'],'u','topo','pc',['location','ip']],
+ pdu:['name','model','style','size','rack',['he'],'u','pc',['o13','o19'],'amp',['location','ip']],
  ap:['name','model','style','pc',['rj45Speed','wifi'],['poeStd'],['location','ip']],
  host:['name','sub','pc',['rj45Speed'],'pd',['ip','mac'],'user'],
  rack:['name','rsize',['minHe'],'rcolor','location'],
@@ -161,16 +172,17 @@ const PRESETS={
  patch:[['24 × Cat6A geschirmt',{pc:{kj:24},cat:'cat6a',shield:true,size:'19',he:1}],['48 × Cat6A · 1 HE',{pc:{kj:48},cat:'cat6a',size:'19',he:1}],['12 × Cat6A · 10″',{pc:{kj:12},size:'10',he:1}],['24 × Cat6 ungeschirmt',{pc:{kj:24},cat:'cat6',shield:false}]],
  fiber:[['24 × LC-Duplex OS2',{pc:{lc:24},fg:'os2',pol:'UPC'}],['24 × LC-Duplex OM4',{pc:{lc:24},fg:'om4'}],['12 × SC OS2 APC',{pc:{sc:12},fg:'os2',pol:'APC'}],['12 × MPO-12 OM4',{pc:{mpo:12},fg:'om4'}],['48 × LC-Duplex OS2 · 2 HE',{pc:{lc:48},fg:'os2',he:2,size:'19'}]],
  server:[['1 HE · 8 × 2,5″ · 2 × SFP28',{he:1,pc:{mgmt:1,rj45:2,sfp28:2},bays:8,baysUsed:8,bayForm:'2.5',bayDir:'v',bayRows:'1'}],['1 HE · 4 × 3,5″ · 2 × 1G',{he:1,pc:{mgmt:1,rj45:2},bays:4,baysUsed:4,bayForm:'3.5',bayDir:'h',bayRows:'1'}],['2 HE · 12 × 3,5″ · 2 × SFP+',{he:2,pc:{mgmt:1,rj45:4,sfpp:2},bays:12,baysUsed:12,bayForm:'3.5',bayDir:'h',bayRows:'3'}],['2 HE · 24 × 2,5″ · 2 × QSFP28',{he:2,pc:{mgmt:1,rj45:2,qsfp28:2},bays:24,baysUsed:24,bayForm:'2.5',bayDir:'v',bayRows:'1'}],['NAS · 4 × 3,5″ · 2 × 10G',{he:1,pc:{rj45:2},rj45Speed:'10G',role:'NAS',bays:4,baysUsed:4,bayForm:'3.5',bayDir:'h',bayRows:'1'}]],
+ pdu:[['1 HE · 8 × C13 · 16 A',{size:'19',he:1,o13:8,o19:0,amp:'16'}],['1 HE · 12 × C13 + 4 × C19 · 32 A',{size:'19',he:1,o13:12,o19:4,amp:'32',pc:{mgmt:1}}],['Gemessen · 8 × C13 · 16 A',{size:'19',he:1,o13:8,o19:0,amp:'16',pc:{mgmt:1},model:'Metered'}],['10″ · 6 × C13 · 10 A',{size:'10',he:1,o13:6,o19:0,amp:'10'}]],
  ups:[['1.500 VA · 1 HE · Line-Interactive',{va:'1500',he:1,topo:'vi',size:'19'}],['3.000 VA · 2 HE · Online',{va:'3000',he:2,topo:'vfi',size:'19'}],['6.000 VA · 3 HE · Online',{va:'6000',he:3,topo:'vfi',size:'19'}],['Tower · 1.000 VA',{va:'1000',size:'frei',topo:'vi'}]],
  ap:[['Wi-Fi 6 · 1 × 1G',{pc:{rj45:1},wifi:'Wi-Fi 6',rj45Speed:'1G',poeStd:'at'}],['Wi-Fi 6E · 1 × 2,5G',{pc:{rj45:1},wifi:'Wi-Fi 6E',rj45Speed:'2.5G',poeStd:'at'}],['Wi-Fi 7 · 1 × 10G',{pc:{rj45:1},wifi:'Wi-Fi 7',rj45Speed:'10G',poeStd:'bt'}],['2 × 1G (Uplink + LAN)',{pc:{rj45:2}}]],
  host:[['PC',{sub:'pc',pc:{rj45:1},pd:false}],['Notebook',{sub:'laptop',pc:{rj45:1},pd:false}],['Drucker',{sub:'printer',pc:{rj45:1},pd:false}],['IP-Telefon · 2 Ports',{sub:'phone',pc:{rj45:2},pd:true}],['IP-Kamera',{sub:'camera',pc:{rj45:1},pd:true}]],
  rack:[['19″ · wächst mit',{rsize:'19',minHe:0}],['19″ · 12 HE',{rsize:'19',minHe:12}],['19″ · 42 HE',{rsize:'19',minHe:42}],['10″ · 6 HE',{rsize:'10',minHe:6}]],
  room:[['Serverraum',{name:'Serverraum',roomc:'blau'}],['Technikraum',{name:'Technikraum',roomc:'grau'}],['Etagenverteiler',{name:'Etagenverteiler',roomc:'violett'}],['Büro',{name:'Büro',roomc:'gruen'}]]
 };
-const KICON={fw:'<rect x="2" y="4" width="16" height="12" rx="1.5"/><path d="M2 8h16M2 12h16M7 4v4M13 8v4M7 12v4"/>',switch:'<rect x="2" y="6" width="16" height="8" rx="1.5"/><path d="M5 10h1.5M8.5 10H10M12 10h1.5M15 10h.5"/>',net:'<rect x="2" y="8" width="16" height="7" rx="1.5"/><path d="M6 8V3.5M14 8V4.5M5 11.5h2"/>',patch:'<rect x="2" y="6" width="16" height="8" rx="1.5"/><path d="M5 8.5v3M8 8.5v3M11 8.5v3M14 8.5v3"/>',fiber:'<rect x="2" y="6" width="16" height="8" rx="1.5"/><circle cx="6" cy="10" r="1.2"/><circle cx="10" cy="10" r="1.2"/><circle cx="14" cy="10" r="1.2"/>',server:'<rect x="3" y="3" width="14" height="6" rx="1"/><rect x="3" y="11" width="14" height="6" rx="1"/><path d="M6 6h1M6 14h1"/>',ups:'<rect x="3" y="4" width="14" height="12" rx="1.5"/><path d="M10.6 6.5 8 10.5h4l-2.6 4"/>',ap:'<circle cx="10" cy="12" r="4.5"/><path d="M4.5 6.5a8 8 0 0 1 11 0"/>',host:'<rect x="3" y="4" width="14" height="9" rx="1"/><path d="M7.5 16.5h5M10 13v3.5"/>',rack:'<rect x="4" y="2" width="12" height="16" rx="1"/><path d="M6.5 6h7M6.5 10h7M6.5 14h7"/>',room:'<rect x="2.5" y="3.5" width="15" height="13" rx="1"/><path d="M2.5 8h6"/>'};
+const KICON={pdu:'<rect x="2" y="7" width="16" height="6" rx="1.2"/><path d="M5 9.2v1.6M8 9.2v1.6M11 9.2v1.6M14 9.2v1.6"/>',fw:'<rect x="2" y="4" width="16" height="12" rx="1.5"/><path d="M2 8h16M2 12h16M7 4v4M13 8v4M7 12v4"/>',switch:'<rect x="2" y="6" width="16" height="8" rx="1.5"/><path d="M5 10h1.5M8.5 10H10M12 10h1.5M15 10h.5"/>',net:'<rect x="2" y="8" width="16" height="7" rx="1.5"/><path d="M6 8V3.5M14 8V4.5M5 11.5h2"/>',patch:'<rect x="2" y="6" width="16" height="8" rx="1.5"/><path d="M5 8.5v3M8 8.5v3M11 8.5v3M14 8.5v3"/>',fiber:'<rect x="2" y="6" width="16" height="8" rx="1.5"/><circle cx="6" cy="10" r="1.2"/><circle cx="10" cy="10" r="1.2"/><circle cx="14" cy="10" r="1.2"/>',server:'<rect x="3" y="3" width="14" height="6" rx="1"/><rect x="3" y="11" width="14" height="6" rx="1"/><path d="M6 6h1M6 14h1"/>',ups:'<rect x="3" y="4" width="14" height="12" rx="1.5"/><path d="M10.6 6.5 8 10.5h4l-2.6 4"/>',ap:'<circle cx="10" cy="12" r="4.5"/><path d="M4.5 6.5a8 8 0 0 1 11 0"/>',host:'<rect x="3" y="4" width="14" height="9" rx="1"/><path d="M7.5 16.5h5M10 13v3.5"/>',rack:'<rect x="4" y="2" width="12" height="16" rx="1"/><path d="M6.5 6h7M6.5 10h7M6.5 14h7"/>',room:'<rect x="2.5" y="3.5" width="15" height="13" rx="1"/><path d="M2.5 8h6"/>'};
 const HICON={pc:'<rect x="4" y="5" width="36" height="24" rx="2"/><path d="M15 37h14M22 29v8"/>',laptop:'<rect x="8" y="7" width="28" height="20" rx="2"/><path d="M3 33h38l-3 4H6z"/>',printer:'<rect x="12" y="4" width="20" height="10"/><rect x="4" y="14" width="36" height="16" rx="2"/><rect x="12" y="24" width="20" height="14"/>',phone:'<rect x="6" y="18" width="32" height="20" rx="3"/><path d="M6 15c0-7 32-7 32 0v3H6z"/><path d="M15 24h2M21 24h2M27 24h2M15 31h2M21 31h2M27 31h2"/>',camera:'<rect x="4" y="10" width="28" height="14" rx="3"/><path d="M32 14l8-4v14l-8-4"/><path d="M14 24v9h12"/><circle cx="12" cy="17" r="3"/>',nas:'<rect x="10" y="4" width="24" height="34" rx="3"/><path d="M15 12h14M15 20h14M15 28h14"/>',tv:'<rect x="3" y="5" width="38" height="25" rx="2"/><path d="M14 37h16M22 30v7"/>',fw:'<rect x="4" y="8" width="36" height="28" rx="2"/><path d="M4 17h36M4 27h36M14 8v9M28 17v10M16 27v9M30 27v9"/>',iot:'<rect x="12" y="12" width="20" height="20" rx="2"/><path d="M17 12V6M22 12V6M27 12V6M17 38v-6M22 38v-6M27 38v-6M12 17H6M12 22H6M12 27H6M38 17h-6M38 22h-6M38 27h-6"/>',other:'<rect x="6" y="6" width="32" height="32" rx="6"/><path d="M18 18a4 4 0 1 1 6 3.5c-1.3.8-2 1.6-2 3v1M22 31v.5"/>'};
 const LS='switch-verkabelung-v1';
-const KINDP={switch:'Switches',fw:'Firewalls',net:'Netzwerkgeräte',patch:'Patchpanels',fiber:'LWL-Panels',server:'Server',ups:'USVs',ap:'Access Points'};
+const KINDP={switch:'Switches',fw:'Firewalls',net:'Netzwerkgeräte',patch:'Patchpanels',fiber:'LWL-Panels',server:'Server',ups:'USVs',pdu:'PDUs',ap:'Access Points'};
 const HOSTP={pc:'PCs',laptop:'Notebooks',printer:'Drucker',phone:'IP-Telefone',camera:'IP-Kameras',nas:'NAS',tv:'Displays',iot:'IoT-Geräte',other:'Sonstige Hosts'};
 const catOf=d=>d.kind==='host'?['host:'+d.sub,HOSTP[d.sub]||'Hosts']:[d.kind,KINDP[d.kind]];
 const catOrder=[...Object.keys(KINDP),...HOSTS.map(h=>'host:'+h[0])];
@@ -243,8 +255,8 @@ const heTxt=d=>'HE '+d.u+(d.he>1?'–'+(d.u+d.he-1):'');
 const where=d=>{const r=d.rack&&rackOf(d.rack);return r?`${r.name}, ${heTxt(d)}`:''};
 const whereAll=d=>{const rm=devRoom(d);return [where(d),rm?rm.name:''].filter(Boolean).join(' · ')};
 function mkDev(kind,o){
-  const base={id:'d'+rid(),kind,name:KIND[kind].n,model:'',style:KIND[kind].styles[0],x:40,y:40,size:KIND[kind].rack?'19':'frei',he:kind==='ups'?2:1,rows:'auto',pc:{},rj45Speed:'1G',poe:false,location:'',ip:'',notes:'',ports:{},cat:'cat6a',shield:true,fg:'os2',pol:'UPC',role:'',wifi:'Wi-Fi 6',poeStd:'at',sub:kind==='net'?'router':'pc',pd:false,user:'',mac:'',pnum:'col',bays:8,baysUsed:8,bayForm:'2.5',bayDir:'v',bayRows:'1',disks:{},raids:[],wan:kind==='fw'?1:0,year:'',lifeOld:'',lifeEol:'',va:'1500',topo:'vi',rack:null,u:1};
-  const pcs={switch:{rj45:24,sfpp:4},fw:{rj45:8,sfpp:2},net:{rj45:8,sfpp:2},patch:{kj:24},fiber:{lc:24},server:{mgmt:1,rj45:2,sfp28:2},ups:{mgmt:1},ap:{rj45:1},host:{rj45:1}};
+  const base={id:'d'+rid(),kind,name:KIND[kind].n,model:'',style:KIND[kind].styles[0],x:40,y:40,size:KIND[kind].rack?'19':'frei',he:kind==='ups'?2:1,rows:'auto',pc:{},rj45Speed:'1G',poe:false,location:'',ip:'',notes:'',ports:{},cat:'cat6a',shield:true,fg:'os2',pol:'UPC',role:'',wifi:'Wi-Fi 6',poeStd:'at',sub:kind==='net'?'router':'pc',pd:false,user:'',mac:'',pnum:'col',bays:8,baysUsed:8,bayForm:'2.5',bayDir:'v',bayRows:'1',disks:{},raids:[],wan:kind==='fw'?1:0,year:'',lifeOld:'',lifeEol:'',watt:'',psu:'1',pa:'',pb:'',o13:8,o19:0,amp:'16',uw:'',bat:'',va:'1500',topo:'vi',rack:null,u:1};
+  const pcs={pdu:{},switch:{rj45:24,sfpp:4},fw:{rj45:8,sfpp:2},net:{rj45:8,sfpp:2},patch:{kj:24},fiber:{lc:24},server:{mgmt:1,rj45:2,sfp28:2},ups:{mgmt:1},ap:{rj45:1},host:{rj45:1}};
   return Object.assign(base,{pc:{...pcs[kind]}},o||{});
 }
 function cableMap(){const m=new Map();for(const c of state.cables){m.set(ek(c.a),c);m.set(ek(c.b),c)}return m}
@@ -253,6 +265,7 @@ function summary(d){
   if(d.kind==='host')return subLbl(d)+(d.ip?' · '+d.ip:'');
   if(d.kind==='ap')return `${d.wifi} · ${d.pc.rj45||0} × LAN`;
   if(d.kind==='server'&&d.bays){const parts=KIND[d.kind].types.filter(t=>t!=='mgmt'&&d.pc[t]).map(t=>`${d.pc[t]} × ${PT[t].n}`);const DI=diskInfo(d);return [`${d.baysUsed}/${d.bays} × ${d.bayForm.replace('.',',')}″`+(DI.total?` · ${fmtTB(DI.total)}`:''),...parts].join(' · ')+(d.size!=='frei'?` · ${d.size}″ ${d.he} HE`:'')}
+  if(d.kind==='pdu')return `${d.o13} × C13${+d.o19?' + '+d.o19+' × C19':''} · ${d.amp==='3x16'?'3 × 16':d.amp} A`+(d.size!=='frei'?` · ${d.size}″ ${d.he} HE`:'');
   if(d.kind==='ups')return `${Number(d.va).toLocaleString('de-DE')} VA · ${TOPO[d.topo].s}${d.size==='frei'?' · Tower':` · ${d.he} HE`}`;
   const parts=KIND[d.kind].types.filter(t=>t!=='mgmt'&&d.pc[t]).map(t=>`${d.pc[t]} × ${t==='kj'?CAT[d.cat].n:PT[t].n}`);
   return (d.kind==='net'?subLbl(d)+' · ':'')+parts.join(' · ')+(d.size!=='frei'?` · ${d.size}″ ${d.he} HE`:'');
@@ -335,7 +348,7 @@ function layRack(d){
   const rows=d.rows==='1'?1:d.rows==='2'?2:autoRows(d);
   const Hh=rack?U*d.he:(rows===2||d.kind==='server'?U:86);
   const c=rows===2?[Hh/2-18,Hh/2+18]:[Hh/2,Hh/2];
-  const B=blocks(d,rows,c,st),BG=bayGeom(d,Hh),bays=d.kind==='server'?(BG?BG.W:0):d.kind==='ups'?140:0;
+  const B=blocks(d,rows,c,st),BG=bayGeom(d,Hh),bays=d.kind==='server'?(BG?BG.W:0):d.kind==='ups'?140:d.kind==='pdu'?Math.max(60,(+d.o13||0)*30+(+d.o19||0)*38-6):0;
   const need=i=>ear+i+(bays?bays+24:0)+B.w+24+ear;
   let info=K.info,over=false,W;
   if(rack){W=TW[d.size];if(need(info)>W){info=K.infoMin;if(need(info)>W){over=true;W=need(info)}}}
@@ -367,9 +380,10 @@ function hole(p){const x=p.x+3.5,w=p.w-7,cx=p.x+p.w/2,n=4,nw=6,y=p.y+3.5,yb=p.y+
   return p.dir<0?`M${x} ${y+n}H${cx-nw}V${y}H${cx+nw}V${y+n}H${x+w}V${yb}H${x}Z`:`M${x} ${y}H${x+w}V${yb-n}H${cx+nw}V${yb}H${cx-nw}V${yb-n}H${x}Z`}
 function bolt(x,y){return `<path d="M${x+3.4} ${y}L${x} ${y+5}h2.5L${x+1.6} ${y+9}L${x+5.2} ${y+3.6}h-2.5Z" fill="#f59e0b"/>`}
 function iconSVG(sub,x,y){return `<g transform="translate(${x} ${y})" fill="none" stroke="#1d2126" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${HICON[sub]||HICON.other}</g>`}
-function lcdSVG(d,st,x,y,w,h){const va=Number(d.va).toLocaleString('de-DE');return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="4" fill="${st.lcd}" stroke="#000" stroke-opacity=".5"/><text x="${x+12}" y="${y+h/2-2}" font-size="${h>50?18:15}" font-weight="700" fill="${st.lcdT}">${va} VA</text><text x="${x+12}" y="${y+h/2+15}" font-size="11" fill="${st.lcdT}" opacity=".8">${TOPO[d.topo].s}</text>`}
+function lcdSVG(d,st,x,y,w,h){const va=Number(d.va).toLocaleString('de-DE');return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="4" fill="${st.lcd}" stroke="#000" stroke-opacity=".5"/><text x="${x+12}" y="${y+h/2-2}" font-size="${h>50?18:15}" font-weight="700" fill="${st.lcdT}">${va} VA</text><text x="${x+12}" y="${y+h/2+15}" font-size="11" fill="${st.lcdT}" opacity=".8">${(P=>P&&P.load?`Last ${Math.round(P.pct)} %${P.min!=null?' · '+P.min+' min':''}`:TOPO[d.topo].s)(PW.get(d.id))}</text>`}
 function infoSVG(d,st,L){
   const x=L.ear,Hh=L.H,cmp=L.info<140,big=Hh>=U,y0=big?34:28,sz=L.rack?`${d.size}″ · ${d.he} HE`:'',used=usedPorts(d),tot=total(d);
+  if(d.kind==='pdu'){const P=PW.get(d.id),a=P?P.load/230:0;let s=`<rect x="${x+14}" y="${Hh/2-17}" width="58" height="34" rx="4" fill="#0b0f0a" stroke="#000"/><text x="${x+66}" y="${Hh/2+7}" text-anchor="end" font-size="17" font-weight="700" fill="#ff5a3c" font-family="monospace">${a.toFixed(1)}</text><text x="${x+80}" y="${Hh/2-4}" font-size="13" font-weight="700" fill="${st.text}">${esc(trunc(d.name,cmp?9:13))}</text><text x="${x+80}" y="${Hh/2+12}" font-size="10.5" fill="${st.sub}">${d.amp==='3x16'?'3 × 16':d.amp} A${P?' · '+Math.round(P.pct)+' %':''}</text>`;return s}
   if(d.kind==='ups'){const lh=Math.min(56,Hh-68);let s=lcdSVG(d,st,x+14,14,L.info-58,lh);s+=`<circle cx="${x+L.info-24}" cy="${14+lh/2}" r="10" fill="none" stroke="${st.text}" stroke-width="2" opacity=".85"/><path d="M${x+L.info-24} ${14+lh/2-6}v5" stroke="${st.acc}" stroke-width="2.4" stroke-linecap="round"/><text x="${x+14}" y="${14+lh+22}" font-size="14" font-weight="700" fill="${st.text}">${esc(trunc(d.name,cmp?16:22))}</text>`;const l2=[d.model,d.ip,sz].filter(Boolean)[0];if(l2&&Hh-(14+lh+22)>26)s+=`<text x="${x+14}" y="${14+lh+38}" font-size="11" fill="${st.sub}">${esc(trunc(l2,26))}</text>`;return s}
   let lines=d.kind==='switch'?[d.model,d.ip,sz]:d.kind==='fw'?[d.model||(d.wan?d.wan+' × WAN':''),d.ip,sz]:d.kind==='net'?[subLbl(d)+(d.model?' · '+d.model:''),d.ip,sz]:d.kind==='patch'?[CAT[d.cat].n+(d.shield?' · geschirmt':' · ungeschirmt'),d.model,sz]:d.kind==='fiber'?['LWL '+FG[d.fg].n+(FG[d.fg].m==='sm'?' · '+d.pol:''),d.model,sz]:[d.role||d.model,d.ip,sz];
   lines=lines.filter(Boolean);
@@ -398,6 +412,9 @@ function infoSVG(d,st,L){
 }
 function baysSVG(d,st,L){
   const x0=L.bx,Hh=L.H;let s='';
+  if(d.kind==='pdu'){const P=PW.get(d.id),used=P?P.plugs:0,cy=Hh/2;let x=x0,i=0;
+    for(const [n,w,h] of [[+d.o13||0,24,20],[+d.o19||0,32,24]])for(let k=0;k<n;k++,i++){const on=i<used,y=cy-h/2;s+=`<g><path d="M${x+3} ${y}h${w-6}l3 4v${h-8}l-3 4h-${w-6}l-3-4v-${h-8}z" fill="#111" stroke="${st.sub}" stroke-opacity=".5"/>${on?`<rect x="${x+2}" y="${y+2}" width="${w-4}" height="${h-4}" rx="2" fill="#2b2f36" stroke="#000"/><rect x="${x+w/2-3}" y="${y+h-1}" width="6" height="${Hh-y-h-4}" fill="#1d1f22"/>`:`<rect x="${x+w*.3-1.5}" y="${y+h/2-3}" width="3" height="6" rx="1" fill="#444"/><rect x="${x+w*.7-1.5}" y="${y+h/2-3}" width="3" height="6" rx="1" fill="#444"/><rect x="${x+w/2-1.5}" y="${y+3}" width="3" height="4" rx="1" fill="#444"/>`}</g>`;x+=w+6}
+    return s}
   if(d.kind==='ups'){const y1=Hh*.22,h=Hh*.56;for(let i=0;i<9;i++)s+=`<rect x="${x0+6+i*15}" y="${y1.toFixed(1)}" width="7" height="${h.toFixed(1)}" rx="3.5" fill="${st.grille}"/>`;return s}
   const G=L.BG;if(!G)return s;const used=clamp(+d.baysUsed||0,0,G.n),DI=diskInfo(d),ed=raidEdit&&raidEdit.dev===d.id,showR=ed||SDV===d.id;
   for(let i=0;i<G.n;i++){const row=Math.floor(i/G.cols),col=i%G.cols,x=x0+col*(G.w+G.gx),y=G.top+row*(G.h+G.gy),w=G.w,h=G.h,on=i<used,X=on?DI.list[i]:null,sz=X&&X.o.c?fmtCap(X.o)+' '+X.t:'',rg=on&&raidOf(d,i),warn=X&&X.out&&!X.ok;
@@ -423,7 +440,7 @@ function rackSVG(d,st,L){
   s+=`<rect x="${E-.5}" y="0" width="${W-2*E+1}" height="${Hh}" rx="${E?2:7}" fill="url(#g-${st.key})" stroke="${st.stroke}"/><rect x="${E+2}" y="1" width="${W-2*E-4}" height="1.4" fill="#fff" opacity="${st.hi}"/><rect x="${E+2}" y="${Hh-2.4}" width="${W-2*E-4}" height="1.4" fill="#000" opacity=".2"/>`;
   if(d.kind==='fw'&&st.fa==='stripe')s+=`<rect x="${E+2}" y="2.4" width="${W-2*E-4}" height="4" fill="${st.acc}"/>`;
   s+=infoSVG(d,st,L);
-  if(d.kind==='server'||d.kind==='ups')s+=baysSVG(d,st,L);
+  if(d.kind==='server'||d.kind==='ups'||d.kind==='pdu')s+=baysSVG(d,st,L);
   if(d.kind==='server'&&L.ports.length){const x1=Math.min(...L.ports.map(p=>p.x))-10,x2=Math.max(...L.ports.map(p=>p.x+p.w))+10,y1=L.c[0]-34,y2=L.rows===2?L.c[1]+34:L.c[0]+24;s+=`<rect x="${x1}" y="${y1}" width="${x2-x1}" height="${y2-y1}" rx="5" fill="#000" opacity=".24"/>`}
   const fy1=L.c[0]-33,fy2=L.rows===2?L.c[1]+32:L.c[0]+25;
   for(const g of L.groups){if(st.fm==='fill')s+=`<rect x="${g.x1-5}" y="${fy1}" width="${g.x2-g.x1+10}" height="${fy2-fy1}" rx="4" fill="${st.frame}"/>`;else if(st.fm==='line')s+=`<rect x="${g.x1-6}" y="${fy1}" width="${g.x2-g.x1+12}" height="${fy2-fy1}" rx="3" fill="none" stroke="${st.frame}" stroke-opacity=".6"/>`}
@@ -657,6 +674,9 @@ function analyze(){
   const res=new Map(),list=[],chans=[],pairs=new Map(),MI=new Map(),done=new Set();
   for(const d of state.devices){const L=lay(d);if(L.over)list.push({s:'warn',m:`„${d.name}“ passt mit ${total(d)} Ports nicht in ${d.size}″ – größere Bauform oder weniger Ports wählen`,dv:d.id})}
   for(const d of state.devices){if(d.kind!=='server'||!d.bays)continue;const DI=diskInfo(d);for(const x of DI.pend)list.push({s:'warn',m:`„${d.name}“, Slot ${x.i+1}: ${fmtCap(x.o)} weicht um ${fmtTB(Math.abs(x.dev))} vom Median der übrigen Platten ab – prüfen und quittieren`,dv:d.id});for(const r of d.raids||[]){const I=raidInfo(d,r,DI);for(const w of I.w)list.push({s:'warn',m:`„${d.name}“, ${r.name} (${I.L.n}): ${w}`,dv:d.id})}}
+  devW=powerCalc();
+  for(const [id,P] of PW){const d=dev(id),nm=d.kind==='ups'?'USV':'PDU';if(P.pct>100)list.push({s:'err',m:`${nm} „${d.name}“ ist überlastet: ${Math.round(P.load)} W bei ${P.cap} W`,dv:id});else if(P.pct>=80)list.push({s:'warn',m:`${nm} „${d.name}“ ist zu ${Math.round(P.pct)} % ausgelastet`,dv:id});if(d.kind==='pdu'&&P.plugs>(+d.o13||0)+(+d.o19||0))list.push({s:'warn',m:`PDU „${d.name}“: ${P.plugs} Stecker, aber nur ${(+d.o13||0)+(+d.o19||0)} Steckdosen`,dv:id})}
+  for(const d of state.devices){if(!pwrDev(d)||d.kind==='pdu'||d.psu!=='2')continue;const f=feedsOf(d);if(f.length===2&&f[0]===f[1])list.push({s:'info',m:`„${d.name}“: beide Netzteile hängen an „${dev(f[0]).name}“ – keine A/B-Redundanz`,dv:d.id});else if(f.length===1)list.push({s:'info',m:`„${d.name}“: nur ein Netzteil ist an USV/PDU angeschlossen`,dv:d.id})}
   for(const d of state.devices){const z=lcs(d);if(z&&z.s!=='ok')list.push({s:z.s==='eol'?'err':'warn',m:z.s==='eol'?`„${d.name}“ hat das Lebensende erreicht (EOL) – gekauft ${d.year}, ${z.age} Jahre alt`:`„${d.name}“ ist veraltet – gekauft ${d.year}, ${z.age} Jahre alt, EOL ab ${z.ey}`,dv:d.id})}
   for(const r of state.racks){const G=rgeom(r);if(r.minHe&&G.used>r.minHe)list.push({s:'warn',m:`Schrank „${r.name}“ ist voll: Geräte reichen bis HE ${G.used}, der Schrank hat ${r.minHe} HE`,rk:r.id})}
   for(const c of state.cables)MI.set(c.id,mediaIss(c));
@@ -741,10 +761,19 @@ function renderCanvas(){
   $('#l-rack').innerHTML=state.racks.map(r=>rackFrameSVG(r,{sel:sel&&sel.kind==='rack'&&sel.id===r.id})).join('');
   $('#l-dev').innerHTML=state.devices.map(d=>devSVG(d,{sel:d.id===sd,selPort:sp&&sp.dev===d.id?sp.port:null,hl:HL})).join('');
   $('#l-num').innerHTML=state.devices.map(d=>numSVG(d,{})).join('');
+  $('#l-pow').innerHTML=powSVG();
   drawCables();
   $('#empty').hidden=state.devices.length+state.racks.length+state.rooms.length>0;
   $('#hint').textContent=state.demo?'Beispielprojekt zum Ausprobieren – unter „Datei“ startest du ein leeres Projekt.':'Port anklicken zeigt die ganze Strecke · Port auf Port ziehen steckt ein Kabel · Geräte in Schränke ziehen';
 }
+function powSVG(){if(!SDV)return '';const d=dev(SDV);if(!d||HID.has(d.id))return '';const pairs=[];
+  for(const id of feedsOf(d))pairs.push([d,dev(id),d.pa===id?'A':'B']);
+  if(isSrc(d)){const P=PW.get(d.id);if(P)for(const x of P.list)pairs.push([x.d,d,x.ab])}
+  const box=x=>{const L=lay(x);return {x:x.x,y:x.y,w:L.W,h:L.H}};let s='';
+  for(const [a,b,t] of pairs){if(HID.has(a.id)||HID.has(b.id))continue;const A=box(a),B=box(b),ar=A.x+A.w/2<B.x+B.w/2,x1=ar?A.x+A.w:A.x,x2=ar?B.x:B.x+B.w,y1=A.y+A.h/2,y2=B.y+B.h/2,k=Math.max(60,Math.abs(x2-x1)*.4)*(ar?1:-1),same=Math.abs((A.x+A.w/2)-(B.x+B.w/2))<60;
+    const sx=same?A.x+A.w+(a.rack?RAIL:0):x1,ex=same?B.x+B.w+(b.rack?RAIL:0):x2,dd=same?`M${sx} ${y1}C${sx+90+Math.abs(y2-y1)*.25} ${y1} ${ex+90+Math.abs(y2-y1)*.25} ${y2} ${ex} ${y2}`:`M${x1} ${y1}C${x1+k} ${y1} ${x2-k} ${y2} ${x2} ${y2}`;
+    s+=`<path d="${dd}" fill="none" stroke="#111" stroke-width="7" stroke-linecap="round" opacity=".35"/><path d="${dd}" fill="none" stroke="#f43f5e" stroke-width="3.6" stroke-dasharray="10 7" stroke-linecap="round"/><g><circle cx="${same?sx:x1}" cy="${y1}" r="11" fill="#f43f5e" stroke="#111" stroke-width="1.5"/><text x="${same?sx:x1}" y="${y1+4.5}" text-anchor="middle" font-size="12" font-weight="800" fill="#fff">${t==='A+B'?'2':t}</text></g>`}
+  return s}
 function drawCables(){const r=cablesSVG({sel:sel&&sel.kind==='cable'?sel.id:null,hl:HL});$('#l-hit').innerHTML=r.hit;$('#l-cab').innerHTML=r.vis;$('#l-plug').innerHTML=r.plug;$('#l-lab').innerHTML=r.lab;hov=null}
 function chip(d){const st=STY[d.style]||STY.host,rack=KIND[d.kind].rack,bg=rack?`linear-gradient(${st.g[0]},${st.g[1]})`:'#f4f5f7',fg=rack?(st.text||'#1d2126'):'#1d2126';return `<i class="cs" style="background:${bg};color:${fg}"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${KICON[d.kind]}</svg></i>`}
 function objChip(k,bg,fg){return `<i class="cs" style="background:${bg};color:${fg}"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${KICON[k]}</svg></i>`}
@@ -812,7 +841,7 @@ const inp=(id,f,val,a='')=>`<input id="${id}" data-f="${f}" value="${esc(val)}" 
 const selx=(id,f,arr,val)=>`<select id="${id}" data-f="${f}">${opts(arr,val)}</select>`;
 const txa=(id,f,val)=>`<textarea id="${id}" data-f="${f}" rows="2" maxlength="300">${esc(val)}</textarea>`;
 const fo=(f,d)=>typeof f.o==='function'?f.o(d):f.o;
-function fieldsHTML(d,m,part,scope){
+function fieldsHTML(d,m,part,scope,rowsO){
   scope=scope||'dev';
   const A=k=>m==='a'?`data-k="${k}"`:`data-f="${scope}.${k}"`,ID=k=>(m==='a'?'a-':'f-')+k;
   const one=k=>{const f=F[k];if(!f||(f.show&&!f.show(d)))return '';const id=ID(k);
@@ -825,7 +854,7 @@ function fieldsHTML(d,m,part,scope){
       return m==='a'?`<label class="fld" for="${iid}"><span>${lab}</span><div class="stepper"><button type="button" data-step="${t}" data-d="-1" aria-label="${lab} weniger">−</button><input id="${iid}" ${at} type="number" min="0" max="${mx}" inputmode="numeric" value="${v}"><button type="button" data-step="${t}" data-d="1" aria-label="${lab} mehr">+</button></div></label>`:fld(iid,lab,`<input id="${iid}" ${at} type="number" min="0" max="${mx}" inputmode="numeric" value="${v}">`)}).join('')}</div></fieldset>`;
     return '';
   };
-  const rows=FORM[scope==='rack'||scope==='room'?scope:d.kind];let pi=rows.indexOf('pc');if(pi<0)pi=Math.ceil(rows.length/2);
+  const rows=rowsO||FORM[scope==='rack'||scope==='room'?scope:d.kind];let pi=rows.indexOf('pc');if(pi<0)pi=Math.ceil(rows.length/2);
   const use=part==='L'?rows.slice(0,pi):part==='R'?rows.slice(pi):rows;
   return use.map(r=>Array.isArray(r)?`<div class="grid2">${r.map(one).join('')}</div>`:one(r)).join('');
 }
@@ -873,6 +902,41 @@ function lcBox(d){const z=lcs(d);if(!z)return '<p class="note lcn">Trage ein Kau
   return `<div class="lcbox ${z.s}"><b>${z.s==='eol'?'EOL – Lebensende erreicht':'Veraltet'}</b><span>Kauf ${d.year} · ${z.age} Jahre alt · ${z.s==='eol'?`EOL seit ${z.ey}`:`EOL ab ${z.ey}`}</span></div>`}
 const RAIDC=['#2563eb','#16a34a','#9333ea','#db2777','#0891b2','#ea580c','#4f46e5','#0d9488'];
 const RAIDL={'0':{n:'RAID 0',min:1,cap:(n,m)=>n*m},'1':{n:'RAID 1',min:2,cap:(n,m)=>m},'5':{n:'RAID 5',min:3,cap:(n,m)=>(n-1)*m},'6':{n:'RAID 6',min:4,cap:(n,m)=>(n-2)*m},'10':{n:'RAID 10',min:4,even:1,cap:(n,m)=>Math.floor(n/2)*m},'50':{n:'RAID 50',min:6,cap:(n,m)=>(n-2)*m},'60':{n:'RAID 60',min:8,cap:(n,m)=>(n-4)*m},'z1':{n:'RAID-Z1',min:3,cap:(n,m)=>(n-1)*m},'z2':{n:'RAID-Z2',min:3,cap:(n,m)=>(n-2)*m},'z3':{n:'RAID-Z3',min:4,cap:(n,m)=>(n-3)*m},'jbod':{n:'JBOD',min:1,sum:1}};
+/* ---------- Stromversorgung ---------- */
+const AMPW={'10':2300,'16':3680,'32':7360,'3x16':11040};
+let PW=new Map();
+const isSrc=d=>d&&(d.kind==='ups'||d.kind==='pdu');
+const pwrDev=d=>['switch','fw','net','server','host','pdu'].includes(d.kind)&&!(d.kind==='host'&&d.pd);
+function upsCap(d){return Math.round(+d.va*({vfi:.9,vi:.7,vfd:.6}[d.topo]||.7))}
+const srcCap=d=>d.kind==='ups'?(+d.uw||upsCap(d)):AMPW[d.amp]||3680;
+function feedsOf(d){if(!pwrDev(d))return [];const f=[d.pa];if(d.psu==='2'&&d.kind!=='pdu')f.push(d.pb);return f.filter(id=>id&&isSrc(dev(id))&&id!==d.id)}
+function srcOpts(d){const bad=new Set([d.id]);if(d.kind==='pdu'){let ch=true;while(ch){ch=false;for(const x of state.devices)if(x.kind==='pdu'&&!bad.has(x.id)&&bad.has(x.pa)){bad.add(x.id);ch=true}}}
+  return [['','Steckdose / nicht erfasst'],...state.devices.filter(x=>isSrc(x)&&!bad.has(x.id)).map(x=>[x.id,`${x.name} (${x.kind==='ups'?'USV':'PDU'})`])]}
+function poeLoad(d){if(d.kind!=='switch')return 0;let w=0;for(const p of lay(d).ports){if(p.type!=='rj45'||!ppoe(d,p.id))continue;const c=cabOf(d.id,p.id,'f');if(!c)continue;const ch=AN.get(c.id)&&AN.get(c.id).ch;if(!ch)continue;const me=e=>e&&e.d===d.id&&e.p===p.id,far=me(ch.A)?ch.B:me(ch.B)?ch.A:null,x=far&&dev(far.d);if(x&&needsPoe(x))w+=x.kind==='ap'?{af:13,at:25,bt:45}[x.poeStd]||25:x.sub==='camera'?8:x.sub==='phone'?6:10}return w}
+function estW(d){const n=t=>d.pc[t]||0;
+  if(d.kind==='switch')return Math.round(25+.8*n('rj45')+1.5*(n('sfp')+n('sfpp')+n('sfp28'))+6*(n('qsfpp')+n('qsfp28'))+poeLoad(d));
+  if(d.kind==='fw')return Math.round(30+.8*n('rj45')+1.5*(n('sfp')+n('sfpp')+n('sfp28'))+6*n('qsfp28'));
+  if(d.kind==='net')return 15;
+  if(d.kind==='server'){const DI=d.bays?diskInfo(d):null;return (d.he>=4?700:d.he>=2?400:250)+(DI?DI.list.reduce((a,x)=>a+(x.t==='SSD'?3:8),0):0)}
+  if(d.kind==='host')return {pc:90,laptop:40,printer:50,phone:6,camera:8,nas:45,tv:70,iot:5,other:25}[d.sub]||25;
+  if(d.kind==='ap')return {af:13,at:25,bt:45}[d.poeStd]||25;
+  return 0}
+function powerCalc(){PW=new Map();const memo=new Map(),busy=new Set();
+  const W=d=>{if(d.kind==='pdu')return L(d).load;return +d.watt||estW(d)};
+  const L=src=>{if(memo.has(src.id))return memo.get(src.id);if(busy.has(src.id))return {load:0,list:[]};busy.add(src.id);let load=0;const list=[];
+    for(const x of state.devices){const f=feedsOf(x);const k=f.filter(id=>id===src.id).length;if(!k)continue;const w=W(x)*k/f.length;load+=w;list.push({d:x,w,ab:x.pa===src.id&&x.pb===src.id&&x.psu==='2'?'A+B':x.pa===src.id?'A':'B'})}
+    busy.delete(src.id);const cap=srcCap(src),r={load,list,cap,pct:cap?load/cap*100:0,plugs:list.length};if(src.kind==='ups'&&+src.bat&&load>0)r.min=Math.min(999,Math.round(+src.bat*.9/load*60));memo.set(src.id,r);return r};
+  for(const d of state.devices)if(isSrc(d))PW.set(d.id,L(d));return W}
+let devW=d=>+d.watt||estW(d);
+function powerHTML(d){if(!(pwrDev(d)||isSrc(d)))return d.kind==='ap'?'<h3>Stromversorgung</h3><p class="note">Wird per PoE vom Switch versorgt.</p>':'';
+  const rows=d.kind==='ups'?['uw','bat']:d.kind==='pdu'?['pa']:d.kind==='host'?['watt','pa']:['watt','psu',['pa','pb']];
+  let h='<h3>Stromversorgung</h3>'+fieldsHTML(d,'i',null,'dev',rows);
+  if(pwrDev(d)&&d.kind!=='pdu'){const f=feedsOf(d);h+=`<p class="note">${+d.watt?d.watt+' W':'Etwa '+estW(d)+' W (geschätzt'+(d.kind==='switch'&&poeLoad(d)?', davon '+poeLoad(d)+' W PoE':'')+')'}${f.length?' · versorgt über '+f.map(id=>esc(dev(id).name)).join(' + '):' · keine USV/PDU zugeordnet'}</p>`}
+  const P=PW.get(d.id);if(P){const col=P.pct>100?'#d0342c':P.pct>=80?'#f08c00':'#16a34a';
+    h+=`<div class="pload"><div class="pbar"><i style="width:${Math.min(100,P.pct).toFixed(1)}%;background:${col}"></i></div><b>${Math.round(P.load)} W von ${P.cap} W · ${Math.round(P.pct)} %</b><span>${d.kind==='pdu'?`${P.plugs} von ${(+d.o13||0)+(+d.o19||0)} Steckdosen belegt · ${de(String(+(P.load/230).toFixed(1)))} A`:P.min!=null?`Laufzeit ca. ${P.min} min`:'Akku (Wh) eintragen, um die Laufzeit zu schätzen'}</span></div>`;
+    if(P.list.length)h+=`<ul class="rcont">${P.list.map(x=>`<li><button type="button" class="link" data-act="seldev" data-id="${x.d.id}">${esc(x.d.name)}</button> <small>${Math.round(x.w)} W · ${x.d.kind==='pdu'?'Eingang':'Netzteil '+x.ab}</small></li>`).join('')}</ul>`;
+    else h+='<p class="note">Noch keine Geräte angeschlossen – am Gerät unter „Stromversorgung“ auswählen.</p>'}
+  return h}
 const fmtTB=v=>v>=1?de(String(+v.toFixed(v>=10?1:2)))+' TB':Math.round(v*1000)+' GB';
 const fmtCap=o=>o&&+o.c>0?`${de(String(+o.c))} ${o.u||'TB'}`:'';
 let raidEdit=null;
@@ -917,6 +981,7 @@ function inspDev(d){
   ${fld('f-notes','Notizen',`<textarea id="f-notes" data-f="dev.notes" rows="2" maxlength="500">${esc(d.notes)}</textarea>`)}
   <div class="row"><button type="button" class="btn" data-act="dup">Duplizieren</button>${hideBtn(d.id)}<button type="button" class="btn danger" data-act="deldev">Löschen</button></div>
   ${netHTML(d,L)}
+  ${powerHTML(d)}
   ${d.kind==='server'&&d.bays?diskHTML(d):''}
   ${L.ports.length?`<h3>Ports</h3><div class="scroll"><table class="ptab"><thead><tr>${pas?'<th>Nr.</th><th>Beschriftung</th><th>Vorderseite</th><th>Rückseite</th>':'<th>Nr.</th><th>Typ</th><th>Tempo</th><th>Beschriftung</th><th>Verbunden mit</th>'}</tr></thead><tbody>${rows}</tbody></table></div>`:'<p class="note">Dieses Gerät hat keine Netzwerkports.</p>'}`;
 }
@@ -1570,7 +1635,7 @@ function sanitize(o){
         x.raids.push({id:okId(r.id)&&!x.raids.some(q=>q.id===r.id)?r.id:'r'+rid(),name:S(r.name,30)||'Verbund',lvl:RAIDL[r.lvl]?r.lvl:'5',col:N(r.col,0,RAIDC.length-1,x.raids.length%RAIDC.length),disks:ds})}}
     x.rj45Speed=pick(d.rj45Speed,PT.rj45.sp,'1G');x.poe=!!d.poe;x.cat=CAT[d.cat]?d.cat:'cat6a';x.shield=d.shield!==false;x.fg=FG[d.fg]?d.fg:'os2';x.pol=pick(d.pol,['UPC','APC'],'UPC');
     x.wifi=pick(d.wifi,F.wifi.o.map(v=>v[0]),'Wi-Fi 6');x.poeStd=pick(d.poeStd,['af','at','bt'],'at');x.sub=pick(d.sub,(kind==='net'?NETS:HOSTS).map(h=>h[0]),x.sub);x.pd=!!d.pd;
-    x.wan=N(d.wan,0,4,kind==='fw'&&!fwOld?1:0);const NE=(v,a,b)=>v===''||v==null||!Number.isFinite(Number(v))?'':clamp(Math.round(Number(v)),a,b);x.year=NE(d.year,1980,2100);x.lifeOld=NE(d.lifeOld,1,50);x.lifeEol=NE(d.lifeEol,1,60);x.va=pick(String(d.va),VAS,x.va);x.topo=TOPO[d.topo]?d.topo:x.topo;
+    x.wan=N(d.wan,0,4,kind==='fw'&&!fwOld?1:0);const NE=(v,a,b)=>v===''||v==null||!Number.isFinite(Number(v))?'':clamp(Math.round(Number(v)),a,b);x.year=NE(d.year,1980,2100);x.watt=NE(d.watt,0,20000);x.psu=d.psu==='2'||d.psu===2?'2':'1';x.pa=okId(d.pa)?d.pa:'';x.pb=okId(d.pb)?d.pb:'';x.o13=N(d.o13,0,48,x.o13);x.o19=N(d.o19,0,24,x.o19);x.amp=AMPW[d.amp]?String(d.amp):'16';x.uw=NE(d.uw,100,200000);x.bat=NE(d.bat,10,500000);x.lifeOld=NE(d.lifeOld,1,50);x.lifeEol=NE(d.lifeEol,1,60);x.va=pick(String(d.va),VAS,x.va);x.topo=TOPO[d.topo]?d.topo:x.topo;
     const src=d.pc&&typeof d.pc==='object'?d.pc:{rj45:d.rj45,sfp:d.sfp,sfpp:d.sfpp};
     x.pc={};for(const t of K.types){const n=N(src[t],0,maxc(x,t),0);if(n)x.pc[t]=n}
     if(total(x)<minPorts(x))x.pc[K.types.includes('rj45')?'rj45':K.types[0]]=K.types.includes('rj45')?8:24;
@@ -1583,6 +1648,7 @@ function sanitize(o){
   {const h=ov_.hide&&typeof ov_.hide==='object'?ov_.hide:{},okK=v=>typeof v==='string'&&/^[a-z]+(:[a-z]+)?$/.test(v),all=new Set([...out.devices,...out.racks,...out.rooms].map(x=>x.id));
    const cats=new Set((Array.isArray(h.cats)?h.cats:[]).filter(okK).slice(0,100));if(ov_.hideHosts)cats.add('hosts');if(ov_.fadeRacks)cats.add('racks');if(ov_.fadeRooms)cats.add('rooms');
    out.view.hide={cats:[...cats],ids:(Array.isArray(h.ids)?h.ids:[]).filter(i=>all.has(i)).slice(0,5000)}}
+  {const ids=new Set(out.devices.filter(isSrc).map(d=>d.id));for(const d of out.devices){if(!ids.has(d.pa)||d.pa===d.id)d.pa='';if(!ids.has(d.pb)||d.pb===d.id)d.pb=''}}
   {out.vlans=[];const seen=new Set();for(const v of (Array.isArray(o.vlans)?o.vlans:[]).slice(0,400)){const id=Number(v&&v.id);if(!Number.isInteger(id)||id<1||id>4094||seen.has(id))continue;seen.add(id);out.vlans.push({id,name:S(v.name,40),color:/^#[0-9a-f]{6}$/i.test(v.color)?v.color:VLC[out.vlans.length%VLC.length],subnet:S(v.subnet,43),gw:S(v.gw,40)})}
    for(const d of out.devices)for(const pc of Object.values(d.ports))for(const id of [pc.vlan,...(pc.tv||[])])if(id&&!seen.has(id)){seen.add(id);out.vlans.push({id,name:'',color:VLC[out.vlans.length%VLC.length],subnet:'',gw:''})}
    out.vlans.sort((a,b)=>a.id-b.id)}
@@ -1754,6 +1820,9 @@ $('#tsvg').addEventListener('pointerdown',e=>{tdrag={x:e.clientX,y:e.clientY,vx:
 $('#tsvg').addEventListener('pointermove',e=>{if(!tdrag)return;const dx=e.clientX-tdrag.x,dy=e.clientY-tdrag.y;if(!tdrag.m&&Math.hypot(dx,dy)<5)return;tdrag.m=true;TV.x=tdrag.vx+dx;TV.y=tdrag.vy+dy;topoApply()});
 $('#tsvg').addEventListener('pointerup',e=>{const g=tdrag;tdrag=null;if(!g||g.m)return;const n=g.t.closest&&g.t.closest('[data-tdev]');if(n){setMode('plan');select({kind:'dev',id:n.dataset.tdev});centerOn(dev(n.dataset.tdev))}const gr=g.t.closest&&g.t.closest('[data-tgrp]');if(gr){ck('view');state.view.topoHosts='single';touched();renderTopo(true)}});
 $('#tp-svg').onclick=()=>{const R=topoSVG();if(!R){toast('Noch keine Topologie');return}const b=R.box,svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${Math.ceil(b.w)}" height="${Math.ceil(b.h)}" viewBox="${b.x} ${b.y} ${b.w} ${b.h}" font-family="Hanken Grotesk, Arial, sans-serif"><rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" fill="#f4f4f1"/><text x="${b.x+40}" y="${b.y+34}" font-size="20" font-weight="700">${esc(state.name)} – logische Topologie</text>${R.svg}</svg>`;if(DL)save(slug()+'-topologie.svg',svg);else copyText(svg,'SVG')};
+function powerRows(){const rows=[...PW].map(([id,P])=>{const d=dev(id);return {dv:id,cells:[d.name,d.kind==='ups'?'USV':'PDU',d.kind==='ups'?`${Number(d.va).toLocaleString('de-DE')} VA · ${P.cap} W`:`${d.amp==='3x16'?'3 × 16':d.amp} A · ${P.cap} W`,Math.round(P.load)+' W',Math.round(P.pct)+' %',P.min!=null?P.min+' min':'',d.kind==='pdu'?`${P.plugs}/${(+d.o13||0)+(+d.o19||0)}`:String(P.plugs),P.list.map(x=>x.d.name+(x.d.kind==='pdu'?'':' ('+x.ab+')')).join(', ')],cls:P.pct>100?'over':P.pct>=80?'high':''}});
+  const loose=state.devices.filter(d=>pwrDev(d)&&d.kind!=='pdu'&&!feedsOf(d).length),tot=state.devices.filter(d=>pwrDev(d)&&d.kind!=='pdu').reduce((a,d)=>a+devW(d),0);
+  return {heads:['Quelle','Art','Kapazität','Last','Auslastung','Laufzeit','Stecker','Versorgt'],rows,num:[3,4,5,6],sub:`Gesamtverbrauch ca. ${Math.round(tot)} W · ${pl(loose.length,'Gerät','Geräte')} ohne USV/PDU`}}
 const TTL={kabel:'Patchliste',strecken:'Strecken',geraete:'Geräte',netze:'VLANs & IP-Adressen',strom:'Stromversorgung',material:'Materialliste'};
 function devRows(){const byName=(a,b)=>String(a.name).localeCompare(String(b.name),'de',{numeric:true});
   return [...state.devices].sort((a,b)=>catOrder.indexOf(catOf(a)[0])-catOrder.indexOf(catOf(b)[0])||byName(a,b)).map(d=>{const z=lcs(d),hv=HVL.get(d.id),rm=devRoom(d);
@@ -1872,10 +1941,11 @@ function demo(){
   const D=(k,o)=>mkDev(k,o);
   const devs=[
     D('fiber',{id:'lwl1',name:'LWL-Panel Serverraum',style:'fs',pc:{lc:24},fg:'os2',pol:'UPC',rack:'rA',u:1,ports:{l1:{label:'Backbone EG'},l2:{label:'Backbone OG'}}}),
-    D('switch',{id:'core',name:'Core-SW',year:2022,model:'8G + 16 SFP28 + 2 QSFP28',style:'fs',pc:{rj45:8,sfp28:16,qsfp28:2},rack:'rA',u:2,ip:'10.0.0.1',ports:{r1:{label:'Firewall LAN',vm:'trunk',vlan:99,tv:[10,20,30]},r7:{label:'USV-NMC',vlan:99},r8:{label:'Mgmt-Netz',vlan:99},t1:{speed:'10G',label:'Backbone EG',vm:'trunk',vlan:99,tv:[10,20,30]}}}),
-    D('fw',{id:'fw1',name:'Firewall',model:'XGS · 2 WAN · 6 LAN',style:'sophos',year:2019,pc:{rj45:8,sfpp:2},wan:2,rack:'rA',u:3,ip:'10.0.0.254',ports:{r1:{label:'Glasfaser-ONT'},r2:{label:'LTE-Backup'},r3:{label:'LAN Core',vm:'trunk',vlan:99,tv:[10,20,30]}}}),
-    D('server',{id:'srv1',name:'ESX-01',year:2015,role:'Hypervisor',model:'1 HE · 2 × QSFP28',style:'hpe',he:1,pc:{mgmt:1,rj45:2,qsfp28:2},rack:'rA',u:4,ip:'10.0.10.11'}),
-    D('ups',{id:'usv1',name:'USV Serverraum',year:2018,model:'Online, 2 HE',style:'apc',he:2,va:'3000',topo:'vfi',pc:{mgmt:1},rack:'rA',u:5,ip:'10.0.0.5'}),
+    D('switch',{id:'core',name:'Core-SW',year:2022,psu:'2',pa:'pdu1',pb:'usv1',model:'8G + 16 SFP28 + 2 QSFP28',style:'fs',pc:{rj45:8,sfp28:16,qsfp28:2},rack:'rA',u:2,ip:'10.0.0.1',ports:{r1:{label:'Firewall LAN',vm:'trunk',vlan:99,tv:[10,20,30]},r7:{label:'USV-NMC',vlan:99},r8:{label:'Mgmt-Netz',vlan:99},t1:{speed:'10G',label:'Backbone EG',vm:'trunk',vlan:99,tv:[10,20,30]}}}),
+    D('fw',{id:'fw1',name:'Firewall',pa:'pdu1',model:'XGS · 2 WAN · 6 LAN',style:'sophos',year:2019,pc:{rj45:8,sfpp:2},wan:2,rack:'rA',u:3,ip:'10.0.0.254',ports:{r1:{label:'Glasfaser-ONT'},r2:{label:'LTE-Backup'},r3:{label:'LAN Core',vm:'trunk',vlan:99,tv:[10,20,30]}}}),
+    D('server',{id:'srv1',name:'ESX-01',year:2015,psu:'2',pa:'pdu1',pb:'usv1',role:'Hypervisor',model:'1 HE · 2 × QSFP28',style:'hpe',he:1,pc:{mgmt:1,rj45:2,qsfp28:2},rack:'rA',u:4,ip:'10.0.10.11'}),
+    D('pdu',{id:'pdu1',name:'PDU A',model:'Metered',style:'apc',o13:8,o19:0,amp:'16',pc:{mgmt:1},pa:'usv1',rack:'rA',u:7}),
+    D('ups',{id:'usv1',name:'USV Serverraum',year:2018,bat:864,model:'Online, 2 HE',style:'apc',he:2,va:'3000',topo:'vfi',pc:{mgmt:1},rack:'rA',u:5,ip:'10.0.0.5'}),
     D('switch',{id:'acc',name:'Access-SW EG',year:2023,model:'24 PoE+ · 2 SFP+',style:'unifi',pc:{rj45:24,sfpp:2},poe:true,rack:'rB',u:1,ip:'10.0.0.11',ports:{r1:{label:'AP Flur',vlan:20},r2:{label:'PC Empfang',vlan:10},r3:{label:'Telefon Empfang',vlan:30},r4:{label:'PC Buchhaltung',vlan:10},p1:{label:'Uplink Core',vm:'trunk',vlan:99,tv:[10,20,30]}}}),
     D('patch',{id:'pp1',name:'Patchpanel EG',style:'unifi',pc:{kj:24},cat:'cat6a',shield:true,rack:'rB',u:2,ports:{k1:{label:'AP Flur',notes:'Flur EG · Deckendose'},k2:{label:'PC Mustermann',notes:'PC Max Mustermann · Empfang, Dose 1'},k3:{label:'Tel. Mustermann',notes:'Telefon Max Mustermann · Empfang, Dose 2'},k4:{label:'PC Musterfrau',notes:'PC Erika Musterfrau · Buchhaltung, Dose 1'}}}),
     D('ap',{id:'ap1',name:'AP Flur EG',style:'unifi',wifi:'Wi-Fi 6E',rj45Speed:'2.5G',poeStd:'at',ip:'10.0.20.21',x:120,y:2020}),

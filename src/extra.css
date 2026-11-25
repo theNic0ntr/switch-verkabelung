@@ -198,3 +198,11 @@ table.etab{width:100%;border-collapse:collapse;font-size:14px;margin-bottom:22px
 .vbulk summary{cursor:pointer;font-size:14px;font-weight:600;padding:6px 0}
 .grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0 10px}
 @media(max-width:700px){table.etab thead{display:none}.etab tr{display:grid;grid-template-columns:52px 90px minmax(0,1fr);gap:4px;padding:8px 0;border-bottom:1px solid var(--line)}.etab td{border:0;padding:2px}.etab td:nth-child(n+4){grid-column:1/-1}}
+/* --- power --- */
+.pload{background:var(--plane);border-radius:10px;padding:10px 12px;margin:0 0 12px;display:grid;gap:4px}
+.pload b{font-size:15px}.pload span{font-size:13px;color:var(--mute)}
+.pbar{height:8px;border-radius:4px;background:color-mix(in srgb,var(--ink) 12%,transparent);overflow:hidden}
+.pbar i{display:block;height:100%}
+.patch tr.over td:nth-child(5){color:#d0342c;font-weight:700}
+.patch tr.high td:nth-child(5){color:#b45309;font-weight:700}
+#l-pow{pointer-events:none}
