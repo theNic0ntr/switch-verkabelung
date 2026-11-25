@@ -135,3 +135,8 @@
 #l-num text,#l-num path{pointer-events:none}
 #l-num .plab{cursor:pointer}
 #l-num .plab rect{pointer-events:all}
+/* --- server drives --- */
+.disks{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:0 10px;margin-bottom:6px}
+.disks .fld{margin-bottom:8px}
+.bay{cursor:pointer}
+.bay:hover>rect:first-child{stroke:#ffe600;stroke-opacity:1;stroke-width:2}
