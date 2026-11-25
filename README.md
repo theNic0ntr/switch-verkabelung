@@ -4,6 +4,7 @@ Netzwerk-Verkabelung im Browser planen und dokumentieren. Switches, Firewalls, P
 
 - **Geräte im Stil gängiger Hersteller:** Lancom, UniFi, HP/HPE, FS, Dell, Supermicro, APC, Eaton, CyberPower, Aruba. Bei Firewalls zusätzlich Sophos, Fortinet, Palo Alto, WatchGuard und OPNsense.
 - **Ports und Kabel:** RJ45, SFP, SFP+, SFP28, QSFP+ und QSFP28 sowie Patchpanels mit Vorder- und Rückseite. Kabel nach Cat-Standard, Glasfaser (OM1–OM5, OS2), DAC oder AOC, dazu die Transceiver.
+- **Port-Nummerierung:** Bei zweireihigen Geräten wählbar: spaltenweise (1 oben, 2 unten oder 2 oben, 1 unten) oder nebeneinander (oben bzw. unten 1, 2, 3 …). Nummern und Beschriftungsfelder liegen immer über den Kabeln.
 - **Strecke verfolgen:** Ein Klick auf einen Port oder ein Gerät markiert die ganze Strecke gelb, über Patchpanels hinweg bis zum Gegenport.
 - **Prüfungen:** Geschwindigkeit, Transceiver-Reichweite, Faser- und Steckertyp, PoE, 100-m-Grenze bei Kupfer, LAG/STP.
 - **Lebenszyklus:** Für jedes Gerät lässt sich ein Kaufjahr eintragen. Veraltete Geräte werden orange markiert (Standard: ab 5 Jahren), Geräte am Lebensende (EOL) rot (Standard: ab 10 Jahren). Die Schwellen sind fürs ganze Projekt und pro Gerät einstellbar.

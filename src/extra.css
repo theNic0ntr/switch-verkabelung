@@ -131,3 +131,7 @@
 .rcont{list-style:none;margin:0 0 14px;padding:0;display:grid;gap:8px;font-size:14px}
 .rcont ul{list-style:none;margin:4px 0 0 2px;padding:0 0 0 10px;border-left:2px solid var(--line);display:grid;gap:3px}
 .rcont small{color:var(--mute);font-size:13px}
+/* --- port numbers + label fields above cables --- */
+#l-num text,#l-num path{pointer-events:none}
+#l-num .plab{cursor:pointer}
+#l-num .plab rect{pointer-events:all}

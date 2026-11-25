@@ -104,6 +104,7 @@ const F={
  u:{l:'Position ab HE',t:'num',min:1,max:99,show:d=>!!d.rack&&d.id!=='preview'},
  he:{l:'Höhe',t:'sel',o:d=>Array.from({length:KIND[d.kind].maxHe},(_,i)=>[String(i+1),(i+1)+' HE']),show:d=>d.size!=='frei'},
  rows:{l:'Portreihen',t:'sel',o:[['auto','Automatisch'],['1','Einreihig'],['2','Zweireihig']]},
+ pnum:{l:'Nummerierung',t:'sel',o:[['col','Spaltenweise – 1 oben, 2 unten'],['colr','Spaltenweise – 2 oben, 1 unten'],['row','Nebeneinander – oben 1, 2, 3 …'],['rowr','Nebeneinander – unten 1, 2, 3 …']],show:d=>!!KIND[d.kind]&&(d.rows==='2'||(d.rows==='auto'&&autoRows(d)===2))},
  pc:{t:'pc'},
  rj45Speed:{l:'RJ45-Geschwindigkeit',t:'sel',o:PT.rj45.sp.map(s=>[s,SP[s].n]),show:d=>(d.pc.rj45||0)>0},
  poe:{l:'PoE auf allen RJ45-Ports',t:'chk',show:d=>(d.pc.rj45||0)>0},
@@ -135,12 +136,12 @@ const F={
  place:{l:'Position',t:'seg',o:[['right','Rechts neben den Plan'],['around','Um den ganzen Plan']],show:d=>d.id==='preview'}
 };
 const FORM={
- switch:['name','model','style','size','rack',['he','rows'],'u','pc',['rj45Speed'],'poe',['location','ip']],
- fw:['name','model','style','size','rack',['he','rows'],'u','pc',['rj45Speed','wan'],['location','ip']],
- net:['name','sub','model','style','size','rack',['he','rows'],'u','pc',['rj45Speed','wan'],['location','ip']],
- patch:['name','model','style','size','rack',['he','rows'],'u','pc',['cat'],'shield','location'],
- fiber:['name','model','style','size','rack',['he','rows'],'u','pc',['fg','pol'],'location'],
- server:['name','role','style','size','rack',['he','rows'],'u','pc',['rj45Speed'],['model','ip'],'location'],
+ switch:['name','model','style','size','rack',['he','rows'],'pnum','u','pc',['rj45Speed'],'poe',['location','ip']],
+ fw:['name','model','style','size','rack',['he','rows'],'pnum','u','pc',['rj45Speed','wan'],['location','ip']],
+ net:['name','sub','model','style','size','rack',['he','rows'],'pnum','u','pc',['rj45Speed','wan'],['location','ip']],
+ patch:['name','model','style','size','rack',['he','rows'],'pnum','u','pc',['cat'],'shield','location'],
+ fiber:['name','model','style','size','rack',['he','rows'],'pnum','u','pc',['fg','pol'],'location'],
+ server:['name','role','style','size','rack',['he','rows'],'pnum','u','pc',['rj45Speed'],['model','ip'],'location'],
  ups:['name','model','style','size','rack',['he','va'],'u','topo','pc',['location','ip']],
  ap:['name','model','style','pc',['rj45Speed','wifi'],['poeStd'],['location','ip']],
  host:['name','sub','pc',['rj45Speed'],'pd',['ip','mac'],'user'],
@@ -221,7 +222,7 @@ const heTxt=d=>'HE '+d.u+(d.he>1?'–'+(d.u+d.he-1):'');
 const where=d=>{const r=d.rack&&rackOf(d.rack);return r?`${r.name}, ${heTxt(d)}`:''};
 const whereAll=d=>{const rm=devRoom(d);return [where(d),rm?rm.name:''].filter(Boolean).join(' · ')};
 function mkDev(kind,o){
-  const base={id:'d'+rid(),kind,name:KIND[kind].n,model:'',style:KIND[kind].styles[0],x:40,y:40,size:KIND[kind].rack?'19':'frei',he:kind==='ups'?2:1,rows:'auto',pc:{},rj45Speed:'1G',poe:false,location:'',ip:'',notes:'',ports:{},cat:'cat6a',shield:true,fg:'os2',pol:'UPC',role:'',wifi:'Wi-Fi 6',poeStd:'at',sub:kind==='net'?'router':'pc',pd:false,user:'',mac:'',wan:kind==='fw'?1:0,year:'',lifeOld:'',lifeEol:'',va:'1500',topo:'vi',rack:null,u:1};
+  const base={id:'d'+rid(),kind,name:KIND[kind].n,model:'',style:KIND[kind].styles[0],x:40,y:40,size:KIND[kind].rack?'19':'frei',he:kind==='ups'?2:1,rows:'auto',pc:{},rj45Speed:'1G',poe:false,location:'',ip:'',notes:'',ports:{},cat:'cat6a',shield:true,fg:'os2',pol:'UPC',role:'',wifi:'Wi-Fi 6',poeStd:'at',sub:kind==='net'?'router':'pc',pd:false,user:'',mac:'',pnum:'col',wan:kind==='fw'?1:0,year:'',lifeOld:'',lifeEol:'',va:'1500',topo:'vi',rack:null,u:1};
   const pcs={switch:{rj45:24,sfpp:4},fw:{rj45:8,sfpp:2},net:{rj45:8,sfpp:2},patch:{kj:24},fiber:{lc:24},server:{mgmt:1,rj45:2,sfp28:2},ups:{mgmt:1},ap:{rj45:1},host:{rj45:1}};
   return Object.assign(base,{pc:{...pcs[kind]}},o||{});
 }
@@ -280,7 +281,7 @@ function rackAt(x,y){for(const r of [...state.racks].reverse()){const G=rgeom(r)
 
 /* ================= layout ================= */
 function lay(d){
-  const key=JSON.stringify([d.kind,d.style,d.size,d.he,d.rows,d.pc,d.wan]),h=LC.get(d.id);
+  const key=JSON.stringify([d.kind,d.style,d.size,d.he,d.rows,d.pnum,d.pc,d.wan]),h=LC.get(d.id);
   if(h&&h.key===key)return h.L;
   const L=d.kind==='ap'?layAp(d):d.kind==='host'?layHost(d):d.kind==='ups'&&d.size==='frei'?layTower(d):layRack(d);
   L.by=Object.fromEntries(L.ports.map(p=>[p.id,p]));LC.set(d.id,{key,L});return L;
@@ -297,8 +298,8 @@ function blocks(d,rows,c,st){
     const n=d.pc[t]||0;if(!n)continue;
     const [w,h,pitch]=PT[t].g;
     if(prev)x+=(PT[prev].ff&&PT[t].ff)||(isPas(prev)&&isPas(t))?14:26;prev=t;
-    const r=rows===2&&n>1?2:1,cols=Math.ceil(n/r),gc=t==='rj45'?(rows===2?st.gc2:st.gc1):(t==='kj'||t==='lc'||t==='sc')?6:99,GG=14;
-    for(let i=0;i<n;i++){const col=r===2?Math.floor(i/2):i,row=r===2?i%2:0,wan=(d.kind==='net'||d.kind==='fw')&&t==='rj45'&&i<(d.wan||0);ports.push({id:PT[t].pre+(i+1),type:t,num:t==='mgmt'||wan?0:num++,lbl:wan?'WAN'+(i+1):null,x:x+col*pitch+Math.floor(col/gc)*GG,y:c[row]-h/2,w,h,row,dir:rows===2&&row===1?1:-1,nb:row===0?c[0]-19:c[1]+26})}
+    const r=rows===2&&n>1?2:1,cols=Math.ceil(n/r),pn=d.pnum||'col',gc=t==='rj45'?(rows===2?st.gc2:st.gc1):(t==='kj'||t==='lc'||t==='sc')?6:99,GG=14;
+    for(let i=0;i<n;i++){const col=r===1?i:pn==='row'||pn==='rowr'?i%cols:Math.floor(i/2),row=r===1?0:pn==='row'?(i<cols?0:1):pn==='rowr'?(i<cols?1:0):pn==='colr'?1-i%2:i%2,wan=(d.kind==='net'||d.kind==='fw')&&t==='rj45'&&i<(d.wan||0);ports.push({id:PT[t].pre+(i+1),type:t,num:t==='mgmt'||wan?0:num++,lbl:wan?'WAN'+(i+1):null,x:x+col*pitch+Math.floor(col/gc)*GG,y:c[row]-h/2,w,h,row,dir:rows===2&&row===1?1:-1,nb:row===0?c[0]-19:c[1]+26})}
     for(let g=0;g*gc<cols;g++){const c1=g*gc,c2=Math.min(cols,(g+1)*gc)-1;groups.push({t,x1:x+c1*pitch+g*GG,x2:x+c2*pitch+g*GG+w})}
     x+=(cols-1)*pitch+w+Math.floor((cols-1)/gc)*GG;
   }
@@ -444,11 +445,22 @@ function portSVG(d,p,st,L,o){
   }
   if(cR&&(HID.has(cR.a.d)||HID.has(cR.b.d)))s+=`<circle cx="${p.x+p.w-1}" cy="${p.y+1}" r="5" fill="${ccolor(cR,AN.get(cR.id))}" stroke="#111" stroke-width="1.4"/>`;
   else if(!pas&&cF&&(HID.has(cF.a.d)||HID.has(cF.b.d)))s+=`<circle cx="${p.x+p.w-1}" cy="${p.y+1}" r="4" fill="#fff" stroke="#111" stroke-width="1.4"/>`;
-  if(pas&&cf.label&&!L.noNum){const fw=PT[t].g[2]-3,fx=cx-fw/2,two=L.two??(L.two=L.ports.some(q=>q.row===1)),ln=two?[trunc(cf.label,16)]:wrap2(cf.label,12),fh=ln.length*7.4+3,fy=p.dir<0?Math.max(1.5,p.nb-12-fh):p.nb+3;
-    s+=`<g class="plab"><rect x="${fx}" y="${fy}" width="${fw}" height="${fh}" rx="1.5" fill="#ffffff" stroke="#000" stroke-opacity=".35" stroke-width=".6"/>${ln.map((l,i)=>{const tw=l.length*3.35,sq=tw>fw-3?` textLength="${fw-3}" lengthAdjust="spacingAndGlyphs"`:'';return `<text x="${cx}" y="${fy+7.6+i*7.4}" text-anchor="middle" font-size="6.6" font-weight="600" fill="#111"${sq}>${esc(l)}</text>`}).join('')}</g>`}
-  if(!L.noNum){const nt=p.lbl||(t==='mgmt'?(STY[d.style].mg||'MGMT'):String(p.num)),ny=p.nb+(p.dir<0?-(st.nbo||0):(st.nbo||0));s+=`<text x="${cx}" y="${ny}" text-anchor="middle" font-size="${t==='mgmt'||p.lbl?9.5:10.5}" font-weight="${p.lbl?800:600}" fill="${p.lbl?'#f59e0b':st.num}">${nt}</text>`;if(poe)s+=bolt(cx-nt.length*3.1-8,ny-8.4)}
   if(off)s+=`<path d="M${p.x+3} ${p.y+p.h-3}L${p.x+p.w-3} ${p.y+3}" stroke="#d0342c" stroke-width="2.2" stroke-linecap="round"/>`;
   return s+'</g>';
+}
+/* Nummern und Beschriftungsfelder liegen in einer eigenen Ebene über den Kabeln */
+function portTop(d,p,st,L){
+  const t=p.type,pas=isPas(t),cf=d.ports[p.id]||{},poe=ppoe(d,p.id),cx=p.x+p.w/2,nh=`stroke="${(st.g||['#fff','#fff'])[1]}" stroke-width="3.2" stroke-linejoin="round" paint-order="stroke"`;let s='';
+  if(pas&&cf.label&&!L.noNum){const fw=PT[t].g[2]-3,fx=cx-fw/2,two=L.two??(L.two=L.ports.some(q=>q.row===1)),ln=two?[trunc(cf.label,16)]:wrap2(cf.label,12),fh=ln.length*7.4+3,fy=p.dir<0?Math.max(1.5,p.nb-12-fh):p.nb+3;
+    s+=`<g class="plab" data-port="${p.id}"><rect x="${fx}" y="${fy}" width="${fw}" height="${fh}" rx="1.5" fill="#ffffff" stroke="#000" stroke-opacity=".35" stroke-width=".6"/>${ln.map((l,i)=>{const tw=l.length*3.35,sq=tw>fw-3?` textLength="${fw-3}" lengthAdjust="spacingAndGlyphs"`:'';return `<text x="${cx}" y="${fy+7.6+i*7.4}" text-anchor="middle" font-size="6.6" font-weight="600" fill="#111"${sq}>${esc(l)}</text>`}).join('')}</g>`}
+  if(!L.noNum){const nt=p.lbl||(t==='mgmt'?(STY[d.style].mg||'MGMT'):String(p.num)),ny=p.nb+(p.dir<0?-(st.nbo||0):(st.nbo||0));s+=`<text x="${cx}" y="${ny}" text-anchor="middle" font-size="${t==='mgmt'||p.lbl?9.5:10.5}" font-weight="${p.lbl?800:600}" fill="${p.lbl?'#f59e0b':st.num}" ${nh}>${nt}</text>`;if(poe)s+=bolt(cx-nt.length*3.1-8,ny-8.4)}
+  return s;
+}
+function numSVG(d,o){
+  if(HID.has(d.id))return '';const L=lay(d);if(L.noNum&&!L.ports.some(p=>isPas(p.type)&&pconf(d,p.id).label))return '';
+  const st=d.kind==='ap'?STY.lancom:d.kind==='host'?STY.host:(STY[d.style]||STY[KIND[d.kind].styles[0]]);
+  const inner=L.ports.map(p=>portTop(d,p,st,L,o)).join('');
+  return inner?`<g class="dnum${FD.has(d.id)?' fade':''}" data-dev="${d.id}" transform="translate(${d.x} ${d.y})">${inner}</g>`:'';
 }
 function devSVG(d,o){
   const L=lay(d),W=L.W,Hh=L.H,st=STY[d.style]||STY[KIND[d.kind].styles[0]];
@@ -668,6 +680,7 @@ function renderCanvas(){
   $('#l-room').innerHTML=state.rooms.map(rm=>roomSVG(rm,{sel:sel&&sel.kind==='room'&&sel.id===rm.id})).join('');
   $('#l-rack').innerHTML=state.racks.map(r=>rackFrameSVG(r,{sel:sel&&sel.kind==='rack'&&sel.id===r.id})).join('');
   $('#l-dev').innerHTML=state.devices.map(d=>devSVG(d,{sel:d.id===sd,selPort:sp&&sp.dev===d.id?sp.port:null,hl:HL})).join('');
+  $('#l-num').innerHTML=state.devices.map(d=>numSVG(d,{})).join('');
   drawCables();
   $('#empty').hidden=state.devices.length+state.racks.length+state.rooms.length>0;
   $('#hint').textContent=state.demo?'Beispielprojekt zum Ausprobieren – unter „Datei“ startest du ein leeres Projekt.':'Port anklicken zeigt die ganze Strecke · Port auf Port ziehen steckt ein Kabel · Geräte in Schränke ziehen';
@@ -1126,7 +1139,7 @@ function onDrag(e){
   if(!drag.moved){if(Math.hypot(dx,dy)<5)return;drag.moved=true;startDrag()}
   if(drag.kind==='pan'){view.x=drag.vx+dx;view.y=drag.vy+dy;applyView();return}
   const w=toWorld(e);
-  if(drag.kind==='dev'){const d=dev(drag.id);d.x=sn(w.x-drag.ox);d.y=sn(w.y-drag.oy);const g=$(`#l-dev [data-dev="${d.id}"]`);g&&g.setAttribute('transform',`translate(${d.x} ${d.y})`);
+  if(drag.kind==='dev'){const d=dev(drag.id);d.x=sn(w.x-drag.ox);d.y=sn(w.y-drag.oy);document.querySelectorAll(`#l-dev [data-dev="${d.id}"], #l-num [data-dev="${d.id}"]`).forEach(g=>g.setAttribute('transform',`translate(${d.x} ${d.y})`));
     const r=KIND[d.kind].rack?rackAt(w.x,w.y):null;drag.tr=r;if(r){drag.tu=clamp(Math.round((d.y-(r.y+HEAD))/U)+1,1,200);snapShow(r,drag.tu,d)}else snapShow(null);
     drawCables();return}
   if(drag.kind==='rack'){const r=rackOf(drag.id);r.x=sn(w.x-drag.ox);r.y=sn(w.y-drag.oy);later(()=>{syncRacks();renderCanvas()});return}
@@ -1147,7 +1160,7 @@ function startDrag(){
   }
 }
 function updateWire(e,w){
-  const el=document.elementFromPoint(e.clientX,e.clientY),pe=el&&el.closest?el.closest('#l-dev [data-port]'):null;
+  const el=document.elementFromPoint(e.clientX,e.clientY),pe=el&&el.closest?el.closest('#l-dev [data-port], #l-num [data-port]'):null;
   let t=null,ok=false;
   if(pe){const d=pe.closest('[data-dev]').dataset.dev,p=pe.dataset.port,fx=drag.fixed;t={d,p};
     if(!(fx.d===d&&fx.p===p)){
@@ -1341,8 +1354,8 @@ function csv(kind){
 function buildSVG(){const keep=[HID,FD,FR,FM,HL];HID=new Set();FD=new Set();FR=new Set();FM=new Set();HL=null;try{return buildSVG_()}finally{[HID,FD,FR,FM,HL]=keep}}
 function buildSVG_(){
   const b=bbox(),pad=36,x=b.x1-pad,y=b.y1-pad-44,w=Math.ceil(b.x2-b.x1+pad*2),h=Math.ceil(b.y2-b.y1+pad*2+44),cs=cablesSVG({exp:true});
-  const rooms=state.rooms.map(rm=>roomSVG(rm,{})).join(''),racks=state.racks.map(r=>rackFrameSVG(r,{})).join(''),devs=state.devices.map(d=>devSVG(d,{})).join('');
-  return {w,h,svg:`<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="${x.toFixed(1)} ${y.toFixed(1)} ${w} ${h}" font-family="Hanken Grotesk, Arial, Helvetica, sans-serif"><defs>${defsSVG()}</defs><rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#e4e4e0"/><text x="${b.x1}" y="${b.y1-pad-10}" font-size="22" font-weight="700" fill="#111">${esc(state.name)}</text><text x="${b.x2}" y="${b.y1-pad-10}" text-anchor="end" font-size="13" fill="#5b5b56">${state.devices.length} Geräte · ${state.racks.length} Schränke · ${state.cables.length} Kabel · Stand ${new Date().toLocaleDateString('de-DE')}</text>${rooms}${racks}${devs}${cs.vis}${cs.plug}${cs.lab}</svg>`};
+  const rooms=state.rooms.map(rm=>roomSVG(rm,{})).join(''),racks=state.racks.map(r=>rackFrameSVG(r,{})).join(''),devs=state.devices.map(d=>devSVG(d,{})).join(''),nums=state.devices.map(d=>numSVG(d,{})).join('');
+  return {w,h,svg:`<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="${x.toFixed(1)} ${y.toFixed(1)} ${w} ${h}" font-family="Hanken Grotesk, Arial, Helvetica, sans-serif"><defs>${defsSVG()}</defs><rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#e4e4e0"/><text x="${b.x1}" y="${b.y1-pad-10}" font-size="22" font-weight="700" fill="#111">${esc(state.name)}</text><text x="${b.x2}" y="${b.y1-pad-10}" text-anchor="end" font-size="13" fill="#5b5b56">${state.devices.length} Geräte · ${state.racks.length} Schränke · ${state.cables.length} Kabel · Stand ${new Date().toLocaleDateString('de-DE')}</text>${rooms}${racks}${devs}${cs.vis}${cs.plug}${cs.lab}${nums}</svg>`};
 }
 async function exp(kind){
   if(kind==='csv'&&tmode==='strecken'&&mode==='list')kind='csv2';
@@ -1403,7 +1416,7 @@ function sanitize(o){
     x.name=S(d.name,40)||K.n;for(const k of ['model','role','location','ip','user','mac'])x[k]=S(d[k],F[k].max);x.notes=S(d.notes,500);
     x.style=K.styles.includes(d.style)?d.style:K.styles[0];
     x.x=N(d.x,-50000,50000,40);x.y=N(d.y,-50000,50000,40);
-    x.size=K.rack?pick(d.size,kind==='ups'?['frei','19']:['frei','10','19'],d.pc?x.size:'frei'):'frei';x.he=N(d.he,1,K.maxHe||1,x.he);x.rows=pick(d.rows,['auto','1','2'],'auto');
+    x.size=K.rack?pick(d.size,kind==='ups'?['frei','19']:['frei','10','19'],d.pc?x.size:'frei'):'frei';x.he=N(d.he,1,K.maxHe||1,x.he);x.rows=pick(d.rows,['auto','1','2'],'auto');x.pnum=pick(d.pnum,['col','colr','row','rowr'],'col');
     x.rj45Speed=pick(d.rj45Speed,PT.rj45.sp,'1G');x.poe=!!d.poe;x.cat=CAT[d.cat]?d.cat:'cat6a';x.shield=d.shield!==false;x.fg=FG[d.fg]?d.fg:'os2';x.pol=pick(d.pol,['UPC','APC'],'UPC');
     x.wifi=pick(d.wifi,F.wifi.o.map(v=>v[0]),'Wi-Fi 6');x.poeStd=pick(d.poeStd,['af','at','bt'],'at');x.sub=pick(d.sub,(kind==='net'?NETS:HOSTS).map(h=>h[0]),x.sub);x.pd=!!d.pd;
     x.wan=N(d.wan,0,4,kind==='fw'&&!fwOld?1:0);const NE=(v,a,b)=>v===''||v==null||!Number.isFinite(Number(v))?'':clamp(Math.round(Number(v)),a,b);x.year=NE(d.year,1980,2100);x.lifeOld=NE(d.lifeOld,1,50);x.lifeEol=NE(d.lifeEol,1,60);x.va=pick(String(d.va),VAS,x.va);x.topo=TOPO[d.topo]?d.topo:x.topo;
@@ -1471,7 +1484,7 @@ function openAdd(kind,target){
   const prev=()=>{const P=$('#prev');
     if(D.kind==='rack'){const G=rgeom(D);P.innerHTML=`<svg viewBox="-10 -10 ${G.W+28} ${G.H+30}" font-family="Hanken Grotesk, Arial, sans-serif" role="img" aria-label="Vorschau">${rackFrameSVG(D,{})}</svg>`;return}
     if(D.kind==='room'){const s=D.place==='around'&&contentBox()?'um den ganzen Plan':`${D.w} × ${D.h}`;P.innerHTML=`<svg viewBox="-20 -20 ${+D.w+40} ${+D.h+40}" role="img" aria-label="Vorschau">${roomSVG({...D,x:0,y:0},{})}<text x="${D.w/2}" y="${D.h/2+30}" text-anchor="middle" font-size="${Math.max(40,D.w/24)}" fill="#6b7280" font-family="Hanken Grotesk, Arial, sans-serif">${esc(s)}</text></svg>`;return}
-    if(total(D)<minPorts(D)){P.innerHTML='<p class="note">Mindestens ein Port nötig.</p>';return}const L=lay(D);P.innerHTML=`<svg viewBox="-8 -8 ${L.W+22} ${L.H+24}" font-family="Hanken Grotesk, Arial, sans-serif" role="img" aria-label="Vorschau">${devSVG(D,{})}</svg>`};
+    if(total(D)<minPorts(D)){P.innerHTML='<p class="note">Mindestens ein Port nötig.</p>';return}const L=lay(D);P.innerHTML=`<svg viewBox="-8 -8 ${L.W+22} ${L.H+24}" font-family="Hanken Grotesk, Arial, sans-serif" role="img" aria-label="Vorschau">${devSVG(D,{})}${numSVG(D,{})}</svg>`};
   const draw=()=>{
     form.querySelectorAll('[data-kind]').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.kind===addKind)));
     $('#presets').innerHTML=(PRESETS[addKind]||[]).map((p,i)=>`<button type="button" class="chip" data-pre="${i}">${esc(p[0])}</button>`).join('');
