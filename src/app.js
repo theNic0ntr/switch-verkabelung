@@ -227,7 +227,7 @@ const heTxt=d=>'HE '+d.u+(d.he>1?'–'+(d.u+d.he-1):'');
 const where=d=>{const r=d.rack&&rackOf(d.rack);return r?`${r.name}, ${heTxt(d)}`:''};
 const whereAll=d=>{const rm=devRoom(d);return [where(d),rm?rm.name:''].filter(Boolean).join(' · ')};
 function mkDev(kind,o){
-  const base={id:'d'+rid(),kind,name:KIND[kind].n,model:'',style:KIND[kind].styles[0],x:40,y:40,size:KIND[kind].rack?'19':'frei',he:kind==='ups'?2:1,rows:'auto',pc:{},rj45Speed:'1G',poe:false,location:'',ip:'',notes:'',ports:{},cat:'cat6a',shield:true,fg:'os2',pol:'UPC',role:'',wifi:'Wi-Fi 6',poeStd:'at',sub:kind==='net'?'router':'pc',pd:false,user:'',mac:'',pnum:'col',bays:8,baysUsed:8,bayForm:'2.5',bayDir:'v',bayRows:'1',disks:{},wan:kind==='fw'?1:0,year:'',lifeOld:'',lifeEol:'',va:'1500',topo:'vi',rack:null,u:1};
+  const base={id:'d'+rid(),kind,name:KIND[kind].n,model:'',style:KIND[kind].styles[0],x:40,y:40,size:KIND[kind].rack?'19':'frei',he:kind==='ups'?2:1,rows:'auto',pc:{},rj45Speed:'1G',poe:false,location:'',ip:'',notes:'',ports:{},cat:'cat6a',shield:true,fg:'os2',pol:'UPC',role:'',wifi:'Wi-Fi 6',poeStd:'at',sub:kind==='net'?'router':'pc',pd:false,user:'',mac:'',pnum:'col',bays:8,baysUsed:8,bayForm:'2.5',bayDir:'v',bayRows:'1',disks:{},raids:[],wan:kind==='fw'?1:0,year:'',lifeOld:'',lifeEol:'',va:'1500',topo:'vi',rack:null,u:1};
   const pcs={switch:{rj45:24,sfpp:4},fw:{rj45:8,sfpp:2},net:{rj45:8,sfpp:2},patch:{kj:24},fiber:{lc:24},server:{mgmt:1,rj45:2,sfp28:2},ups:{mgmt:1},ap:{rj45:1},host:{rj45:1}};
   return Object.assign(base,{pc:{...pcs[kind]}},o||{});
 }
@@ -236,7 +236,7 @@ function usedPorts(d){return lay(d).ports.filter(p=>CM.has(d.id+':'+p.id+':f')||
 function summary(d){
   if(d.kind==='host')return subLbl(d)+(d.ip?' · '+d.ip:'');
   if(d.kind==='ap')return `${d.wifi} · ${d.pc.rj45||0} × LAN`;
-  if(d.kind==='server'&&d.bays){const parts=KIND[d.kind].types.filter(t=>t!=='mgmt'&&d.pc[t]).map(t=>`${d.pc[t]} × ${PT[t].n}`);return [`${d.baysUsed}/${d.bays} × ${d.bayForm.replace('.',',')}″`,...parts].join(' · ')+(d.size!=='frei'?` · ${d.size}″ ${d.he} HE`:'')}
+  if(d.kind==='server'&&d.bays){const parts=KIND[d.kind].types.filter(t=>t!=='mgmt'&&d.pc[t]).map(t=>`${d.pc[t]} × ${PT[t].n}`);const DI=diskInfo(d);return [`${d.baysUsed}/${d.bays} × ${d.bayForm.replace('.',',')}″`+(DI.total?` · ${fmtTB(DI.total)}`:''),...parts].join(' · ')+(d.size!=='frei'?` · ${d.size}″ ${d.he} HE`:'')}
   if(d.kind==='ups')return `${Number(d.va).toLocaleString('de-DE')} VA · ${TOPO[d.topo].s}${d.size==='frei'?' · Tower':` · ${d.he} HE`}`;
   const parts=KIND[d.kind].types.filter(t=>t!=='mgmt'&&d.pc[t]).map(t=>`${d.pc[t]} × ${t==='kj'?CAT[d.cat].n:PT[t].n}`);
   return (d.kind==='net'?subLbl(d)+' · ':'')+parts.join(' · ')+(d.size!=='frei'?` · ${d.size}″ ${d.he} HE`:'');
@@ -361,7 +361,8 @@ function infoSVG(d,st,L){
   if((d.kind==='switch'||d.kind==='net')&&st.key==='unifi'){const l2=d.ip||d.model;return `<rect x="${x+12}" y="12" width="${L.info-24}" height="${Hh-24}" rx="6" fill="#121417" stroke="#000" stroke-opacity=".3"/><text x="${x+24}" y="${big?34:30}" font-size="13" font-weight="700" fill="#f4f6f8">${esc(trunc(d.name,cmp?11:17))}</text>${d.kind==='net'?`<text x="${x+24}" y="${big?51:46}" font-size="11" fill="#9aa3ad">${esc(subLbl(d))}</text>`:l2?`<text x="${x+24}" y="${big?51:46}" font-size="11" fill="${d.ip?'#8db4ff':'#9aa3ad'}">${esc(trunc(l2,smax))}</text>`:''}${sz&&big?`<text x="${x+24}" y="66" font-size="10.5" fill="#9aa3ad">${d.kind==='net'&&d.ip?esc(d.ip):sz}</text>`:''}<text x="${x+24}" y="${Hh-23}" font-size="10.5" fill="#9aa3ad">${used}/${tot} belegt</text>`}
   let s='';
   if(st.key==='hp')s+=`<rect x="${x}" y="1" width="${L.info-6}" height="${Hh-2}" fill="${st.panel}"/><rect x="${x+L.info-6}" y="1" width="1" height="${Hh-2}" fill="#000" opacity=".22"/>`;
-  s+=`<text x="${x+14}" y="${y0}" font-size="${cmp?13:15}" font-weight="700" fill="${st.text}">${esc(trunc(d.name,nmax))}</text>`;
+  const DI=d.kind==='server'&&d.bays?diskInfo(d):null,tt=DI&&DI.total?fmtTB(DI.total):'';
+  s+=`<text x="${x+14}" y="${y0}" font-size="${cmp?13:15}" font-weight="700" fill="${st.text}">${esc(trunc(d.name,tt?Math.max(5,nmax-tt.length-2):nmax))}${tt?`<tspan fill="${st.sub}" font-weight="600" font-size="${cmp?11.5:13}"> · ${tt}</tspan>`:''}${DI&&DI.pend.length?`<tspan fill="#ffe600" font-weight="800"> !</tspan>`:''}</text>`;
   lines.slice(0,big?3:2).forEach((t,i)=>{s+=`<text x="${x+14}" y="${y0+18+i*15}" font-size="11" fill="${st.sub}">${esc(trunc(t,smax))}</text>`});
   const ly=big?Hh-19:Hh-12;
   if(d.kind==='server')s+=`<circle cx="${x+22}" cy="${ly-2}" r="6.5" fill="none" stroke="${st.text}" stroke-width="1.6" opacity=".85"/><path d="M${x+22} ${ly-7}v4" stroke="${st.acc}" stroke-width="2" stroke-linecap="round"/><rect x="${x+36}" y="${ly-4}" width="9" height="5" rx="1" fill="${st.acc}"/><text x="${x+50}" y="${ly}" font-size="9.5" fill="${st.sub}">UID</text>`;
@@ -382,18 +383,21 @@ function infoSVG(d,st,L){
 function baysSVG(d,st,L){
   const x0=L.bx,Hh=L.H;let s='';
   if(d.kind==='ups'){const y1=Hh*.22,h=Hh*.56;for(let i=0;i<9;i++)s+=`<rect x="${x0+6+i*15}" y="${y1.toFixed(1)}" width="7" height="${h.toFixed(1)}" rx="3.5" fill="${st.grille}"/>`;return s}
-  const G=L.BG;if(!G)return s;const used=clamp(+d.baysUsed||0,0,G.n);
-  for(let i=0;i<G.n;i++){const row=Math.floor(i/G.cols),col=i%G.cols,x=x0+col*(G.w+G.gx),y=G.top+row*(G.h+G.gy),w=G.w,h=G.h,on=i<used,sz=on&&d.disks&&d.disks[i]||'';
+  const G=L.BG;if(!G)return s;const used=clamp(+d.baysUsed||0,0,G.n),DI=diskInfo(d),ed=raidEdit&&raidEdit.dev===d.id;
+  for(let i=0;i<G.n;i++){const row=Math.floor(i/G.cols),col=i%G.cols,x=x0+col*(G.w+G.gx),y=G.top+row*(G.h+G.gy),w=G.w,h=G.h,on=i<used,X=on?DI.list[i]:null,sz=X&&X.o.c?fmtCap(X.o)+' '+X.t:'',rg=on&&raidOf(d,i),warn=X&&X.out&&!X.ok;
     s+=`<g class="bay" data-bay="${i}">`;
     if(!on){s+=`<rect x="${x}" y="${y.toFixed(1)}" width="${w}" height="${h.toFixed(1)}" rx="2" fill="#000" fill-opacity=".38" stroke="${st.sub}" stroke-opacity=".35" stroke-dasharray="3 2.5"/>`;
       const n=G.dir==='v'?Math.max(2,Math.floor(h/14)):Math.max(1,Math.floor(h/9));for(let k=0;k<n;k++){if(G.dir==='v')s+=`<rect x="${x+w/2-4}" y="${(y+8+k*(h-16)/Math.max(1,n-1)-1).toFixed(1)}" width="8" height="2" rx="1" fill="${st.sub}" opacity=".25"/>`;else s+=`<rect x="${x+10}" y="${(y+h/2-(n-1)*4.5+k*9-1).toFixed(1)}" width="${w-20}" height="2" rx="1" fill="${st.sub}" opacity=".22"/>`}
       s+='</g>';continue}
     s+=`<rect x="${x}" y="${y.toFixed(1)}" width="${w}" height="${h.toFixed(1)}" rx="2" fill="${st.bay}" stroke="#000" stroke-opacity=".45"/>`;
     if(G.dir==='v'){s+=`<rect x="${x+5}" y="${y+5}" width="${w-10}" height="5" rx="1.5" fill="${st.sub}" opacity=".45"/><rect x="${x+w/2-3}" y="${(y+h-9).toFixed(1)}" width="6" height="3" rx="1" fill="${st.bayLed}"/>`;
-      if(sz&&h>44)s+=`<text transform="translate(${x+w/2+3.4} ${(y+h/2+2).toFixed(1)}) rotate(-90)" text-anchor="middle" font-size="9.5" font-weight="600" fill="${st.text}" opacity=".9">${esc(trunc(sz,Math.floor((h-24)/5.6)))}</text>`}
+      if(sz&&h>44)s+=`<text transform="translate(${x+w/2+3.4} ${(y+h/2+2).toFixed(1)}) rotate(-90)" text-anchor="middle" font-size="9.5" font-weight="600" fill="${st.text}" opacity=".9">${esc(trunc(sz,Math.floor((h-24)/5.4)))}</text>`}
     else{const ly=(y+h/2).toFixed(1);s+=`<circle cx="${x+w-9}" cy="${ly}" r="2.6" fill="${st.bayLed}"/>`;
-      if(sz&&h>=11)s+=`<text x="${x+7}" y="${(y+h/2+3.4).toFixed(1)}" font-size="${h>=20?10:8.5}" font-weight="600" fill="${st.text}" opacity=".9">${esc(trunc(sz,Math.floor((w-24)/5.6)))}</text>`;
+      if(sz&&h>=11)s+=`<text x="${x+7}" y="${(y+h/2+3.4).toFixed(1)}" font-size="${h>=20?10:8.5}" font-weight="600" fill="${st.text}" opacity=".9">${esc(trunc(sz,Math.floor((w-22)/5.3)))}</text>`;
       else s+=`<rect x="${x+8}" y="${(y+h/2-2.5).toFixed(1)}" width="${Math.round(w*.55)}" height="5" rx="2" fill="${st.sub}" opacity=".45"/>`}
+    if(rg)s+=`<rect x="${x+1.5}" y="${(y+1.5).toFixed(1)}" width="${w-3}" height="${(h-3).toFixed(1)}" rx="2" fill="none" stroke="${RAIDC[rg.col%RAIDC.length]}" stroke-width="3.2"/>`;
+    if(warn)s+=`<rect x="${x-1}" y="${(y-1).toFixed(1)}" width="${w+2}" height="${(h+2).toFixed(1)}" rx="3" fill="#ffe600" fill-opacity=".28" stroke="#ffe600" stroke-width="3"/>`;
+    if(ed)s+=`<g><rect x="${x+w/2-9}" y="${(y+h/2-8).toFixed(1)}" width="18" height="16" rx="4" fill="${rg?RAIDC[rg.col%RAIDC.length]:'#111'}" stroke="#fff" stroke-width="1"/><text x="${x+w/2}" y="${(y+h/2+4).toFixed(1)}" text-anchor="middle" font-size="10.5" font-weight="700" fill="#fff">${i+1}</text></g>`;
     s+='</g>'}
   return s;
 }
@@ -632,6 +636,7 @@ function analyze(){
   syncRacks();CM=cableMap();
   const res=new Map(),list=[],chans=[],pairs=new Map(),MI=new Map(),done=new Set();
   for(const d of state.devices){const L=lay(d);if(L.over)list.push({s:'warn',m:`„${d.name}“ passt mit ${total(d)} Ports nicht in ${d.size}″ – größere Bauform oder weniger Ports wählen`,dv:d.id})}
+  for(const d of state.devices){if(d.kind!=='server'||!d.bays)continue;const DI=diskInfo(d);for(const x of DI.pend)list.push({s:'warn',m:`„${d.name}“, Slot ${x.i+1}: ${fmtCap(x.o)} weicht um ${fmtTB(Math.abs(x.dev))} vom Median der übrigen Platten ab – prüfen und quittieren`,dv:d.id});for(const r of d.raids||[]){const I=raidInfo(d,r,DI);for(const w of I.w)list.push({s:'warn',m:`„${d.name}“, ${r.name} (${I.L.n}): ${w}`,dv:d.id})}}
   for(const d of state.devices){const z=lcs(d);if(z&&z.s!=='ok')list.push({s:z.s==='eol'?'err':'warn',m:z.s==='eol'?`„${d.name}“ hat das Lebensende erreicht (EOL) – gekauft ${d.year}, ${z.age} Jahre alt`:`„${d.name}“ ist veraltet – gekauft ${d.year}, ${z.age} Jahre alt, EOL ab ${z.ey}`,dv:d.id})}
   for(const r of state.racks){const G=rgeom(r);if(r.minHe&&G.used>r.minHe)list.push({s:'warn',m:`Schrank „${r.name}“ ist voll: Geräte reichen bis HE ${G.used}, der Schrank hat ${r.minHe} HE`,rk:r.id})}
   for(const c of state.cables)MI.set(c.id,mediaIss(c));
@@ -823,11 +828,41 @@ const hideBtn=id=>`<button type="button" class="btn" data-act="hide" data-id="${
 function lcBox(d){const z=lcs(d);if(!z)return '<p class="note lcn">Trage ein Kaufjahr ein, dann markiert der Plan das Gerät, sobald es veraltet ist oder sein Lebensende (EOL) erreicht.</p>';
   if(z.s==='ok')return `<div class="lcbox ok"><b>Im Lebenszyklus</b><span>Kauf ${d.year} · ${pl(Math.max(0,z.age),'Jahr','Jahre')} alt · veraltet ab ${z.oy}, EOL ab ${z.ey}</span></div>`;
   return `<div class="lcbox ${z.s}"><b>${z.s==='eol'?'EOL – Lebensende erreicht':'Veraltet'}</b><span>Kauf ${d.year} · ${z.age} Jahre alt · ${z.s==='eol'?`EOL seit ${z.ey}`:`EOL ab ${z.ey}`}</span></div>`}
-function capTB(t){const m=/^\s*(\d+(?:[.,]\d+)?)\s*(tib|tb|t|gib|gb|g)?/i.exec(t||'');if(!m)return null;let v=parseFloat(m[1].replace(',','.'));const u=(m[2]||'').toLowerCase();
-  if(u==='gb'||u==='g')v/=1000;else if(u==='gib')v*=0.001073741824;else if(u==='tib')v*=1.099511627776;else if(!u&&v>=100)v/=1000;return v}
+const RAIDC=['#2563eb','#16a34a','#9333ea','#db2777','#0891b2','#ea580c','#4f46e5','#0d9488'];
+const RAIDL={'0':{n:'RAID 0',min:1,cap:(n,m)=>n*m},'1':{n:'RAID 1',min:2,cap:(n,m)=>m},'5':{n:'RAID 5',min:3,cap:(n,m)=>(n-1)*m},'6':{n:'RAID 6',min:4,cap:(n,m)=>(n-2)*m},'10':{n:'RAID 10',min:4,even:1,cap:(n,m)=>Math.floor(n/2)*m},'50':{n:'RAID 50',min:6,cap:(n,m)=>(n-2)*m},'60':{n:'RAID 60',min:8,cap:(n,m)=>(n-4)*m},'z1':{n:'RAID-Z1',min:3,cap:(n,m)=>(n-1)*m},'z2':{n:'RAID-Z2',min:3,cap:(n,m)=>(n-2)*m},'z3':{n:'RAID-Z3',min:4,cap:(n,m)=>(n-3)*m},'jbod':{n:'JBOD',min:1,sum:1}};
 const fmtTB=v=>v>=1?de(String(+v.toFixed(v>=10?1:2)))+' TB':Math.round(v*1000)+' GB';
-function diskHTML(d){const used=clamp(+d.baysUsed||0,0,d.bays),dk=d.disks||{};let tot=0,all=used>0;for(let i=0;i<used;i++){const c=capTB(dk[i]);if(c==null)all=false;else tot+=c}
-  return `<h3>Laufwerke</h3><p class="note">${used} von ${d.bays} Slots belegt · ${d.bayForm.replace('.',',')}″${tot?` · ${all?'zusammen':'mindestens'} ${fmtTB(tot)} brutto`:''}. Die Größe ist freiwillig – ein Klick auf eine Platte im Plan springt hierher.</p>${used?`<div class="disks">${Array.from({length:used},(_,i)=>fld('f-disk-'+i,'Slot '+(i+1),`<input id="f-disk-${i}" data-f="disk.${i}" value="${esc(dk[i]||'')}" maxlength="24" placeholder="z. B. 4 TB" autocomplete="off">`)).join('')}</div>`:''}`}
+const fmtCap=o=>o&&+o.c>0?`${de(String(+o.c))} ${o.u||'TB'}`:'';
+let raidEdit=null;
+/* Platten eines Servers: Größe in TB, Ausreißer (> 5 TB vom mittleren Wert – Median – der übrigen Platten, damit ein Tippfehler nicht alle markiert), Summe ohne unquittierte Ausreißer */
+function diskInfo(d){const used=clamp(+d.baysUsed||0,0,+d.bays||0),dk=d.disks||{},def=d.bayForm==='3.5'?'HDD':'SSD',list=[];
+  for(let i=0;i<used;i++){const o=dk[i]||{},tb=+o.c>0?+o.c*(o.u==='GB'?.001:1):null;list.push({i,o,tb,t:o.t||def,ok:!!o.ok,out:false,dev:0})}
+  const known=list.filter(x=>x.tb!=null);
+  for(const x of known){const rest=known.filter(y=>y!==x).map(y=>y.tb).sort((a,b)=>a-b);if(!rest.length)continue;const m=rest.length>>1,mid=rest.length%2?rest[m]:(rest[m-1]+rest[m])/2;x.dev=x.tb-mid;x.out=Math.abs(x.dev)>5}
+  const pend=known.filter(x=>x.out&&!x.ok),total=known.filter(x=>!(x.out&&!x.ok)).reduce((a,x)=>a+x.tb,0);
+  return {used,list,known,pend,total}}
+const raidOf=(d,i)=>(d.raids||[]).find(r=>r.disks.includes(i));
+function raidInfo(d,r,DI){const L=RAIDL[r.lvl]||RAIDL['5'],mem=r.disks.filter(i=>i<DI.used).map(i=>DI.list[i]),n=mem.length,w=[];
+  if(n<L.min)w.push(`${L.n} braucht mindestens ${L.min} Platten`);if(L.even&&n%2)w.push(`${L.n} braucht eine gerade Anzahl Platten`);
+  const types=new Set(mem.map(x=>x.t));if(types.size>1)w.push('HDD und SSD gemischt');
+  const sz=mem.filter(x=>x.tb!=null&&!(x.out&&!x.ok)).map(x=>x.tb);let net=null;
+  if(n&&sz.length===n){if(L.sum)net=sz.reduce((a,b)=>a+b,0);else if(n>=L.min&&!(L.even&&n%2)){net=L.cap(n,Math.min(...sz));if(new Set(sz.map(v=>v.toFixed(3))).size>1)w.push('Unterschiedliche Größen – die kleinste Platte zählt')}}
+  if(mem.some(x=>x.out&&!x.ok))w.push('Enthält eine nicht quittierte Platte');
+  return {n,net,w,L}}
+function diskHTML(d){const DI=diskInfo(d),ed=raidEdit&&raidEdit.dev===d.id?raidEdit.id:null;
+  let h=`<div id="disksec"><h3>Laufwerke</h3><p class="note">${DI.used} von ${d.bays} Slots belegt · ${d.bayForm.replace('.',',')}″${DI.total?` · <b>${fmtTB(DI.total)}</b> brutto`:''}${DI.pend.length?` · <span class="wtag">${pl(DI.pend.length,'Platte','Platten')} prüfen</span>`:''}. Größe und Typ sind freiwillig – ein Klick auf eine Platte im Plan springt hierher.</p>`;
+  if(DI.used){h+='<div class="dlist">'+DI.list.map(x=>{const r=raidOf(d,x.i),warn=x.out&&!x.ok;
+    return `<div class="drow${warn?' warn':''}${x.out&&x.ok?' okd':''}"${r?` style="--rc:${RAIDC[r.col%RAIDC.length]}"`:''}><label for="f-disk-${x.i}" class="dn">${x.i+1}${r?`<i title="${esc(r.name)}"></i>`:''}</label><input id="f-disk-${x.i}" data-f="disk.${x.i}.c" value="${x.o.c!=null?esc(de(String(x.o.c))):''}" inputmode="decimal" placeholder="Größe" autocomplete="off" aria-label="Slot ${x.i+1} Größe"><select id="f-du-${x.i}" data-f="disk.${x.i}.u" aria-label="Slot ${x.i+1} Einheit">${opts([['TB','TB'],['GB','GB']],x.o.u||'TB')}</select><select id="f-dt-${x.i}" data-f="disk.${x.i}.t" aria-label="Slot ${x.i+1} Typ">${opts([['HDD','HDD'],['SSD','SSD']],x.t)}</select>${warn?`<p class="dw">Weicht um ${fmtTB(Math.abs(x.dev))} vom mittleren Wert (Median) der übrigen Platten ab und zählt erst nach dem Quittieren mit. <button type="button" class="btn sm" data-act="diskok" data-i="${x.i}">Stimmt so – quittieren</button></p>`:''}</div>`}).join('')+'</div>'}
+  h+=`<h3>RAID</h3>`;
+  for(const r of d.raids||[]){const I=raidInfo(d,r,DI),c=RAIDC[r.col%RAIDC.length],on=ed===r.id;
+    h+=`<div class="raid${on?' ed':''}" style="--rc:${c}"><div class="rhd"><i class="sw"></i><input id="f-rn-${r.id}" data-f="raid.${r.id}.name" value="${esc(r.name)}" maxlength="30" aria-label="Name des Verbunds"><select id="f-rl-${r.id}" data-f="raid.${r.id}.lvl" aria-label="RAID-Level">${opts(Object.entries(RAIDL).map(([k,v])=>[k,v.n]),r.lvl)}</select></div>
+      <div class="rchips" role="group" aria-label="Platten im Verbund">${DI.list.map(x=>{const o=raidOf(d,x.i),mine=o&&o.id===r.id;return `<button type="button" class="dchip${mine?' on':''}" data-act="raidtog" data-r="${r.id}" data-i="${x.i}" aria-pressed="${!!mine}"${o&&!mine?` disabled title="gehört zu ${esc(o.name)}"`:''}>${x.i+1}</button>`}).join('')||'<span class="note">Keine befüllten Slots</span>'}</div>
+      <p class="rinfo">${pl(I.n,'Platte','Platten')}${I.net!=null?` · <b>${fmtTB(I.net)} nutzbar</b>`:''}${I.w.map(t=>`<br><span class="wtag">${esc(t)}</span>`).join('')}</p>
+      <div class="row"><button type="button" class="btn${on?' pri':''}" data-act="raidedit" data-r="${r.id}">${on?'Fertig':'Im Plan auswählen'}</button><button type="button" class="btn danger" data-act="raiddel" data-r="${r.id}">Entfernen</button></div></div>`}
+  h+=`<button type="button" class="btn wide" data-act="raidadd"${DI.used?'':' disabled'}>RAID hinzufügen</button>${ed?'<p class="note">Platten im Plan anklicken oder oben die Nummern antippen, um sie dem Verbund zuzuordnen.</p>':''}</div>`;
+  return h}
+function refreshDisks(){setTimeout(()=>{const sec=$('#disksec'),d=sel&&sel.kind==='dev'&&dev(sel.id);if(!sec||!d)return;const a=document.activeElement,id=a&&a.id,pos=a&&a.tagName==='INPUT'?a.selectionStart:null;sec.outerHTML=diskHTML(d);if(id){const e=document.getElementById(id);if(e){e.focus();if(pos!=null)try{e.setSelectionRange(pos,pos)}catch(_){}}}},0)}
+function raidToggle(d,rid_,i){const r=(d.raids||[]).find(x=>x.id===rid_);if(!r||i>=(+d.baysUsed||0))return;const o=raidOf(d,i);if(o&&o.id!==r.id){toast(`Slot ${i+1} gehört schon zu „${o.name}“`);return}
+  ck('raid'+r.id);if(o)r.disks=r.disks.filter(x=>x!==i);else r.disks=[...r.disks,i].sort((a,b)=>a-b);touched();renderAll()}
 function inspDev(d){
   const L=lay(d),pas=KIND[d.kind].types.every(isPas),w=whereAll(d);
   const rows=L.ports.map(p=>{const cf=pconf(d,p.id);
@@ -940,7 +975,7 @@ function touched(){state.updated=Date.now();state.demo=false;store.dirty=true;cl
 function fixSel(){if(!sel)return;if(sel.kind==='dev'&&!dev(sel.id))sel=null;else if(sel.kind==='port'&&!(dev(sel.dev)&&pexists(dev(sel.dev),sel.port)))sel=null;else if(sel.kind==='cable'&&!state.cables.some(c=>c.id===sel.id))sel=null;else if(sel.kind==='rack'&&!rackOf(sel.id))sel=null;else if(sel.kind==='room'&&!roomOf(sel.id))sel=null}
 function undo(){if(!H.u.length)return;H.r.push(JSON.stringify(state));state=JSON.parse(H.u.pop());H.key=null;fixSel();touched();renderAll()}
 function redo(){if(!H.r.length)return;H.u.push(JSON.stringify(state));state=JSON.parse(H.r.pop());H.key=null;fixSel();touched();renderAll()}
-function select(s){sel=s;if(innerWidth<=1100)$('#rail').classList.remove('open');$('#insp').classList.toggle('min',!s&&innerWidth<=760);$('#itog').setAttribute('aria-expanded',String(!!s||innerWidth>760));renderAll()}
+function select(s){sel=s;if(raidEdit&&!(s&&s.kind==='dev'&&s.id===raidEdit.dev))raidEdit=null;if(innerWidth<=1100)$('#rail').classList.remove('open');$('#insp').classList.toggle('min',!s&&innerWidth<=760);$('#itog').setAttribute('aria-expanded',String(!!s||innerWidth>760));renderAll()}
 function nextLabel(){let m=0;for(const c of state.cables){const r=/^K-(\d+)$/.exec(c.label);if(r)m=Math.max(m,+r[1])}return 'K-'+String(m+1).padStart(3,'0')}
 function pickSide(d,pid,other){const pf=other&&(other.kind==='host'||other.kind==='ap')?'r':'f',alt=pf==='f'?'r':'f';if(!cabOf(d.id,pid,pf))return pf;if(!cabOf(d.id,pid,alt))return alt;return null}
 function applyTr(c){
@@ -1038,6 +1073,15 @@ function applyField(el,live){
   const isTxt=el.tagName==='TEXTAREA'||(el.tagName==='INPUT'&&!['checkbox','radio','number'].includes(el.type));
   if(live&&!isTxt)return;
   if(el.type==='radio'&&!el.checked)return;
+  if(f.startsWith('disk.')||f.startsWith('raid.')){const d=sel&&sel.kind==='dev'&&dev(sel.id);if(!d)return;const P=f.split('.');
+    if(P[0]==='disk'){const i=P[1],g=P[2];if(!/^\d{1,2}$/.test(i)||!['c','u','t'].includes(g))return;let v=el.value;
+      if(g==='c'){v=String(v).replace(',','.').trim();v=v===''?null:Number.isFinite(parseFloat(v))?Math.min(1e6,Math.max(0,parseFloat(v))):null}else if(g==='u'&&!['TB','GB'].includes(v))return;else if(g==='t'&&!['HDD','SSD'].includes(v))return;
+      d.disks=d.disks||{};const o=d.disks[i]||{},su=g==='c'?(/\d\s*(gi?b?)\s*$/i.test(el.value)?'GB':/\d\s*(ti?b?)\s*$/i.test(el.value)?'TB':null):null;if((o[g]??null)!==v||(su&&su!==(o.u||'TB'))){ck('disk'+i+g+d.id);const n={...o};if(v==null)delete n[g];else n[g]=v;if(su)n.u=su;if(g!=='t')delete n.ok;if(Object.keys(n).length)d.disks[i]=n;else delete d.disks[i];touched();renderAll(true)}
+      if(!live||el.tagName==='SELECT')refreshDisks();return}
+    const r=(d.raids||[]).find(x=>x.id===P[1]);if(!r)return;
+    if(P[2]==='name'){const v=String(el.value).slice(0,30);if(r.name===v)return;ck('rname'+r.id);r.name=v;touched();renderAll(true);return}
+    if(P[2]==='lvl'){if(!RAIDL[el.value]||r.lvl===el.value)return;ck();r.lvl=el.value;touched();renderAll();return}
+    return}
   const val=el.type==='checkbox'?el.checked:el.value,parts=f.split('.'),sc=parts[0],k=parts.slice(1).join('.');
   let keep=isTxt,title=null;
   if(sc==='proj'){if(state.name===val)return;ck('proj');state.name=String(val).slice(0,80);title=state.name}
@@ -1077,7 +1121,6 @@ function applyField(el,live){
     else return;
     if(rm[k]===v)return;ck('room'+k+rm.id);rm[k]=v;
   }
-  else if(sc==='disk'){const d=dev(sel.id);if(!d||!/^\d{1,2}$/.test(k))return;const v=String(val).trim().slice(0,24);d.disks=d.disks||{};if((d.disks[k]||'')===v)return;ck('disk'+k+d.id);if(v)d.disks[k]=v;else delete d.disks[k];keep=true}
   else if(sc==='port'){const d=dev(sel.dev);if(!d)return;const cur=pconf(d,sel.port)[k];
     if(k==='poe'){ck();const o=d.ports[sel.port]||(d.ports[sel.port]={});if(!!val===!!d.poe)delete o.poe;else o.poe=!!val;if(!Object.keys(o).length)delete d.ports[sel.port]}
     else{if((cur||'')===val||(k==='off'&&!!cur===val))return;ck('port'+k+sel.dev+sel.port);pset(d,sel.port,k,k==='off'?!!val:String(val).slice(0,k==='notes'?300:60))}
@@ -1138,8 +1181,9 @@ function showTip(e,did,pid){
     tip.innerHTML=`<b>${esc(pname(d,pid))} · ${PT[t].n}</b> <span class="m">${esc(d.name)}</span>${cf.label?`<br><b>${esc(cf.label)}</b>`:''}${cf.notes?`<br><span class="m">Notiz:</span> ${esc(cf.notes)}`:''}<br>${body}`}
   tip.hidden=false;const w=tip.offsetWidth,h=tip.offsetHeight;tip.style.left=Math.min(innerWidth-w-8,e.clientX+16)+'px';tip.style.top=Math.min(innerHeight-h-8,e.clientY+16)+'px';
 }
-function showBayTip(e,did,i){const tip=$('#tip'),k='bay:'+did+':'+i,d=dev(did);if(!d)return;
-  if(tipKey!==k){tipKey=k;const on=i<(+d.baysUsed||0),sz=on&&d.disks&&d.disks[i];tip.innerHTML=`<b>Slot ${i+1} · ${d.bayForm.replace('.',',')}″</b> <span class="m">${esc(d.name)}</span><br>${on?(sz?'Platte: '+esc(sz):'<span class="m">Belegt – Größe nicht angegeben</span>'):'<span class="m">Leer</span>'}${on?'<br><span class="m">Klicken, um die Größe einzutragen</span>':''}`}
+function showBayTip(e,did,i){const tip=$('#tip'),k='bay:'+did+':'+i+(raidEdit?'e':''),d=dev(did);if(!d)return;
+  if(tipKey!==k){tipKey=k;const DI=diskInfo(d),X=DI.list[i],r=X&&raidOf(d,i),ed=raidEdit&&raidEdit.dev===d.id;
+    tip.innerHTML=`<b>Slot ${i+1} · ${d.bayForm.replace('.',',')}″</b> <span class="m">${esc(d.name)}</span><br>${X?`${X.o.c?esc(fmtCap(X.o)):'<span class="m">Größe nicht angegeben</span>'} · ${X.t}${r?`<br><span class="m">Verbund:</span> ${esc(r.name)} (${RAIDL[r.lvl].n})`:''}${X.out&&!X.ok?'<br><span class="m">Weicht stark ab – bitte prüfen und quittieren</span>':''}<br><span class="m">${ed?'Klicken: zum Verbund hinzufügen oder entfernen':'Klicken, um Größe und Typ einzutragen'}</span>`:'<span class="m">Leer</span>'}`}
   tip.hidden=false;const w=tip.offsetWidth,h=tip.offsetHeight;tip.style.left=Math.min(innerWidth-w-8,e.clientX+16)+'px';tip.style.top=Math.min(innerHeight-h-8,e.clientY+16)+'px'}
 function hideTip(){$('#tip').hidden=true;tipKey=''}
 cv.addEventListener('pointerdown',e=>{
@@ -1219,6 +1263,7 @@ function endDrag(e,cancel){
   if(!g.moved){
     if(g.kind==='port')select({kind:'port',dev:g.dev,port:g.port});
     else if(g.kind==='cable')select({kind:'cable',id:g.id});
+    else if(g.kind==='dev'&&g.bay!=null&&raidEdit&&raidEdit.dev===g.id){raidToggle(dev(g.id),raidEdit.id,g.bay)}
     else if(g.kind==='dev'){select({kind:'dev',id:g.id});if(g.bay!=null){const f=$('#f-disk-'+g.bay);if(f){f.scrollIntoView({block:'center'});f.focus()}}}
     else if(g.kind==='rack'){if(g.slot){const [r,u]=g.slot.split(':');openAdd(null,{rack:r,u:+u})}else select({kind:'rack',id:g.id})}
     else if(g.kind==='room'||g.kind==='resize')select({kind:'room',id:g.id});
@@ -1264,6 +1309,11 @@ ic.addEventListener('click',e=>{
     else if(a==='delrack')delRack(rackOf(sel.id));
     else if(a==='delroom')delRoom(roomOf(sel.id));
     else if(a==='fitroom')fitRoom(roomOf(sel.id));
+    else if(a==='diskok'){const d=dev(sel.id),i=b.dataset.i;if(d&&d.disks&&d.disks[i]){ck();d.disks[i].ok=true;touched();renderAll()}}
+    else if(a==='raidadd'){const d=dev(sel.id);if(!d)return;ck();d.raids=d.raids||[];const used=new Set(d.raids.map(r=>r.col));let col=0;while(used.has(col)&&col<RAIDC.length)col++;const r={id:'r'+rid(),name:'Verbund '+(d.raids.length+1),lvl:'5',col:col%RAIDC.length,disks:[]};d.raids.push(r);raidEdit={dev:d.id,id:r.id};touched();renderAll();toast('Platten im Plan oder über die Nummern auswählen')}
+    else if(a==='raidtog'){const d=dev(sel.id);d&&raidToggle(d,b.dataset.r,+b.dataset.i)}
+    else if(a==='raidedit'){const d=dev(sel.id);raidEdit=raidEdit&&raidEdit.id===b.dataset.r?null:{dev:d.id,id:b.dataset.r};renderAll()}
+    else if(a==='raiddel'){const d=dev(sel.id);if(!d)return;ck();d.raids=(d.raids||[]).filter(r=>r.id!==b.dataset.r);if(raidEdit&&raidEdit.id===b.dataset.r)raidEdit=null;touched();renderAll()}
     else if(a==='hide'){const id=b.dataset.id,h=HIDL.has(id);setHid([id],!h);if(!h){sel=null;toast('Ausgeblendet – über „Ansicht“ oben wieder einblenden')}renderAll()}
     else if(a==='q'){setMode('plan');const r=$('#rail');if(getComputedStyle(r).position==='absolute')r.classList.add('open');$('#rq').value=b.dataset.q;renderRail();$('#rq').focus()}
     return}
@@ -1451,7 +1501,12 @@ function sanitize(o){
     x.x=N(d.x,-50000,50000,40);x.y=N(d.y,-50000,50000,40);
     x.size=K.rack?pick(d.size,kind==='ups'?['frei','19']:['frei','10','19'],d.pc?x.size:'frei'):'frei';x.he=N(d.he,1,K.maxHe||1,x.he);x.rows=pick(d.rows,['auto','1','2'],'auto');x.pnum=pick(d.pnum,['col','colr','row','rowr'],'col');
     if(kind==='server'){const big=x.size!=='frei'&&x.he>1&&d.bays==null;x.bays=N(d.bays,0,48,big?12:8);x.baysUsed=N(d.baysUsed,0,x.bays,x.bays);x.bayForm=pick(d.bayForm,['2.5','3.5'],big?'3.5':'2.5');x.bayDir=pick(d.bayDir,['v','h'],big?'h':'v');x.bayRows=pick(String(d.bayRows),['1','2','3','4'],big?'3':'1');
-      x.disks={};if(d.disks&&typeof d.disks==='object')for(const [k,v] of Object.entries(d.disks))if(/^\d{1,2}$/.test(k)&&+k<x.bays&&typeof v==='string'&&v.trim())x.disks[k]=S(v.trim(),24)}
+      x.disks={};if(d.disks&&typeof d.disks==='object')for(const [k,v] of Object.entries(d.disks)){if(!/^\d{1,2}$/.test(k)||+k>=x.bays)continue;let o=null;
+        if(typeof v==='string'){const m=/^\s*(\d+(?:[.,]\d+)?)\s*(tib|tb|t|gib|gb|g)?/i.exec(v);if(m){const n=parseFloat(m[1].replace(',','.'));o={c:n,u:/^g/i.test(m[2]||'')||(!m[2]&&n>=100)?'GB':'TB'}}}
+        else if(v&&typeof v==='object'){o={};const c=Number(v.c);if(Number.isFinite(c)&&c>0)o.c=Math.min(c,1e6);if(v.u==='GB'||v.u==='TB')o.u=v.u;if(v.t==='HDD'||v.t==='SSD')o.t=v.t;if(v.ok===true)o.ok=true}
+        if(o&&Object.keys(o).length)x.disks[k]=o}
+      x.raids=[];if(Array.isArray(d.raids))for(const r of d.raids.slice(0,24)){if(!r||typeof r!=='object')continue;const ds=[...new Set((Array.isArray(r.disks)?r.disks:[]).map(Number).filter(i=>Number.isInteger(i)&&i>=0&&i<x.bays&&!x.raids.some(q=>q.disks.includes(i))))].sort((a,b)=>a-b);
+        x.raids.push({id:okId(r.id)&&!x.raids.some(q=>q.id===r.id)?r.id:'r'+rid(),name:S(r.name,30)||'Verbund',lvl:RAIDL[r.lvl]?r.lvl:'5',col:N(r.col,0,RAIDC.length-1,x.raids.length%RAIDC.length),disks:ds})}}
     x.rj45Speed=pick(d.rj45Speed,PT.rj45.sp,'1G');x.poe=!!d.poe;x.cat=CAT[d.cat]?d.cat:'cat6a';x.shield=d.shield!==false;x.fg=FG[d.fg]?d.fg:'os2';x.pol=pick(d.pol,['UPC','APC'],'UPC');
     x.wifi=pick(d.wifi,F.wifi.o.map(v=>v[0]),'Wi-Fi 6');x.poeStd=pick(d.poeStd,['af','at','bt'],'at');x.sub=pick(d.sub,(kind==='net'?NETS:HOSTS).map(h=>h[0]),x.sub);x.pd=!!d.pd;
     x.wan=N(d.wan,0,4,kind==='fw'&&!fwOld?1:0);const NE=(v,a,b)=>v===''||v==null||!Number.isFinite(Number(v))?'':clamp(Math.round(Number(v)),a,b);x.year=NE(d.year,1980,2100);x.lifeOld=NE(d.lifeOld,1,50);x.lifeEol=NE(d.lifeEol,1,60);x.va=pick(String(d.va),VAS,x.va);x.topo=TOPO[d.topo]?d.topo:x.topo;

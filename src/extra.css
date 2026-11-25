@@ -140,3 +140,26 @@
 .disks .fld{margin-bottom:8px}
 .bay{cursor:pointer}
 .bay:hover>rect:first-child{stroke:#ffe600;stroke-opacity:1;stroke-width:2}
+/* --- disks: size, unit, type, outliers, RAID --- */
+.dlist{display:grid;gap:6px;margin:0 0 16px}
+.drow{display:grid;grid-template-columns:34px minmax(0,1fr) 64px 70px;gap:6px;align-items:center;padding:3px 4px 3px 0;border-radius:8px;border-left:4px solid var(--rc,transparent);padding-left:4px}
+.drow .dn{font-size:13px;font-weight:700;color:var(--mute);text-align:right;font-variant-numeric:tabular-nums;display:flex;align-items:center;justify-content:flex-end;gap:4px}
+.drow .dn i{width:8px;height:8px;border-radius:50%;background:var(--rc)}
+.drow input,.drow select{min-width:0;height:38px;padding:0 8px;font-size:14px}
+.drow.warn{background:#ffe600;color:#111}
+.drow.warn .dn{color:#111}
+.drow.warn input{border-color:#111}
+.drow .dw{grid-column:1/-1;margin:2px 4px 4px;font-size:13px;line-height:1.4}
+.drow .dw .btn{margin-top:6px;width:100%;background:#111;color:#fff;border-color:#111}
+.btn.sm{min-height:34px;padding:0 10px;font-size:13px}
+.wtag{display:inline-block;background:#ffe600;color:#111;font-weight:600;border-radius:4px;padding:0 5px}
+.raid{border:1px solid var(--line);border-left:5px solid var(--rc);border-radius:10px;padding:10px 10px 4px;margin:0 0 10px}
+.raid.ed{box-shadow:0 0 0 2px var(--rc)}
+.rhd{display:grid;grid-template-columns:auto minmax(0,1fr) 112px;gap:8px;align-items:center;margin-bottom:8px}
+.rhd .sw{width:14px;height:14px;border-radius:4px;background:var(--rc)}
+.rhd input,.rhd select{height:38px;min-width:0;padding:0 8px;font-size:14px}
+.rchips{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px}
+.dchip{min-width:34px;height:32px;padding:0 6px;border-radius:7px;border:1px solid var(--edge);background:var(--bg);color:var(--ink);font:700 13px/1 inherit;cursor:pointer;font-variant-numeric:tabular-nums}
+.dchip.on{background:var(--rc);border-color:var(--rc);color:#fff}
+.dchip:disabled{opacity:.3;cursor:default}
+.rinfo{font-size:13px;margin:0 0 6px;line-height:1.5}
