@@ -163,3 +163,38 @@
 .dchip.on{background:var(--rc);border-color:var(--rc);color:#fff}
 .dchip:disabled{opacity:.3;cursor:default}
 .rinfo{font-size:13px;margin:0 0 6px;line-height:1.5}
+/* --- topology view --- */
+.topo{grid-column:1/-1;display:flex;flex-direction:column;min-height:0;background:var(--bg);padding:18px max(16px,3vw) 16px}
+.topo[hidden]{display:none}
+.topo .tbar{margin-bottom:12px}
+.topo .vt button[aria-pressed=true]{background:var(--ink);color:var(--bg)}
+.tstage{position:relative;flex:1;min-height:420px;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#f4f4f1;background-image:radial-gradient(#d3d3cd 1px,transparent 1px);background-size:20px 20px}
+.tstage svg{position:absolute;inset:0;width:100%;height:100%;touch-action:none;font-family:"Hanken Grotesk",Arial,sans-serif;cursor:grab}
+.tstage .tn{cursor:pointer}
+.tstage .tn:hover>rect:first-child{stroke:#111;stroke-width:2.4}
+.tp-empty{position:absolute;inset:auto 0 50% 0;text-align:center}
+/* --- list: VLAN editor --- */
+.lsh{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:8px 0 10px}
+.lsh h3{margin:0;font-size:20px}
+table.etab{width:100%;border-collapse:collapse;font-size:14px;margin-bottom:22px}
+.etab th{text-align:left;font-size:13px;color:var(--mute);font-weight:600;padding:6px 6px;border-bottom:2px solid var(--ink);white-space:nowrap}
+.etab td{padding:6px;border-bottom:1px solid var(--line);vertical-align:middle}
+.etab input{min-height:38px;padding:6px 8px;font-size:14px}
+.etab input[type=color]{width:44px;padding:2px;min-height:38px}
+.etab .vid{width:84px}
+.etab input.bad{border-color:#d0342c}
+.etab .n{text-align:right;font-variant-numeric:tabular-nums}
+.etab small{color:var(--mute);font-size:12px;display:block}
+.ipbar{height:6px;border-radius:3px;background:var(--plane);overflow:hidden;min-width:90px;margin-bottom:3px}
+.ipbar i{display:block;height:100%}
+.ib.sm{width:34px;height:34px;color:var(--ink);border-color:var(--line);font-size:18px}
+.vchips{display:flex;flex-wrap:wrap;gap:5px;align-items:center}
+.vchip{min-height:32px;padding:0 10px;border-radius:16px;border:1.5px solid var(--vc);background:var(--bg);color:var(--ink);font:600 13px/1 inherit;cursor:pointer}
+.vchip.on{background:var(--vc);color:#fff}
+.vbox{border-left:6px solid var(--vc);background:var(--plane);border-radius:8px;padding:9px 12px;margin:0 0 14px;display:grid;gap:3px}
+.vbox b{font-size:15px}.vbox span{font-size:13px;color:var(--mute)}
+.vbox .btn{margin-top:6px;justify-self:start}
+.vbulk{margin:0 0 14px}
+.vbulk summary{cursor:pointer;font-size:14px;font-weight:600;padding:6px 0}
+.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0 10px}
+@media(max-width:700px){table.etab thead{display:none}.etab tr{display:grid;grid-template-columns:52px 90px minmax(0,1fr);gap:4px;padding:8px 0;border-bottom:1px solid var(--line)}.etab td{border:0;padding:2px}.etab td:nth-child(n+4){grid-column:1/-1}}

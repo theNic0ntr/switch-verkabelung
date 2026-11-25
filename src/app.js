@@ -175,6 +175,22 @@ const HOSTP={pc:'PCs',laptop:'Notebooks',printer:'Drucker',phone:'IP-Telefone',c
 const catOf=d=>d.kind==='host'?['host:'+d.sub,HOSTP[d.sub]||'Hosts']:[d.kind,KINDP[d.kind]];
 const catOrder=[...Object.keys(KINDP),...HOSTS.map(h=>'host:'+h[0])];
 const YEAR=new Date().getFullYear();
+/* ---------- VLANs und IP-Adressen ---------- */
+const VLC=['#2563eb','#16a34a','#9333ea','#db2777','#0891b2','#65a30d','#4f46e5','#0d9488','#c026d3','#b45309','#475569','#be123c'];
+let HVL=new Map(),SDV=null,IPI=null;
+const vlanOf=id=>state.vlans.find(v=>v.id===+id);
+const vcol=id=>{const v=vlanOf(id);return v?v.color:'#8a8f96'};
+const vshort=id=>{const v=vlanOf(id);return v&&v.name?`${v.id} · ${v.name}`:`VLAN ${id}`};
+const vlanPort=(d,pid)=>['switch','fw','net','server'].includes(d.kind)&&!isPas(ptype(pid));
+function pvlan(d,pid){if(!vlanPort(d,pid))return null;const cf=pconf(d,pid);if(cf.vm==='trunk')return {m:'trunk',nat:cf.vlan||null,tag:cf.tv||[]};return cf.vlan?{m:'access',v:cf.vlan}:null}
+const vlanTxt=pv=>!pv?'':pv.m==='access'?vshort(pv.v):`Trunk${pv.nat?' · nativ '+pv.nat:''}${pv.tag.length?' · '+pv.tag.join(', '):''}`;
+const ip2n=t=>{const m=/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(String(t||'').trim().split('/')[0]);if(!m)return null;const a=m.slice(1).map(Number);if(a.some(x=>x>255))return null;return a[0]*16777216+a[1]*65536+a[2]*256+a[3]};
+const n2ip=n=>[Math.floor(n/16777216)%256,Math.floor(n/65536)%256,Math.floor(n/256)%256,n%256].join('.');
+function cidr(t){const m=/^\s*([\d.]+)\s*\/\s*(\d{1,2})\s*$/.exec(t||'');if(!m)return null;const ip=ip2n(m[1]),b=+m[2];if(ip==null||b>32||b<8)return null;const size=2**(32-b),net=ip-ip%size,bc=net+size-1;return {net,bc,b,first:b>=31?net:net+1,last:b>=31?bc:bc-1,hosts:b>=31?size:size-2,txt:n2ip(net)+'/'+b}}
+const inNet=(n,S)=>S&&n!=null&&n>=S.net&&n<=S.bc;
+function vnet(v){return v&&cidr(v.subnet)}
+function freeIp(v){const S=vnet(v);if(!S)return null;const used=new Set(state.devices.map(d=>ip2n(d.ip)).filter(n=>n!=null));const gw=ip2n(v.gw);for(let n=S.first;n<=S.last&&n<S.first+70000;n++)if(!used.has(n)&&n!==gw)return n2ip(n);return null}
+function ipVlan(n){for(const v of state.vlans){const S=vnet(v);if(inNet(n,S))return v}return null}
 const LCC={old:{c:'#f08c00',t:'#111',n:'Veraltet',w:'veraltet'},eol:{c:'#d6312b',t:'#fff',n:'EOL',w:'EOL'}};
 function lcs(d){if(!d||!d.year)return null;const age=YEAR-d.year,o=+d.lifeOld||state.life.old,e=+d.lifeEol||state.life.eol;return {age,o,e,s:age>=e?'eol':age>=o?'old':'ok',oy:+d.year+o,ey:+d.year+e}}
 const lcPill=d=>{const z=lcs(d);return z&&z.s!=='ok'?`<i class="lc ${z.s}">${LCC[z.s].w}</i>`:''};
@@ -383,7 +399,7 @@ function infoSVG(d,st,L){
 function baysSVG(d,st,L){
   const x0=L.bx,Hh=L.H;let s='';
   if(d.kind==='ups'){const y1=Hh*.22,h=Hh*.56;for(let i=0;i<9;i++)s+=`<rect x="${x0+6+i*15}" y="${y1.toFixed(1)}" width="7" height="${h.toFixed(1)}" rx="3.5" fill="${st.grille}"/>`;return s}
-  const G=L.BG;if(!G)return s;const used=clamp(+d.baysUsed||0,0,G.n),DI=diskInfo(d),ed=raidEdit&&raidEdit.dev===d.id;
+  const G=L.BG;if(!G)return s;const used=clamp(+d.baysUsed||0,0,G.n),DI=diskInfo(d),ed=raidEdit&&raidEdit.dev===d.id,showR=ed||SDV===d.id;
   for(let i=0;i<G.n;i++){const row=Math.floor(i/G.cols),col=i%G.cols,x=x0+col*(G.w+G.gx),y=G.top+row*(G.h+G.gy),w=G.w,h=G.h,on=i<used,X=on?DI.list[i]:null,sz=X&&X.o.c?fmtCap(X.o)+' '+X.t:'',rg=on&&raidOf(d,i),warn=X&&X.out&&!X.ok;
     s+=`<g class="bay" data-bay="${i}">`;
     if(!on){s+=`<rect x="${x}" y="${y.toFixed(1)}" width="${w}" height="${h.toFixed(1)}" rx="2" fill="#000" fill-opacity=".38" stroke="${st.sub}" stroke-opacity=".35" stroke-dasharray="3 2.5"/>`;
@@ -395,7 +411,7 @@ function baysSVG(d,st,L){
     else{const ly=(y+h/2).toFixed(1);s+=`<circle cx="${x+w-9}" cy="${ly}" r="2.6" fill="${st.bayLed}"/>`;
       if(sz&&h>=11)s+=`<text x="${x+7}" y="${(y+h/2+3.4).toFixed(1)}" font-size="${h>=20?10:8.5}" font-weight="600" fill="${st.text}" opacity=".9">${esc(trunc(sz,Math.floor((w-22)/5.3)))}</text>`;
       else s+=`<rect x="${x+8}" y="${(y+h/2-2.5).toFixed(1)}" width="${Math.round(w*.55)}" height="5" rx="2" fill="${st.sub}" opacity=".45"/>`}
-    if(rg)s+=`<rect x="${x+1.5}" y="${(y+1.5).toFixed(1)}" width="${w-3}" height="${(h-3).toFixed(1)}" rx="2" fill="none" stroke="${RAIDC[rg.col%RAIDC.length]}" stroke-width="3.2"/>`;
+    if(rg&&showR)s+=`<rect x="${x+1.5}" y="${(y+1.5).toFixed(1)}" width="${w-3}" height="${(h-3).toFixed(1)}" rx="2" fill="none" stroke="${RAIDC[rg.col%RAIDC.length]}" stroke-width="3.2"/>`;
     if(warn)s+=`<rect x="${x-1}" y="${(y-1).toFixed(1)}" width="${w+2}" height="${(h+2).toFixed(1)}" rx="3" fill="#ffe600" fill-opacity=".28" stroke="#ffe600" stroke-width="3"/>`;
     if(ed)s+=`<g><rect x="${x+w/2-9}" y="${(y+h/2-8).toFixed(1)}" width="18" height="16" rx="4" fill="${rg?RAIDC[rg.col%RAIDC.length]:'#111'}" stroke="#fff" stroke-width="1"/><text x="${x+w/2}" y="${(y+h/2+4).toFixed(1)}" text-anchor="middle" font-size="10.5" font-weight="700" fill="#fff">${i+1}</text></g>`;
     s+='</g>'}
@@ -435,8 +451,10 @@ function apSVG(d,L){
 }
 function hostSVG(d,L){
   const W=L.W,Hh=L.H,hn=subLbl(d);
-  let s=`<rect x="0" y="0" width="${W}" height="${Hh}" rx="10" fill="#fbfbf9" stroke="#a3a8ae"/><rect x="6" y="5" width="${L.pw+16}" height="38" rx="7" fill="#e3e6ea"/><text x="${W-12}" y="27" text-anchor="end" font-size="11" font-weight="600" fill="#5b626b">${esc(hn)}</text>`;
-  if(d.pd)s+=bolt(W-12-hn.length*6.3-11,18.5);
+  const hv=HVL.get(d.id),vc=hv?vcol(hv):null;
+  let s=`<rect x="0" y="0" width="${W}" height="${Hh}" rx="10" fill="#fbfbf9" stroke="${vc||'#a3a8ae'}" stroke-width="${vc?2.6:1}"/>${vc?`<path d="M10 0H0V${Hh}h10z" fill="none"/><rect x="0" y="0" width="9" height="${Hh}" rx="4" fill="${vc}"/>`:''}<rect x="${vc?12:6}" y="5" width="${vc?L.pw+14:L.pw+16}" height="38" rx="7" fill="#e3e6ea"/>`;
+  if(vc){const vt=trunc(vshort(hv),18),vw=vt.length*6+14;s+=`<rect x="${W-12-vw}" y="7" width="${vw}" height="16" rx="8" fill="${vc}"/><text x="${W-12-vw/2}" y="18.6" text-anchor="middle" font-size="10" font-weight="700" fill="#fff">${esc(vt)}</text><text x="${W-12}" y="38" text-anchor="end" font-size="10.5" font-weight="600" fill="#5b626b">${esc(hn)}</text>`;if(d.pd)s+=bolt(W-12-hn.length*5.9-11,29.5)}
+  else{s+=`<text x="${W-12}" y="27" text-anchor="end" font-size="11" font-weight="600" fill="#5b626b">${esc(hn)}</text>`;if(d.pd)s+=bolt(W-12-hn.length*6.3-11,18.5)}
   s+=iconSVG(d.sub,14,58);
   s+=`<text x="72" y="76" font-size="14" font-weight="700" fill="#16191d">${esc(trunc(d.name,Math.floor((W-84)/8)))}</text>`;
   if(d.ip)s+=`<text x="72" y="93" font-size="12" fill="#3d4249">${esc(trunc(d.ip,24))}</text>`;
@@ -467,6 +485,8 @@ function portSVG(d,p,st,L,o){
     else if(t==='sc')s+=`<rect x="${p.x+6.5}" y="${p.y+7}" width="9" height="10" rx="1" fill="#111"/>`;
     else s+=`<rect x="${p.x+5}" y="${p.y+p.h/2-2.5}" width="${p.w-10}" height="5" rx="1" fill="#111"/>`;
   }
+  if(SDV===d.id){const pv=pvlan(d,p.id);if(pv){if(pv.m==='access')s+=`<rect class="vmk" x="${p.x-2.5}" y="${p.y-2.5}" width="${p.w+5}" height="${p.h+5}" rx="3.5" fill="none" stroke="${vcol(pv.v)}" stroke-width="3.4"/>`;
+    else{const T=[...(pv.nat?[pv.nat]:[]),...pv.tag.filter(v=>v!==pv.nat)],sw=(p.w+5)/Math.max(1,T.length),by=p.dir<0?p.y+p.h+3:p.y-7;s+=`<rect class="vmk" x="${p.x-2.5}" y="${p.y-2.5}" width="${p.w+5}" height="${p.h+5}" rx="3.5" fill="none" stroke="#111" stroke-width="1.6" stroke-dasharray="3 2"/>`+T.map((v,i)=>`<rect x="${(p.x-2.5+i*sw).toFixed(1)}" y="${by}" width="${sw.toFixed(1)}" height="4" fill="${vcol(v)}"/>`).join('')}}}
   if(cR&&(HID.has(cR.a.d)||HID.has(cR.b.d)))s+=`<circle cx="${p.x+p.w-1}" cy="${p.y+1}" r="5" fill="${ccolor(cR,AN.get(cR.id))}" stroke="#111" stroke-width="1.4"/>`;
   else if(!pas&&cF&&(HID.has(cF.a.d)||HID.has(cF.b.d)))s+=`<circle cx="${p.x+p.w-1}" cy="${p.y+1}" r="4" fill="#fff" stroke="#111" stroke-width="1.4"/>`;
   if(off)s+=`<path d="M${p.x+3} ${p.y+p.h-3}L${p.x+p.w-3} ${p.y+3}" stroke="#d0342c" stroke-width="2.2" stroke-linecap="round"/>`;
@@ -656,6 +676,11 @@ function analyze(){
       if(X.eff!==Y.eff){if(X.opt&&Y.opt)add('err',`Kein Link: ${SP[X.eff].n} ↔ ${SP[Y.eff].n} – beide Seiten gleich einstellen`,1);else add('warn',`Unterschiedliche Geschwindigkeit (${SP[X.eff].n} ↔ ${SP[Y.eff].n}) – Link läuft höchstens mit ${SP[ch.speed].n}`)}
       if(X.tr&&Y.tr&&X.opt&&Y.opt&&X.tr.n!==Y.tr.n)add('err',`Transceiver passen nicht zusammen: ${X.tr.n} ↔ ${Y.tr.n}`,1);
       for(const [P,Q] of [[X,Y],[Y,X]])if(needsPoe(P.d)&&P.t==='rj45'&&!ppoe(Q.d,Q.e.p))add('warn',`${P.d.name} braucht PoE${P.d.kind==='ap'?' (802.3'+P.d.poeStd+')':''} – ${pfull(Q.e)} liefert keins. PoE-Port oder Injektor nötig`);
+      {const A=pvlan(X.d,X.e.p),B=pvlan(Y.d,Y.e.p);
+        if(A&&B){const has=(T,v)=>T.m==='access'?T.v===v:(T.nat===v||T.tag.includes(v));
+          if(A.m==='access'&&B.m==='access'&&A.v!==B.v)add('warn',`VLAN passt nicht: ${vshort(A.v)} ↔ ${vshort(B.v)}`);
+          else if(A.m!==B.m){const [Ac,Tr]=A.m==='access'?[A,B]:[B,A];if(!has(Tr,Ac.v))add('warn',`${vshort(Ac.v)} fehlt auf dem Trunk der Gegenseite`);else if(Tr.nat!==Ac.v)add('info',`Access-Port (${vshort(Ac.v)}) an Trunk: Pakete kommen getaggt an – Native VLAN prüfen`)}
+          else if(A.m==='trunk'&&B.m==='trunk'){if((A.nat||0)!==(B.nat||0))add('warn',`Native VLAN unterschiedlich: ${A.nat||'keins'} ↔ ${B.nat||'keins'}`);const only=[...A.tag.filter(v=>!B.tag.includes(v)),...B.tag.filter(v=>!A.tag.includes(v))];if(only.length)add('info',`Nur auf einer Seite getaggt: VLAN ${[...new Set(only)].sort((a,b)=>a-b).join(', ')}`)}}}
       if(X.d.id!==Y.d.id&&X.t!=='mgmt'&&Y.t!=='mgmt'){const k=[X.d.id,Y.d.id].sort().join('|');pairs.set(k,(pairs.get(k)||[]).concat([ch]))}
     }
     const cu=steps.filter(s=>s.c.med==='cu');
@@ -684,7 +709,17 @@ function analyze(){
   for(const c of state.cables)for(const [s,m] of res.get(c.id).iss)list.push({s,m,c:c.id});
   const uniq=[],keys=new Set();
   for(const i of list.sort((a,b)=>SEV[a.s].r-SEV[b.s].r)){const k=i.s+i.m;if(!keys.has(k)){keys.add(k);uniq.push(i)}}
-  AN=res;ISS=uniq;CH=chans;
+  AN=res;CH=chans;
+  HVL=new Map();for(const d of state.devices){if(d.kind!=='host'&&d.kind!=='ap')continue;for(const p of lay(d).ports){const c=cabOf(d.id,p.id,'f');if(!c)continue;const ch=res.get(c.id).ch,me=e=>e&&e.d===d.id&&e.p===p.id,far=me(ch.A)?ch.B:me(ch.B)?ch.A:null;const pv=far&&pvlan(dev(far.d),far.p);const v=pv?(pv.m==='access'?pv.v:pv.nat):null;if(v){HVL.set(d.id,v);break}}}
+  const ips=new Map(),more=[];IPI=new Map();
+  for(const d of state.devices){if(!d.ip)continue;const n=ip2n(d.ip);if(n==null){more.push({s:'warn',m:`„${d.name}“: „${d.ip}“ ist keine gültige IPv4-Adresse`,dv:d.id});IPI.set(d.id,{bad:1});continue}
+    if(!ips.has(n))ips.set(n,[]);ips.get(n).push(d);const hv=HVL.get(d.id),V=hv?vlanOf(hv):ipVlan(n),S=vnet(V),inf={n,v:V?V.id:null};
+    if(hv&&S&&!inNet(n,S)){inf.wrong=1;more.push({s:'warn',m:`„${d.name}“ hängt in ${vshort(hv)}, die IP ${d.ip} liegt aber nicht in ${S.txt}`,dv:d.id})}
+    else if(S&&(n===S.net||n===S.bc)&&S.b<31){inf.wrong=1;more.push({s:'warn',m:`„${d.name}“: ${d.ip} ist die ${n===S.net?'Netz':'Broadcast'}-Adresse von ${S.txt}`,dv:d.id})}
+    IPI.set(d.id,inf)}
+  for(const [n,ds] of ips)if(ds.length>1){for(const d of ds)IPI.get(d.id).dup=1;more.push({s:'err',m:`IP ${n2ip(n)} ist doppelt vergeben: ${ds.map(d=>d.name).join(', ')}`,dv:ds[0].id})}
+  for(const i of more)if(!uniq.some(j=>j.m===i.m))uniq.push(i);uniq.sort((a,b)=>SEV[a.s].r-SEV[b.s].r);
+  ISS=uniq;
 }
 /* the whole end-to-end path of the selected port or cable */
 function hlSet(){
@@ -698,9 +733,9 @@ function hlSet(){
 }
 
 /* ================= render ================= */
-function renderAll(keepInsp){analyze();renderCanvas();renderRail();if(!keepInsp)renderInsp();renderTop();if(mode==='list')renderTable()}
+function renderAll(keepInsp){analyze();renderCanvas();renderRail();if(!keepInsp)renderInsp();renderTop();if(mode==='list')renderTable();else if(mode==='topo')renderTopo()}
 function renderCanvas(){
-  HL=hlSet();computeVis();
+  HL=hlSet();computeVis();SDV=sel&&(sel.kind==='dev'?sel.id:sel.kind==='port'?sel.dev:null);
   const sd=sel&&sel.kind==='dev'?sel.id:null,sp=sel&&sel.kind==='port'?sel:null;
   $('#l-room').innerHTML=state.rooms.map(rm=>roomSVG(rm,{sel:sel&&sel.kind==='room'&&sel.id===rm.id})).join('');
   $('#l-rack').innerHTML=state.racks.map(r=>rackFrameSVG(r,{sel:sel&&sel.kind==='rack'&&sel.id===r.id})).join('');
@@ -824,6 +859,14 @@ function peerText(d,p){
   if(far&&ch.steps.length>1){const via=ch.steps.slice(0,-1).map(s=>dev(s.to.d).name).filter((v,i,a)=>a.indexOf(v)===i);return `${esc(trunc(dev(far.d).name,18))} · ${esc(pname(dev(far.d),far.p))}<small>über ${esc(via.join(', '))}</small>`}
   const o=(c.a.d===d.id&&c.a.p===p.id)?c.b:c.a;return `${esc(trunc(dev(o.d).name,18))} · ${esc(pname(dev(o.d),o.p))}`;
 }
+function netHTML(d,L){let h='';const hv=HVL.get(d.id),inf=IPI&&IPI.get(d.id);
+  const sub=state.vlans.filter(v=>vnet(v));
+  if(hv){const V=vlanOf(hv),S=vnet(V);h+=`<div class="vbox" style="--vc:${vcol(hv)}"><b>${esc(vshort(hv))}</b><span>${S?S.txt+(V.gw?' · Gateway '+esc(V.gw):''):'Über den Switch-Port zugeordnet'}</span>${S&&(!d.ip||inf&&inf.wrong)?`<button type="button" class="btn sm" data-act="freeip" data-v="${hv}">Nächste freie IP${freeIp(V)?' ('+freeIp(V)+')':''}</button>`:''}</div>`}
+  else if(sub.length&&!d.ip)h+=`<p class="note">Freie IP vergeben aus: ${sub.map(v=>`<button type="button" class="link" data-act="freeip" data-v="${v.id}">${esc(vshort(v.id))}</button>`).join(' · ')}</p>`;
+  if(inf&&(inf.dup||inf.wrong||inf.bad))h+=`<p class="note"><span class="wtag">${inf.dup?'IP doppelt vergeben':inf.bad?'Keine gültige IP':'IP passt nicht zum Subnetz'}</span></p>`;
+  const vp=L.ports.filter(p=>vlanPort(d,p.id)&&p.num);
+  if(vp.length>1&&state.vlans.length){const nums=vp.map(p=>p.num);h+=`<details class="vbulk"><summary>VLAN für mehrere Ports setzen</summary><div class="grid3">${fld('f-vb1','Von Port',`<input id="f-vb1" type="number" min="${Math.min(...nums)}" max="${Math.max(...nums)}" value="${Math.min(...nums)}">`)}${fld('f-vb2','Bis Port',`<input id="f-vb2" type="number" min="${Math.min(...nums)}" max="${Math.max(...nums)}" value="${Math.max(...nums)}">`)}${fld('f-vb3','VLAN',`<select id="f-vb3">${opts([['','– entfernen –'],...state.vlans.map(v=>[String(v.id),vshort(v.id)]),['trunk','Trunk (alle VLANs)']],String(state.vlans[0].id))}</select>`)}</div><button type="button" class="btn wide" data-act="vbulk">Übernehmen</button></details>`}
+  return h}
 const hideBtn=id=>`<button type="button" class="btn" data-act="hide" data-id="${id}">${HIDL.has(id)?'Einblenden':'Ausblenden'}</button>`;
 function lcBox(d){const z=lcs(d);if(!z)return '<p class="note lcn">Trage ein Kaufjahr ein, dann markiert der Plan das Gerät, sobald es veraltet ist oder sein Lebensende (EOL) erreicht.</p>';
   if(z.s==='ok')return `<div class="lcbox ok"><b>Im Lebenszyklus</b><span>Kauf ${d.year} · ${pl(Math.max(0,z.age),'Jahr','Jahre')} alt · veraltet ab ${z.oy}, EOL ab ${z.ey}</span></div>`;
@@ -873,6 +916,7 @@ function inspDev(d){
   ${fieldsHTML(d,'i')}
   ${fld('f-notes','Notizen',`<textarea id="f-notes" data-f="dev.notes" rows="2" maxlength="500">${esc(d.notes)}</textarea>`)}
   <div class="row"><button type="button" class="btn" data-act="dup">Duplizieren</button>${hideBtn(d.id)}<button type="button" class="btn danger" data-act="deldev">Löschen</button></div>
+  ${netHTML(d,L)}
   ${d.kind==='server'&&d.bays?diskHTML(d):''}
   ${L.ports.length?`<h3>Ports</h3><div class="scroll"><table class="ptab"><thead><tr>${pas?'<th>Nr.</th><th>Beschriftung</th><th>Vorderseite</th><th>Rückseite</th>':'<th>Nr.</th><th>Typ</th><th>Tempo</th><th>Beschriftung</th><th>Verbunden mit</th>'}</tr></thead><tbody>${rows}</tbody></table></div>`:'<p class="note">Dieses Gerät hat keine Netzwerkports.</p>'}`;
 }
@@ -924,13 +968,19 @@ function farSummary(d,pid){
   const ch=AN.get(c.id).ch,me=e=>e&&e.d===d.id&&e.p===pid,far=me(ch.A)?ch.B:me(ch.B)?ch.A:null;if(!far)return '';
   const fd=dev(far.d);return `<div class="far"><span>Gegenstelle</span><b>${esc(fd.name)} · ${esc(pname(fd,far.p))}</b>${where(fd)?`<small>${esc(where(fd))}</small>`:''}<button type="button" class="btn" data-act="goport" data-d="${far.d}" data-p="${far.p}">Hinspringen</button></div>`;
 }
+function vlanUI(d,pid,cf){const tr=cf.vm==='trunk',vo=[['','– kein VLAN –'],...state.vlans.map(v=>[String(v.id),vshort(v.id)])];
+  let h=`<fieldset class="seg" style="grid-template-columns:repeat(2,minmax(0,1fr))"><legend>VLAN-Modus</legend><label><input type="radio" name="pvm" data-f="port.vm" value="access"${tr?'':' checked'}><span>Access (untagged)</span></label><label><input type="radio" name="pvm" data-f="port.vm" value="trunk"${tr?' checked':''}><span>Trunk (tagged)</span></label></fieldset>`;
+  h+=fld('f-pvl',tr?'Native VLAN (untagged)':'VLAN',`<select id="f-pvl" data-f="port.vlan">${opts(vo,cf.vlan?String(cf.vlan):'')}</select>`);
+  if(tr)h+=`<div class="fld"><span>Getaggte VLANs</span><div class="vchips">${state.vlans.map(v=>{const on=(cf.tv||[]).includes(v.id);return `<button type="button" class="vchip${on?' on':''}" style="--vc:${v.color}" data-act="vtag" data-v="${v.id}" aria-pressed="${on}">${esc(vshort(v.id))}</button>`}).join('')||'<span class="note">Noch keine VLANs angelegt.</span>'}${state.vlans.length?'<button type="button" class="link" data-act="vtagall">alle</button>':''}</div></div>`;
+  return h+`<p class="note"><button type="button" class="link" data-act="vlanlist">VLANs verwalten</button></p>`}
 function inspPort(d,pid){
   const t=ptype(pid),cf=pconf(d,pid),pas=isPas(t),nm=pname(d,pid);
   let h=`<div class="ih"><span class="kind">${esc(nm)} · ${PT[t].n}</span><h2 id="ih-t">${esc(cf.label||nm)}</h2><p class="sub"><button type="button" class="link" data-act="seldev" data-id="${d.id}">${esc(d.name)}</button>${whereAll(d)?' · '+esc(whereAll(d)):''}</p></div>`;
   h+=farSummary(d,pid);
   h+=fld('f-plabel','Beschriftung',inp('f-plabel','port.label',cf.label||'',`maxlength="60" placeholder="${pas?'z. B. Raum 1.12 · Dose 3':'z. B. Uplink Core'}"`));
   if(!pas){
-    h+=`<div class="grid2">${fld('f-pspeed','Geschwindigkeit',selx('f-pspeed','port.speed',PT[t].sp.map(s=>[s,SP[s].n]),pspeed(d,pid)))}${fld('f-pvlan','VLAN',inp('f-pvlan','port.vlan',cf.vlan||'','maxlength="40" placeholder="10 oder 1,20,30"'))}</div>`;
+    h+=fld('f-pspeed','Geschwindigkeit',selx('f-pspeed','port.speed',PT[t].sp.map(s=>[s,SP[s].n]),pspeed(d,pid)));
+    if(vlanPort(d,pid))h+=vlanUI(d,pid,cf);
     if(d.kind==='switch'&&t==='rj45')h+=`<label class="chk"><input type="checkbox" id="f-ppoe" data-f="port.poe"${ppoe(d,pid)?' checked':''}> PoE aktiv</label>`;
     h+=`<label class="chk"><input type="checkbox" id="f-poff" data-f="port.off"${cf.off?' checked':''}> Port deaktiviert</label>`;
   }
@@ -1121,6 +1171,10 @@ function applyField(el,live){
     else return;
     if(rm[k]===v)return;ck('room'+k+rm.id);rm[k]=v;
   }
+  else if(sc==='port'&&(k==='vm'||k==='vlan')){const d=dev(sel.dev);if(!d)return;const o=d.ports[sel.port]||{};
+    if(k==='vm'){const tr=val==='trunk';if((o.vm==='trunk')===tr)return;ck();pset(d,sel.port,'vm',tr?'trunk':'');if(!tr)pset(d,sel.port,'tv','');else if(!o.tv)pset(d,sel.port,'tv',[])}
+    else{const v=val===''?null:+val;if((o.vlan||null)===v)return;ck();pset(d,sel.port,'vlan',v)}
+    keep=false}
   else if(sc==='port'){const d=dev(sel.dev);if(!d)return;const cur=pconf(d,sel.port)[k];
     if(k==='poe'){ck();const o=d.ports[sel.port]||(d.ports[sel.port]={});if(!!val===!!d.poe)delete o.poe;else o.poe=!!val;if(!Object.keys(o).length)delete d.ports[sel.port]}
     else{if((cur||'')===val||(k==='off'&&!!cur===val))return;ck('port'+k+sel.dev+sel.port);pset(d,sel.port,k,k==='off'?!!val:String(val).slice(0,k==='notes'?300:60))}
@@ -1175,7 +1229,7 @@ function showTip(e,did,pid){
     const far=s=>{const c=cabOf(did,pid,s);if(!c)return null;const o=(c.a.d===did&&c.a.p===pid&&(c.a.s==='r'?'r':'f')===s)?c.b:c.a;return `${pfull(o)}${usr(o.d)}${c.label?' ('+c.label+')':''}${HID.has(o.d)?' · ausgeblendet':''}`};
     let body;
     if(pas){const f=far('f'),r=far('r');body=`<span class="m">Vorderseite:</span> ${esc(f||'frei')}<br><span class="m">Rückseite:</span> ${esc(r||'frei')}`}
-    else{const bits=[SP[pspeed(d,pid)].n];if(cf.vlan)bits.push('VLAN '+cf.vlan);if(ppoe(d,pid))bits.push('PoE');if(cf.off)bits.push('deaktiviert');const c=cabOf(did,pid,'f');let to='frei – zum Verbinden ziehen';
+    else{const bits=[SP[pspeed(d,pid)].n];{const pv=pvlan(d,pid);if(pv)bits.push(vlanTxt(pv))}if(ppoe(d,pid))bits.push('PoE');if(cf.off)bits.push('deaktiviert');const c=cabOf(did,pid,'f');let to='frei – zum Verbinden ziehen';
       if(c){const ch=AN.get(c.id).ch,me=x=>x&&x.d===did&&x.p===pid,fe=me(ch.A)?ch.B:me(ch.B)?ch.A:null;to='→ '+(fe&&ch.steps.length>1?pfull(fe)+usr(fe.d)+' (über Patchpanel)'+(HID.has(fe.d)?' · ausgeblendet':''):far('f'))}
       body=`<span class="m">${esc(bits.join(' · '))}</span><br>${esc(to)}`}
     tip.innerHTML=`<b>${esc(pname(d,pid))} · ${PT[t].n}</b> <span class="m">${esc(d.name)}</span>${cf.label?`<br><b>${esc(cf.label)}</b>`:''}${cf.notes?`<br><span class="m">Notiz:</span> ${esc(cf.notes)}`:''}<br>${body}`}
@@ -1314,6 +1368,12 @@ ic.addEventListener('click',e=>{
     else if(a==='raidtog'){const d=dev(sel.id);d&&raidToggle(d,b.dataset.r,+b.dataset.i)}
     else if(a==='raidedit'){const d=dev(sel.id);raidEdit=raidEdit&&raidEdit.id===b.dataset.r?null:{dev:d.id,id:b.dataset.r};renderAll()}
     else if(a==='raiddel'){const d=dev(sel.id);if(!d)return;ck();d.raids=(d.raids||[]).filter(r=>r.id!==b.dataset.r);if(raidEdit&&raidEdit.id===b.dataset.r)raidEdit=null;touched();renderAll()}
+    else if(a==='vtag'||a==='vtagall'){const d=dev(sel.dev);if(!d)return;ck();const o=d.ports[sel.port]||(d.ports[sel.port]={});const T=new Set(o.tv||[]);if(a==='vtagall')state.vlans.forEach(v=>T.add(v.id));else{const v=+b.dataset.v;T.has(v)?T.delete(v):T.add(v)}o.tv=[...T].sort((x,y)=>x-y);o.vm='trunk';touched();renderAll()}
+    else if(a==='vlanlist'){setMode('list');setTab('netze')}
+    else if(a==='vbulk'){const d=dev(sel.id);if(!d)return;const f=+$('#f-vb1').value,t=+$('#f-vb2').value,v=$('#f-vb3').value;const ps=lay(d).ports.filter(p=>vlanPort(d,p.id)&&p.num>=Math.min(f,t)&&p.num<=Math.max(f,t));if(!ps.length){toast('Keine passenden Ports');return}ck();
+      for(const p of ps){const o=d.ports[p.id]||(d.ports[p.id]={});if(v==='trunk'){o.vm='trunk';o.tv=state.vlans.map(x=>x.id)}else if(v===''){delete o.vm;delete o.tv;delete o.vlan}else{delete o.vm;delete o.tv;o.vlan=+v}if(!Object.keys(o).length)delete d.ports[p.id]}
+      touched();renderAll();toast(`${pl(ps.length,'Port','Ports')} geändert`)}
+    else if(a==='freeip'){const d=dev(sel.id),v=vlanOf(b.dataset.v),ip=v&&freeIp(v);if(!d||!ip){toast('Kein freies Subnetz gefunden');return}ck();d.ip=ip;touched();renderAll();toast('IP '+ip+' vergeben')}
     else if(a==='hide'){const id=b.dataset.id,h=HIDL.has(id);setHid([id],!h);if(!h){sel=null;toast('Ausgeblendet – über „Ansicht“ oben wieder einblenden')}renderAll()}
     else if(a==='q'){setMode('plan');const r=$('#rail');if(getComputedStyle(r).position==='absolute')r.classList.add('open');$('#rq').value=b.dataset.q;renderRail();$('#rq').focus()}
     return}
@@ -1363,11 +1423,12 @@ $('#b-rail').onclick=()=>$('#rail').classList.toggle('open');
 $('#itog').onclick=()=>{const m=$('#insp').classList.toggle('min');$('#itog').setAttribute('aria-expanded',String(!m))};
 $('#z-in').onclick=()=>zoomBy(1.25);$('#z-out').onclick=()=>zoomBy(.8);$('#z-fit').onclick=fit;$('#z-arr').onclick=arrange;
 $('#z-lbl').onclick=()=>{const r=stage.getBoundingClientRect();zoomAt(r.width/2,r.height/2,1/view.z)};
-function setMode(m){mode=m;$('#t-plan').setAttribute('aria-selected',String(m==='plan'));$('#t-list').setAttribute('aria-selected',String(m==='list'));$('#main').classList.toggle('tbl',m==='list');$('#tview').hidden=m!=='list';if(m==='list')renderTable();else requestAnimationFrame(applyView)}
-$('#t-plan').onclick=()=>setMode('plan');$('#t-list').onclick=()=>setMode('list');
-$('.vt').addEventListener('click',e=>{const b=e.target.closest('[data-tm]');if(!b)return;tmode=b.dataset.tm;document.querySelectorAll('.vt button').forEach(x=>x.setAttribute('aria-selected',String(x===b)));renderTable()});
+function setMode(m){mode=m;for(const [id,k] of [['#t-plan','plan'],['#t-topo','topo'],['#t-list','list']])$(id).setAttribute('aria-selected',String(m===k));$('#main').classList.toggle('tbl',m!=='plan');$('#tview').hidden=m!=='list';$('#topo').hidden=m!=='topo';if(m==='list')renderTable();else if(m==='topo')renderTopo(true);else requestAnimationFrame(applyView)}
+$('#t-plan').onclick=()=>setMode('plan');$('#t-list').onclick=()=>setMode('list');$('#t-topo').onclick=()=>setMode('topo');
+function setTab(t){tmode=t;document.querySelectorAll('.vt button').forEach(x=>x.setAttribute('aria-selected',String(x.dataset.tm===t)));renderTable()}
+$('.vt').addEventListener('click',e=>{const b=e.target.closest('[data-tm]');if(b)setTab(b.dataset.tm)});
 $('#q').addEventListener('input',renderTable);
-$('#b-csv').onclick=()=>exp('csv');
+$('#b-csv').onclick=exportTab;
 document.addEventListener('keydown',e=>{
   if(e.key==='Escape'){
     if(!$('#vpop').hidden){toggleVis(false);$('#b-vis').focus();return}
@@ -1407,7 +1468,7 @@ function toggleMenu(open){const m=$('#menu');m.hidden=!open;$('#b-file').setAttr
 $('#b-file').onclick=e=>{e.stopPropagation();toggleMenu($('#menu').hidden)};
 document.addEventListener('click',e=>{if(!$('#menu').hidden&&!e.target.closest('.menuw'))toggleMenu(false)});
 $('#menu').addEventListener('click',e=>{const b=e.target.closest('[data-m]');if(!b)return;toggleMenu(false);menuAct(b.dataset.m)});
-const emptyState=()=>({v:3,name:'Neues Netzwerk',devices:[],cables:[],racks:[],rooms:[],view:{labelMode:'num',colorBy:'speed',hide:{cats:[],ids:[]}},life:{old:5,eol:10},updated:0,demo:false});
+const emptyState=()=>({v:3,name:'Neues Netzwerk',devices:[],cables:[],racks:[],rooms:[],view:{labelMode:'num',colorBy:'speed',hide:{cats:[],ids:[]}},life:{old:5,eol:10},vlans:[],updated:0,demo:false});
 async function menuAct(m){
   if(['json','csv','csv2','svg','png'].includes(m))return exp(m);
   if(m==='open')return openImport();
@@ -1486,7 +1547,7 @@ function sanitize(o){
   const okId=v=>typeof v==='string'&&/^[A-Za-z0-9_-]{1,40}$/.test(v);
   const pick=(v,list,df)=>list.includes(v)?v:df;
   const ov_=o.view||{};
-  const out={v:3,name:S(o.name,80)||'Netzwerk',devices:[],cables:[],racks:[],rooms:[],view:{labelMode:pick(ov_.labelMode,['num','spec','off'],ov_.labels===false?'off':'num'),colorBy:ov_.colorBy==='cable'?'cable':'speed',hide:{cats:[],ids:[]}},life:{old:N(o.life&&o.life.old,1,50,5),eol:N(o.life&&o.life.eol,1,60,10)},updated:Number(o.updated)||0,demo:!!o.demo};
+  const out={v:3,name:S(o.name,80)||'Netzwerk',devices:[],cables:[],racks:[],rooms:[],view:{labelMode:pick(ov_.labelMode,['num','spec','off'],ov_.labels===false?'off':'num'),colorBy:ov_.colorBy==='cable'?'cable':'speed',hide:{cats:[],ids:[]},topoHosts:pick(ov_.topoHosts,['single','group','off'],''),topoColor:pick(ov_.topoColor,['speed','vlan'],'speed')},life:{old:N(o.life&&o.life.old,1,50,5),eol:N(o.life&&o.life.eol,1,60,10)},updated:Number(o.updated)||0,demo:!!o.demo};
   const oids=new Set();
   for(const r of (Array.isArray(o.racks)?o.racks:[]).slice(0,60)){if(!r||typeof r!=='object')continue;const id=okId(r.id)&&!oids.has(r.id)?r.id:'k'+rid();oids.add(id);out.racks.push({id,name:S(r.name,60)||'Schrank',rsize:pick(r.rsize,['19','10'],'19'),minHe:N(r.minHe,0,60,0),rcolor:pick(r.rcolor,['schwarz','grau'],'schwarz'),location:S(r.location,60),notes:S(r.notes,500),x:N(r.x,-50000,50000,40),y:N(r.y,-50000,50000,40)})}
   for(const m of (Array.isArray(o.rooms)?o.rooms:[]).slice(0,60)){if(!m||typeof m!=='object')continue;const id=okId(m.id)&&!oids.has(m.id)?m.id:'m'+rid();oids.add(id);out.rooms.push({id,name:S(m.name,60)||'Raum',roomc:pick(m.roomc,Object.keys(RCOL),'blau'),x:N(m.x,-50000,50000,0),y:N(m.y,-50000,50000,0),w:N(m.w,300,30000,1600),h:N(m.h,200,30000,1100),notes:S(m.notes,500)})}
@@ -1513,13 +1574,18 @@ function sanitize(o){
     const src=d.pc&&typeof d.pc==='object'?d.pc:{rj45:d.rj45,sfp:d.sfp,sfpp:d.sfpp};
     x.pc={};for(const t of K.types){const n=N(src[t],0,maxc(x,t),0);if(n)x.pc[t]=n}
     if(total(x)<minPorts(x))x.pc[K.types.includes('rj45')?'rj45':K.types[0]]=K.types.includes('rj45')?8:24;
-    if(d.ports&&typeof d.ports==='object')for(const [k,v] of Object.entries(d.ports)){if(!pexists(x,k)||!v||typeof v!=='object')continue;const t=ptype(k),pc={};if(v.label)pc.label=S(v.label,60);if(!isPas(t)&&PT[t].sp.includes(v.speed))pc.speed=v.speed;if(v.vlan)pc.vlan=S(v.vlan,40);if(typeof v.poe==='boolean'&&t==='rj45')pc.poe=v.poe;if(v.off&&!isPas(t))pc.off=true;if(v.notes)pc.notes=S(v.notes,300);if(Object.keys(pc).length)x.ports[k]=pc}
+    if(d.ports&&typeof d.ports==='object')for(const [k,v] of Object.entries(d.ports)){if(!pexists(x,k)||!v||typeof v!=='object')continue;const t=ptype(k),pc={};if(v.label)pc.label=S(v.label,60);if(!isPas(t)&&PT[t].sp.includes(v.speed))pc.speed=v.speed;if(!isPas(t)&&['switch','fw','net','server'].includes(kind)){const ok=n=>Number.isInteger(n)&&n>=1&&n<=4094;
+      if(v.vm==='trunk'||Array.isArray(v.tv)){const nv=Number(v.vlan);if(ok(nv))pc.vlan=nv;if(v.vm==='trunk'){pc.vm='trunk';pc.tv=[...new Set((Array.isArray(v.tv)?v.tv:[]).map(Number).filter(ok))].sort((a,b)=>a-b)}}
+      else if(v.vlan!=null&&v.vlan!==''){const ns=[...new Set(String(v.vlan).split(/[^0-9]+/).map(Number).filter(ok))];if(ns.length===1)pc.vlan=ns[0];else if(ns.length>1){pc.vm='trunk';pc.tv=ns.sort((a,b)=>a-b)}}}if(typeof v.poe==='boolean'&&t==='rj45')pc.poe=v.poe;if(v.off&&!isPas(t))pc.off=true;if(v.notes)pc.notes=S(v.notes,300);if(Object.keys(pc).length)x.ports[k]=pc}
     if(d.rack&&rIds.has(d.rack)&&rackable(x)){const r=out.racks.find(q=>q.id===d.rack);if(!(x.size==='19'&&r.rsize==='10')){x.rack=d.rack;x.u=N(d.u,1,200,1)}}
     out.devices.push(x);
   }
   {const h=ov_.hide&&typeof ov_.hide==='object'?ov_.hide:{},okK=v=>typeof v==='string'&&/^[a-z]+(:[a-z]+)?$/.test(v),all=new Set([...out.devices,...out.racks,...out.rooms].map(x=>x.id));
    const cats=new Set((Array.isArray(h.cats)?h.cats:[]).filter(okK).slice(0,100));if(ov_.hideHosts)cats.add('hosts');if(ov_.fadeRacks)cats.add('racks');if(ov_.fadeRooms)cats.add('rooms');
    out.view.hide={cats:[...cats],ids:(Array.isArray(h.ids)?h.ids:[]).filter(i=>all.has(i)).slice(0,5000)}}
+  {out.vlans=[];const seen=new Set();for(const v of (Array.isArray(o.vlans)?o.vlans:[]).slice(0,400)){const id=Number(v&&v.id);if(!Number.isInteger(id)||id<1||id>4094||seen.has(id))continue;seen.add(id);out.vlans.push({id,name:S(v.name,40),color:/^#[0-9a-f]{6}$/i.test(v.color)?v.color:VLC[out.vlans.length%VLC.length],subnet:S(v.subnet,43),gw:S(v.gw,40)})}
+   for(const d of out.devices)for(const pc of Object.values(d.ports))for(const id of [pc.vlan,...(pc.tv||[])])if(id&&!seen.has(id)){seen.add(id);out.vlans.push({id,name:'',color:VLC[out.vlans.length%VLC.length],subnet:'',gw:''})}
+   out.vlans.sort((a,b)=>a.id-b.id)}
   const used=new Set(),cids=new Set(),byId=Object.fromEntries(out.devices.map(d=>[d.id,d]));
   for(const c of (Array.isArray(o.cables)?o.cables:[]).slice(0,5000)){
     if(!c||!c.a||!c.b)continue;
@@ -1617,19 +1683,124 @@ function openAdd(kind,target){
 function toast(t){const box=$('#toasts'),el=document.createElement('div');el.className='toast';el.textContent=t;box.append(el);setTimeout(()=>el.remove(),3000);while(box.children.length>3)box.firstChild.remove()}
 
 /* ================= patch list ================= */
+/* ================= logische Topologie ================= */
+const TV={x:0,y:0,z:1};let TB=null,tdrag=null;
+const ACT=d=>['fw','net','switch','server','ap','host','ups'].includes(d.kind);
+function topoModel(){
+  const hm=state.view.topoHosts||(state.devices.filter(d=>d.kind==='host').length>24?'group':'single');
+  const nodes=new Map(),E=new Map();
+  for(const ch of CH){if(!ch.A||!ch.B)continue;const a=dev(ch.A.d),b=dev(ch.B.d);if(!a||!b||a.id===b.id||!ACT(a)||!ACT(b))continue;
+    const k=[a.id,b.id].sort().join('|');let e=E.get(k);if(!e){e={a:a.id,b:b.id,n:0,chs:[]};E.set(k,e)}e.n++;e.chs.push(ch)}
+  const deg=new Map();for(const e of E.values())for(const x of [e.a,e.b])deg.set(x,(deg.get(x)||0)+1);
+  for(const d of state.devices)if(ACT(d)&&(deg.get(d.id)||d.kind==='fw'||d.kind==='switch'||d.kind==='net')&&!(d.kind==='host'&&hm==='off'))nodes.set(d.id,{id:d.id,d,kids:[],eps:[]});
+  const infra=d=>d.kind==='fw'||d.kind==='net'||d.kind==='switch';
+  const adj=new Map();for(const e of E.values()){if(!nodes.has(e.a)||!nodes.has(e.b))continue;for(const [x,y] of [[e.a,e.b],[e.b,e.a]]){if(!adj.has(x))adj.set(x,[]);adj.get(x).push(y)}}
+  const N=[...nodes.values()],rank=d=>d.kind==='fw'?0:d.kind==='net'&&['router','modem','gateway'].includes(d.sub)?0:d.kind==='net'?1:2;
+  let roots=N.filter(n=>infra(n.d)&&rank(n.d)===0);if(!roots.length){const sw=N.filter(n=>infra(n.d)).sort((a,b)=>(adj.get(b.id)||[]).length-(adj.get(a.id)||[]).length);if(sw.length)roots=[sw[0]]}
+  const depth=new Map(),par=new Map(),q=[];for(const r of roots){depth.set(r.id,0);q.push(r.id)}
+  while(q.length){const x=q.shift();for(const y of adj.get(x)||[]){const ny=nodes.get(y);if(!infra(ny.d)||depth.has(y))continue;depth.set(y,depth.get(x)+1);par.set(y,x);q.push(y)}}
+  for(const n of N)if(infra(n.d)&&!depth.has(n.id)){depth.set(n.id,0);roots.push(n);const q2=[n.id];while(q2.length){const x=q2.shift();for(const y of adj.get(x)||[]){const ny=nodes.get(y);if(!infra(ny.d)||depth.has(y))continue;depth.set(y,depth.get(x)+1);par.set(y,x);q2.push(y)}}}
+  const loose=[];
+  for(const n of N){if(infra(n.d))continue;const ps=(adj.get(n.id)||[]).filter(y=>depth.has(y)).sort((a,b)=>depth.get(a)-depth.get(b));if(ps.length){par.set(n.id,ps[0]);nodes.get(ps[0]).eps.push(n)}else loose.push(n)}
+  for(const [c,p] of par){const n=nodes.get(c);if(infra(n.d))nodes.get(p).kids.push(n)}
+  if(hm==='group')for(const n of nodes.values()){const hs=n.eps.filter(x=>x.d.kind==='host');if(hs.length>1){n.eps=n.eps.filter(x=>x.d.kind!=='host');n.eps.push({id:'grp-'+n.id,grp:hs,kids:[],eps:[]})}}
+  return {nodes,E,roots,loose,par,hm}}
+function topoLayout(M){const NW=176,NH=58,GX=26,GY=104,COLS=4,pos=new Map();
+  const blockW=n=>{const k=n.eps.length;return k?Math.min(k,COLS)*(NW+GX)-GX:0};
+  const W=n=>{if(n._w!=null)return n._w;const parts=[...n.kids.map(W)];const bw=blockW(n);if(bw)parts.push(bw);const sum=parts.reduce((a,b)=>a+b,0)+Math.max(0,parts.length-1)*GX*2;return n._w=Math.max(NW,sum)};
+  const place=(n,x,y)=>{const w=W(n);pos.set(n.id,{x:x+w/2-NW/2,y,n});let cx=x+(w-([...n.kids.map(W),blockW(n)].filter(Boolean).reduce((a,b)=>a+b,0)+Math.max(0,n.kids.length+(n.eps.length?1:0)-1)*GX*2))/2;
+    for(const k of n.kids){place(k,cx,y+NH+GY);cx+=W(k)+GX*2}
+    n.eps.forEach((e,i)=>pos.set(e.id,{x:cx+(i%COLS)*(NW+GX),y:y+NH+GY+Math.floor(i/COLS)*(NH+34),n:e}))};
+  let x=0,maxY=0;for(const r of M.roots){place(r,x,0);x+=W(r)+GX*4}
+  for(const p of pos.values())maxY=Math.max(maxY,p.y);
+  M.loose.forEach((n,i)=>pos.set(n.id,{x:(i%8)*(NW+GX),y:maxY+NH+GY+Math.floor(i/8)*(NH+34),n,loose:1}));
+  return {pos,NW,NH}}
+function topoSVG(forExport){
+  const M=topoModel(),Lo=topoLayout(M),{pos,NW,NH}=Lo,cv=state.view.topoColor||'speed';if(!pos.size)return null;
+  let x1=Infinity,y1=Infinity,x2=-Infinity,y2=-Infinity;for(const p of pos.values()){x1=Math.min(x1,p.x);y1=Math.min(y1,p.y);x2=Math.max(x2,p.x+NW);y2=Math.max(y2,p.y+NH)}
+  const P=id=>pos.get(id)||(()=>{for(const n of M.nodes.values())if(n.eps.some(e=>e.grp&&e.grp.some(h=>h.d.id===id)))return pos.get('grp-'+n.id)})();
+  let ed='',lab='';const seen=new Set();
+  for(const e of M.E.values()){const A=P(e.a),B=P(e.b);if(!A||!B||A===B)continue;const key=[A.n.id,B.n.id].sort().join('|');if(seen.has(key)&&(A.n.grp||B.n.grp))continue;seen.add(key);
+    const [U,D]=A.y<=B.y?[A,B]:[B,A],ux=U.x+NW/2,uy=U.y+NH,dx=D.x+NW/2,dy=D.y,ch=e.chs[0],sp=ch.speed,nl=e.chs.every(c=>c.nl);
+    let col=sp&&!nl?SP[sp].c:'#8a8f96';if(cv==='vlan'){const pa=pvlan(dev(ch.A.d),ch.A.p),pb=pvlan(dev(ch.B.d),ch.B.p),pv=pa||pb;col=pv?(pv.m==='trunk'?'#111':vcol(pv.v)):'#b5b5b0'}
+    const w=!sp?2:SP[sp].v>=25e3?5:SP[sp].v>=1e4?4:SP[sp].v>=2500?3:2.2,sameRow=Math.abs(uy-NH-dy)<1;
+    const d=sameRow?`M${U.x+NW/2} ${U.y}C${U.x+NW/2} ${U.y-50} ${dx} ${dy-50} ${dx} ${dy}`:`M${ux} ${uy}C${ux} ${uy+48} ${dx} ${dy-48} ${dx} ${dy}`;
+    ed+=`<path d="${d}" fill="none" stroke="${col}" stroke-width="${w}"${nl?' stroke-dasharray="6 5"':cv==='vlan'&&col==='#111'?' stroke-dasharray="10 4"':''} stroke-linecap="round"/>`;
+    const infra=n=>n.d&&['fw','net','switch'].includes(n.d.kind);
+    if(infra(U.n)&&infra(D.n)||e.n>1){const mx=(ux+dx)/2,my=sameRow?U.y-38:(uy+dy)/2,t=(e.n>1?e.n+'× ':'')+(sp&&!nl?SP[sp].n.replace(' Gbit/s','G').replace(' Mbit/s','M').replace(',','.'):'kein Link');lab+=`<g><rect x="${mx-t.length*3.3-7}" y="${my-9}" width="${t.length*6.6+14}" height="18" rx="9" fill="#fff" stroke="${col}" stroke-width="1.4"/><text x="${mx}" y="${my+4}" text-anchor="middle" font-size="11" font-weight="700" fill="#111">${esc(t)}</text></g>`}}
+  let nd='';
+  for(const p of pos.values()){const n=p.n,x=p.x,y=p.y;
+    if(n.grp){const by=new Map();for(const h of n.grp){const v=HVL.get(h.d.id)||0;by.set(v,(by.get(v)||0)+1)}
+      nd+=`<g class="tn" data-tgrp="${n.id}"><rect x="${x}" y="${y}" width="${NW}" height="${NH}" rx="10" fill="#fbfbf9" stroke="#a3a8ae"/><text x="${x+14}" y="${y+24}" font-size="14" font-weight="700" fill="#16191d">${n.grp.length} Hosts</text>${[...by].map(([v,c],i)=>`<g><circle cx="${x+20+i*44}" cy="${y+41}" r="6" fill="${v?vcol(v):'#c4c9cf'}"/><text x="${x+30+i*44}" y="${y+45}" font-size="11" fill="#3d4249">${c}</text></g>`).slice(0,3).join('')}</g>`;continue}
+    const d=n.d,st=STY[d.style]||STY[KIND[d.kind].styles[0]],dark=KIND[d.kind].rack&&st.g&&!['unifi','smc','aruba','host'].includes(st.key),bg=d.kind==='host'||d.kind==='ap'?'#fbfbf9':st.g[0],fg=dark?'#fff':'#16191d',sub=d.ip||d.model||(d.kind==='host'?subLbl(d):KIND[d.kind].n),hv=HVL.get(d.id),z=lcs(d);
+    nd+=`<g class="tn" data-tdev="${d.id}"><rect x="${x}" y="${y}" width="${NW}" height="${NH}" rx="10" fill="${bg}" stroke="${hv?vcol(hv):dark?'#000':'#a3a8ae'}" stroke-width="${hv?2.4:1.2}"/>${hv?`<rect x="${x}" y="${y}" width="8" height="${NH}" rx="4" fill="${vcol(hv)}"/>`:''}${p.loose?`<rect x="${x}" y="${y}" width="${NW}" height="${NH}" rx="10" fill="none" stroke="#d0342c" stroke-dasharray="4 3"/>`:''}
+      <g transform="translate(${x+14} ${y+11}) scale(1.15)" fill="none" stroke="${fg}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${KICON[d.kind]}</g>
+      <text x="${x+44}" y="${y+25}" font-size="13.5" font-weight="700" fill="${fg}">${esc(trunc(d.name,17))}</text><text x="${x+44}" y="${y+42}" font-size="11" fill="${dark?'#c3c9d0':'#5b626b'}">${esc(trunc(sub,22))}</text>
+      ${z&&z.s!=='ok'?`<rect x="${x+NW-40}" y="${y-9}" width="36" height="16" rx="8" fill="${LCC[z.s].c}"/><text x="${x+NW-22}" y="${y+3}" text-anchor="middle" font-size="9.5" font-weight="700" fill="${LCC[z.s].t}">${z.s==='eol'?'EOL':'alt'}</text>`:''}</g>`}
+  const pad=40;TB={x:x1-pad,y:y1-pad-50,w:x2-x1+pad*2,h:y2-y1+pad*2+50};
+  return {svg:`${ed}${nd}${lab}`,box:TB,M}}
+function renderTopo(fit){
+  for(const b of document.querySelectorAll('[data-th]'))b.setAttribute('aria-pressed',String(b.dataset.th===(state.view.topoHosts||(state.devices.filter(d=>d.kind==='host').length>24?'group':'single'))));
+  for(const b of document.querySelectorAll('[data-tc]'))b.setAttribute('aria-pressed',String(b.dataset.tc===(state.view.topoColor||'speed')));
+  const R=topoSVG();$('#tp-empty').hidden=!!R;$('#tworld').innerHTML=R?R.svg:'';
+  $('#tp-sub').textContent=R?`${pl([...R.M.nodes.values()].length,'Gerät','Geräte')} · ${pl(R.M.E.size,'Verbindung','Verbindungen')} · ohne Patchpanels`:'';
+  if(R&&(fit||!TV.ok))topoFit();else topoApply()}
+function topoApply(){$('#tworld').setAttribute('transform',`translate(${TV.x.toFixed(1)} ${TV.y.toFixed(1)}) scale(${TV.z.toFixed(4)})`)}
+function topoFit(){const r=$('#tstage').getBoundingClientRect();if(!TB||!r.width)return;TV.z=clamp(Math.min(r.width/TB.w,r.height/TB.h),.15,1.4);TV.x=(r.width-TB.w*TV.z)/2-TB.x*TV.z;TV.y=(r.height-TB.h*TV.z)/2-TB.y*TV.z;TV.ok=1;topoApply()}
+$('#tp-fit').onclick=topoFit;
+$('#topo').addEventListener('click',e=>{const h=e.target.closest('[data-th]'),c=e.target.closest('[data-tc]');if(h){ck('view');state.view.topoHosts=h.dataset.th;touched();renderTopo(true)}if(c){ck('view');state.view.topoColor=c.dataset.tc;touched();renderTopo()}});
+$('#tsvg').addEventListener('wheel',e=>{e.preventDefault();const r=$('#tstage').getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top,f=Math.exp(-e.deltaY*.0015),z=clamp(TV.z*f,.1,3);TV.x=mx-(mx-TV.x)*z/TV.z;TV.y=my-(my-TV.y)*z/TV.z;TV.z=z;topoApply()},{passive:false});
+$('#tsvg').addEventListener('pointerdown',e=>{tdrag={x:e.clientX,y:e.clientY,vx:TV.x,vy:TV.y,m:false,t:e.target};try{$('#tsvg').setPointerCapture(e.pointerId)}catch(_){}});
+$('#tsvg').addEventListener('pointermove',e=>{if(!tdrag)return;const dx=e.clientX-tdrag.x,dy=e.clientY-tdrag.y;if(!tdrag.m&&Math.hypot(dx,dy)<5)return;tdrag.m=true;TV.x=tdrag.vx+dx;TV.y=tdrag.vy+dy;topoApply()});
+$('#tsvg').addEventListener('pointerup',e=>{const g=tdrag;tdrag=null;if(!g||g.m)return;const n=g.t.closest&&g.t.closest('[data-tdev]');if(n){setMode('plan');select({kind:'dev',id:n.dataset.tdev});centerOn(dev(n.dataset.tdev))}const gr=g.t.closest&&g.t.closest('[data-tgrp]');if(gr){ck('view');state.view.topoHosts='single';touched();renderTopo(true)}});
+$('#tp-svg').onclick=()=>{const R=topoSVG();if(!R){toast('Noch keine Topologie');return}const b=R.box,svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${Math.ceil(b.w)}" height="${Math.ceil(b.h)}" viewBox="${b.x} ${b.y} ${b.w} ${b.h}" font-family="Hanken Grotesk, Arial, sans-serif"><rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" fill="#f4f4f1"/><text x="${b.x+40}" y="${b.y+34}" font-size="20" font-weight="700">${esc(state.name)} – logische Topologie</text>${R.svg}</svg>`;if(DL)save(slug()+'-topologie.svg',svg);else copyText(svg,'SVG')};
+const TTL={kabel:'Patchliste',strecken:'Strecken',geraete:'Geräte',netze:'VLANs & IP-Adressen',strom:'Stromversorgung',material:'Materialliste'};
+function devRows(){const byName=(a,b)=>String(a.name).localeCompare(String(b.name),'de',{numeric:true});
+  return [...state.devices].sort((a,b)=>catOrder.indexOf(catOf(a)[0])-catOrder.indexOf(catOf(b)[0])||byName(a,b)).map(d=>{const z=lcs(d),hv=HVL.get(d.id),rm=devRoom(d);
+    return {dv:d.id,cells:[d.name,d.kind==='host'||d.kind==='net'?subLbl(d):KIND[d.kind].n,[d.rack?where(d):'',rm?rm.name:''].filter(Boolean).join(' · '),d.model||d.role||'',d.ip||'',hv?vshort(hv):'',`${usedPorts(d)}/${total(d)}`,d.year?`${d.year}${z&&z.s!=='ok'?' · '+LCC[z.s].n:''}`:'',d.user||d.location||'']}})}
+function ipRows(){return state.devices.filter(d=>d.ip).map(d=>{const I=IPI&&IPI.get(d.id)||{},V=I.v?vlanOf(I.v):null,S=vnet(V);return {dv:d.id,n:I.n??Infinity,cells:[d.ip,d.name,d.kind==='host'?subLbl(d):KIND[d.kind].n,V?vshort(V.id):'',S?S.txt:'',I.bad?'ungültig':I.dup?'doppelt':I.wrong?'falsches Subnetz':'ok']}}).sort((a,b)=>a.n-b.n)}
+function tableData(m){
+  if(m==='kabel')return {heads:['Kabel','Von','Port','Nach','Port','Medium','Transceiver','Länge','Link','Hinweis'],rows:cableRows(),link:8,num:[7],sub:`${state.cables.length} Kabel · ${state.devices.length} Geräte`};
+  if(m==='strecken')return {heads:['Ende A','Ende B','Über','Kabel','Länge','Link','Hinweis'],rows:chanRows(),link:5,num:[4],nw:[3],sub:`${CH.length} Strecken von Ende zu Ende`};
+  if(m==='geraete')return {heads:['Name','Art','Ort','Modell','IP','VLAN','Ports','Kaufjahr','Benutzer / Standort'],rows:devRows(),num:[6],sub:`${state.devices.length} Geräte in ${pl(state.racks.length,'Schrank','Schränken')}`};
+  if(m==='netze')return {heads:['IP-Adresse','Gerät','Art','VLAN','Subnetz','Status'],rows:ipRows(),sub:''};
+  if(m==='strom')return typeof powerRows==='function'?powerRows():{heads:[],rows:[]};
+  if(m==='material')return typeof matRows==='function'?matRows():{heads:[],rows:[]};
+  return {heads:[],rows:[]}}
 function renderTable(){
-  const q=$('#q').value.trim().toLowerCase(),cab=tmode==='kabel';
-  const heads=cab?['Kabel','Von','Port','Nach','Port','Medium','Transceiver','Länge','Link','Hinweis']:['Ende A','Ende B','Über','Kabel','Länge','Link','Hinweis'];
-  const all=cab?cableRows():chanRows(),rows=all.filter(r=>!q||r.cells.join(' ').toLowerCase().includes(q));
-  $('#t-h').textContent=cab?'Patchliste':'Strecken';
-  $('#t-sub').textContent=cab?`${state.cables.length} Kabel · ${state.devices.length} Geräte${q?' · '+rows.length+' Treffer':''}`:`${CH.length} Strecken von Ende zu Ende${q?' · '+rows.length+' Treffer':''}`;
-  $('#pth').innerHTML=`<tr>${heads.map(h=>`<th>${h}</th>`).join('')}</tr>`;
-  const linkCol=cab?8:5,numCols=cab?[7]:[4],nwCols=cab?[]:[3];
-  $('#ptb').innerHTML=rows.length?rows.map(r=>`<tr data-cab="${r.c.id}" tabindex="0">${r.cells.map((v,i)=>`<td data-l="${heads[i]}" class="${cab&&i===0?'lb':numCols.includes(i)?'n':i===linkCol||nwCols.includes(i)?'nw':''}"><span>${i===linkCol?`<i class="dot" style="--c:${cab?ccolor(r.c,AN.get(r.c.id)):(v==='kein Link'||v==='passiv'?'#8a8f96':SP[Object.keys(SP).find(k=>SP[k].n===v)]?.c||'#8a8f96')}"></i>`:''}${esc(v)}</span></td>`).join('')}</tr>`).join(''):`<tr><td class="tempty" colspan="${heads.length}">${state.cables.length?'Keine Treffer.':'Noch keine Kabel – im Plan Port auf Port ziehen.'}</td></tr>`;
+  const q=$('#q').value.trim().toLowerCase(),T=tableData(tmode),custom=tmode==='netze';
+  $('#t-h').textContent=TTL[tmode];
+  $('#tcustom').hidden=!custom;if(custom)renderNetze();
+  const rows=T.rows.filter(r=>!q||r.cells.join(' ').toLowerCase().includes(q));
+  $('#t-sub').textContent=(T.sub||'')+(q?(T.sub?' · ':'')+rows.length+' Treffer':'');
+  $('#tscroll').classList.toggle('below',custom);
+  $('#pth').innerHTML=`<tr>${T.heads.map(h=>`<th>${h}</th>`).join('')}</tr>`;
+  const cab=tmode==='kabel',num=T.num||[],nw=T.nw||[];
+  $('#ptb').innerHTML=rows.length?rows.map(r=>`<tr ${r.c?`data-cab="${r.c.id}"`:r.dv?`data-dv="${r.dv}"`:''}${r.c||r.dv?' tabindex="0"':''}${r.cls?` class="${r.cls}"`:''}>${r.cells.map((v,i)=>`<td data-l="${T.heads[i]}" class="${cab&&i===0?'lb':num.includes(i)?'n':i===T.link||nw.includes(i)?'nw':''}"><span>${i===T.link?`<i class="dot" style="--c:${cab?ccolor(r.c,AN.get(r.c.id)):(v==='kein Link'||v==='passiv'?'#8a8f96':SP[Object.keys(SP).find(k=>SP[k].n===v)]?.c||'#8a8f96')}"></i>`:''}${tmode==='netze'&&i===5&&v!=='ok'?`<span class="wtag">${esc(v)}</span>`:tmode==='netze'&&i===3&&r.dv&&IPI.get(r.dv)&&IPI.get(r.dv).v?`<i class="dot" style="--c:${vcol(IPI.get(r.dv).v)}"></i>${esc(v)}`:esc(v)}</span></td>`).join('')}</tr>`).join(''):`<tr><td class="tempty" colspan="${T.heads.length||1}">${q?'Keine Treffer.':'Noch nichts vorhanden.'}</td></tr>`;
 }
-const openRow=tr=>{setMode('plan');select({kind:'cable',id:tr.dataset.cab});centerCable(tr.dataset.cab)};
-$('#ptb').addEventListener('click',e=>{const tr=e.target.closest('tr[data-cab]');tr&&openRow(tr)});
-$('#ptb').addEventListener('keydown',e=>{const tr=e.target.closest('tr[data-cab]');if(tr&&e.key==='Enter')openRow(tr)});
+function renderNetze(){
+  const box=$('#tcustom'),fid=document.activeElement&&box.contains(document.activeElement)?document.activeElement.id:null;
+  const cnt=new Map();for(const d of state.devices)for(const p of lay(d).ports){const pv=pvlan(d,p.id);if(!pv)continue;for(const v of pv.m==='access'?[pv.v]:[pv.nat,...pv.tag].filter(Boolean))cnt.set(v,(cnt.get(v)||0)+1)}
+  const hosts=new Map();for(const v of HVL.values())hosts.set(v,(hosts.get(v)||0)+1);
+  const used=v=>{const S=vnet(v);if(!S)return null;return state.devices.filter(d=>inNet(ip2n(d.ip),S)).length};
+  box.innerHTML=`<div class="lsh"><h3>VLANs</h3><button type="button" class="btn pri" data-vact="add">VLAN hinzufügen</button></div>
+  ${state.vlans.length?`<div class="scroll"><table class="etab"><thead><tr><th>Farbe</th><th>ID</th><th>Name</th><th>Subnetz</th><th>Gateway</th><th class="n">Ports</th><th class="n">Hosts</th><th>IP-Belegung</th><th></th></tr></thead><tbody>${state.vlans.map(v=>{const S=vnet(v),u=used(v),bad=v.subnet&&!S;
+    return `<tr data-vid="${v.id}"><td><input type="color" id="vc-${v.id}" data-vf="color" value="${v.color}" aria-label="Farbe VLAN ${v.id}"></td><td><input id="vi-${v.id}" data-vf="id" type="number" min="1" max="4094" value="${v.id}" class="vid" aria-label="VLAN-ID"></td><td><input id="vn-${v.id}" data-vf="name" value="${esc(v.name)}" maxlength="40" placeholder="z. B. Clients" aria-label="Name"></td><td><input id="vs-${v.id}" data-vf="subnet" value="${esc(v.subnet)}" maxlength="43" placeholder="10.0.${v.id%256}.0/24" aria-label="Subnetz"${bad?' class="bad"':''}></td><td><input id="vg-${v.id}" data-vf="gw" value="${esc(v.gw)}" maxlength="40" placeholder="${S?n2ip(S.first):''}" aria-label="Gateway"></td><td class="n">${cnt.get(v.id)||0}</td><td class="n">${hosts.get(v.id)||0}</td><td>${S?`<div class="ipbar"><i style="width:${Math.min(100,u/S.hosts*100).toFixed(1)}%;background:${v.color}"></i></div><small>${u} von ${S.hosts} belegt${freeIp(v)?' · frei z. B. '+freeIp(v):''}</small>`:bad?'<span class="wtag">Subnetz ungültig</span>':'<small>kein Subnetz</small>'}</td><td><button type="button" class="ib sm" data-vact="del" aria-label="VLAN ${v.id} löschen">×</button></td></tr>`}).join('')}</tbody></table></div>`:'<p class="note">Noch keine VLANs. Lege VLANs an und weise sie dann am Port zu – Access für Endgeräte, Trunk für Verbindungen zwischen Switches.</p>'}
+  <div class="lsh"><h3>IP-Adressen</h3></div>`;
+  if(fid){const e=document.getElementById(fid);e&&e.focus()}
+}
+$('#tcustom').addEventListener('change',e=>{const el=e.target,tr=el.closest('[data-vid]');if(!tr||!el.dataset.vf)return;const v=vlanOf(tr.dataset.vid);if(!v)return;const f=el.dataset.vf;
+  if(f==='id'){const n=parseInt(el.value,10);if(!(n>=1&&n<=4094)){el.value=v.id;return}if(n===v.id)return;if(vlanOf(n)){toast('VLAN '+n+' gibt es schon');el.value=v.id;return}ck();const o=v.id;v.id=n;for(const d of state.devices)for(const pc of Object.values(d.ports)){if(pc.vlan===o)pc.vlan=n;if(pc.tv)pc.tv=pc.tv.map(x=>x===o?n:x).sort((a,b)=>a-b)}state.vlans.sort((a,b)=>a.id-b.id)}
+  else{const val=String(el.value).trim().slice(0,f==='subnet'?43:40);if(v[f]===val)return;ck('v'+f+v.id);v[f]=f==='color'&&!/^#[0-9a-f]{6}$/i.test(val)?v.color:val}
+  touched();renderAll()});
+$('#tcustom').addEventListener('click',e=>{const b=e.target.closest('[data-vact]');if(!b)return;
+  if(b.dataset.vact==='add'){let id=10;while(vlanOf(id))id+=10;if(id>4094){id=2;while(vlanOf(id))id++}ck();state.vlans.push({id,name:'',color:VLC[state.vlans.length%VLC.length],subnet:'',gw:''});state.vlans.sort((a,b)=>a.id-b.id);touched();renderAll();const n=document.getElementById('vn-'+id);n&&n.focus()}
+  if(b.dataset.vact==='del'){const id=+b.closest('[data-vid]').dataset.vid;ck();state.vlans=state.vlans.filter(v=>v.id!==id);for(const d of state.devices)for(const [k,pc] of Object.entries(d.ports)){if(pc.vlan===id)delete pc.vlan;if(pc.tv)pc.tv=pc.tv.filter(x=>x!==id);if(!pc.tv||!pc.tv.length){if(pc.vm!=='trunk')delete pc.tv}if(!Object.keys(pc).length)delete d.ports[k]}touched();renderAll();toast('VLAN '+id+' gelöscht')}});
+function exportTab(){const T=tableData(tmode);if(!T.rows.length){toast('Die Liste ist leer');return}const q=v=>{v=String(v??'');if(/^[=+\-@]/.test(v))v="'"+v;return /[";\n\r]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};
+  const text='﻿'+[T.heads,...T.rows.map(r=>r.cells)].map(r=>r.map(q).join(';')).join('\r\n');if(DL)save(slug()+'-'+tmode+'.csv',text);else copyText(text,TTL[tmode])}
+const openRow=tr=>{setMode('plan');if(tr.dataset.dv){select({kind:'dev',id:tr.dataset.dv});centerOn(dev(tr.dataset.dv))}else{select({kind:'cable',id:tr.dataset.cab});centerCable(tr.dataset.cab)}};
+$('#ptb').addEventListener('click',e=>{const tr=e.target.closest('tr[data-cab],tr[data-dv]');tr&&openRow(tr)});
+$('#ptb').addEventListener('keydown',e=>{const tr=e.target.closest('tr[data-cab],tr[data-dv]');if(tr&&e.key==='Enter')openRow(tr)});
 
 /* ================= saving ================= */
 function setSave(s){const m={local:['Im Browser gespeichert','#8a8a85'],cloud:[store.kind==='server'?'Auf dem Server gespeichert':'Gespeichert','#3ddc6a'],conflict:['Nicht gespeichert – Konflikt','#ff6b5f'],offline:['Server nicht erreichbar','#ff6b5f'],saving:['Speichert …','#ffe600'],err:['Speichern fehlgeschlagen','#ff6b5f'],demo:['Beispiel','#8a8a85'],boot:['Lädt …','#8a8a85']}[s]||['',''];const el=$('#save');el.textContent=m[0];el.title=m[0];el.style.setProperty('--sc',m[1])}
@@ -1701,11 +1872,11 @@ function demo(){
   const D=(k,o)=>mkDev(k,o);
   const devs=[
     D('fiber',{id:'lwl1',name:'LWL-Panel Serverraum',style:'fs',pc:{lc:24},fg:'os2',pol:'UPC',rack:'rA',u:1,ports:{l1:{label:'Backbone EG'},l2:{label:'Backbone OG'}}}),
-    D('switch',{id:'core',name:'Core-SW',year:2022,model:'8G + 16 SFP28 + 2 QSFP28',style:'fs',pc:{rj45:8,sfp28:16,qsfp28:2},rack:'rA',u:2,ip:'10.0.0.1',ports:{r1:{label:'Firewall LAN'},r7:{label:'USV-NMC',vlan:'99'},r8:{label:'Mgmt-Netz',vlan:'99'},t1:{speed:'10G',label:'Backbone EG'}}}),
-    D('fw',{id:'fw1',name:'Firewall',model:'XGS · 2 WAN · 6 LAN',style:'sophos',year:2019,pc:{rj45:8,sfpp:2},wan:2,rack:'rA',u:3,ip:'10.0.0.254',ports:{r1:{label:'Glasfaser-ONT'},r2:{label:'LTE-Backup'}}}),
+    D('switch',{id:'core',name:'Core-SW',year:2022,model:'8G + 16 SFP28 + 2 QSFP28',style:'fs',pc:{rj45:8,sfp28:16,qsfp28:2},rack:'rA',u:2,ip:'10.0.0.1',ports:{r1:{label:'Firewall LAN',vm:'trunk',vlan:99,tv:[10,20,30]},r7:{label:'USV-NMC',vlan:99},r8:{label:'Mgmt-Netz',vlan:99},t1:{speed:'10G',label:'Backbone EG',vm:'trunk',vlan:99,tv:[10,20,30]}}}),
+    D('fw',{id:'fw1',name:'Firewall',model:'XGS · 2 WAN · 6 LAN',style:'sophos',year:2019,pc:{rj45:8,sfpp:2},wan:2,rack:'rA',u:3,ip:'10.0.0.254',ports:{r1:{label:'Glasfaser-ONT'},r2:{label:'LTE-Backup'},r3:{label:'LAN Core',vm:'trunk',vlan:99,tv:[10,20,30]}}}),
     D('server',{id:'srv1',name:'ESX-01',year:2015,role:'Hypervisor',model:'1 HE · 2 × QSFP28',style:'hpe',he:1,pc:{mgmt:1,rj45:2,qsfp28:2},rack:'rA',u:4,ip:'10.0.10.11'}),
     D('ups',{id:'usv1',name:'USV Serverraum',year:2018,model:'Online, 2 HE',style:'apc',he:2,va:'3000',topo:'vfi',pc:{mgmt:1},rack:'rA',u:5,ip:'10.0.0.5'}),
-    D('switch',{id:'acc',name:'Access-SW EG',year:2023,model:'24 PoE+ · 2 SFP+',style:'unifi',pc:{rj45:24,sfpp:2},poe:true,rack:'rB',u:1,ip:'10.0.0.11',ports:{r1:{label:'AP Flur',vlan:'20'},r2:{label:'PC Empfang',vlan:'10'},r3:{label:'Telefon Empfang',vlan:'30'},r4:{label:'PC Buchhaltung',vlan:'10'}}}),
+    D('switch',{id:'acc',name:'Access-SW EG',year:2023,model:'24 PoE+ · 2 SFP+',style:'unifi',pc:{rj45:24,sfpp:2},poe:true,rack:'rB',u:1,ip:'10.0.0.11',ports:{r1:{label:'AP Flur',vlan:20},r2:{label:'PC Empfang',vlan:10},r3:{label:'Telefon Empfang',vlan:30},r4:{label:'PC Buchhaltung',vlan:10},p1:{label:'Uplink Core',vm:'trunk',vlan:99,tv:[10,20,30]}}}),
     D('patch',{id:'pp1',name:'Patchpanel EG',style:'unifi',pc:{kj:24},cat:'cat6a',shield:true,rack:'rB',u:2,ports:{k1:{label:'AP Flur',notes:'Flur EG · Deckendose'},k2:{label:'PC Mustermann',notes:'PC Max Mustermann · Empfang, Dose 1'},k3:{label:'Tel. Mustermann',notes:'Telefon Max Mustermann · Empfang, Dose 2'},k4:{label:'PC Musterfrau',notes:'PC Erika Musterfrau · Buchhaltung, Dose 1'}}}),
     D('ap',{id:'ap1',name:'AP Flur EG',style:'unifi',wifi:'Wi-Fi 6E',rj45Speed:'2.5G',poeStd:'at',ip:'10.0.20.21',x:120,y:2020}),
     D('host',{id:'pc1',name:'PC Empfang',year:2020,sub:'pc',ip:'10.0.10.51',user:'Max Mustermann',mac:'3c:52:82:1a:7f:10',x:380,y:2020}),
@@ -1732,7 +1903,7 @@ function demo(){
     C('c13',{d:'pp1',p:'k3',s:'r'},{d:'tel1',p:'r1'},{label:'K-013',cat:'cat7',shield:'S/FTP',len:18,color:'weiss'}),
     C('c14',{d:'acc',p:'r4'},{d:'pp1',p:'k4'},{label:'K-014',shield:'S/FTP',len:0.5,color:'blau'}),
     C('c15',{d:'pp1',p:'k4',s:'r'},{d:'pc2',p:'r1'},{label:'K-015',cat:'cat7',shield:'S/FTP',len:24,color:'weiss'})
-  ],view:{labelMode:'num',colorBy:'speed',hide:{cats:[],ids:[]}},life:{old:5,eol:10},updated:0,demo:true};
+  ],vlans:[{id:10,name:'Clients',color:'#2563eb',subnet:'10.0.10.0/24',gw:'10.0.10.1'},{id:20,name:'WLAN',color:'#16a34a',subnet:'10.0.20.0/24',gw:'10.0.20.1'},{id:30,name:'Telefonie',color:'#9333ea',subnet:'10.0.30.0/24',gw:'10.0.30.1'},{id:99,name:'Management',color:'#475569',subnet:'10.0.0.0/24',gw:'10.0.0.254'}],view:{labelMode:'num',colorBy:'speed',hide:{cats:[],ids:[]}},life:{old:5,eol:10},updated:0,demo:true};
 }
 
 /* ================= start ================= */
