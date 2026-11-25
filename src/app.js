@@ -1568,7 +1568,7 @@ function buildMenu(){
   const can=!!DL;
   const items=[['json',can?'Projekt speichern (.json)':'Projekt als JSON kopieren'],['open','Projekt laden …'],['-'],['csv',can?'Patchliste als CSV':'Patchliste kopieren (CSV)'],['csv2',can?'Strecken als CSV':'Strecken kopieren (CSV)'],['svg',can?'Plan als SVG-Bild':'Plan als SVG kopieren']];
   if(can)items.push(['png','Plan als PNG-Bild']);
-  items.push(['-'],['example','Beispielprojekt laden'],['new','Neues leeres Projekt']);
+  items.push(['-'],['versions','Versionsverlauf …'],['-'],['example','Beispielprojekt laden'],['new','Neues leeres Projekt']);
   $('#menu').innerHTML=items.map(([k,t])=>k==='-'?'<hr>':`<button type="button" role="menuitem" data-m="${k}">${t}</button>`).join('');
   $('#b-csv').textContent=can?'CSV herunterladen':'CSV kopieren';
 }
@@ -1580,6 +1580,7 @@ const emptyState=()=>({v:3,name:'Neues Netzwerk',devices:[],cables:[],racks:[],r
 async function menuAct(m){
   if(['json','csv','csv2','svg','png'].includes(m))return exp(m);
   if(m==='open')return openImport();
+  if(m==='versions')return openVersions();
   if(m==='example'){if(state.devices.length&&!state.demo&&!(await ask('Beispiel laden?','Das aktuelle Projekt wird ersetzt. Mit Strg+Z holst du es zurück.','Beispiel laden')))return;ck();state=demo();sel=null;LC.clear();touched();state.demo=true;renderAll();fit();return}
   if(m==='new'){if((state.devices.length||state.racks.length||state.rooms.length)&&!(await ask('Neues Projekt?','Das aktuelle Projekt wird geleert. Mit Strg+Z holst du es zurück.','Leeren',true)))return;ck();state=emptyState();sel=null;touched();renderAll();fit()}
 }
@@ -1934,8 +1935,45 @@ $('#ptb').addEventListener('keydown',e=>{const tr=e.target.closest('tr[data-cab]
 
 /* ================= saving ================= */
 function setSave(s){const m={local:['Im Browser gespeichert','#8a8a85'],cloud:[store.kind==='server'?'Auf dem Server gespeichert':'Gespeichert','#3ddc6a'],conflict:['Nicht gespeichert – Konflikt','#ff6b5f'],offline:['Server nicht erreichbar','#ff6b5f'],saving:['Speichert …','#ffe600'],err:['Speichern fehlgeschlagen','#ff6b5f'],demo:['Beispiel','#8a8a85'],boot:['Lädt …','#8a8a85']}[s]||['',''];const el=$('#save');el.textContent=m[0];el.title=m[0];el.style.setProperty('--sc',m[1])}
-function saveLocal(){try{localStorage.setItem(LS,JSON.stringify(state))}catch(_){}}
+function saveLocal(){try{localStorage.setItem(LS,JSON.stringify(state))}catch(_){}if(store.kind!=='server'&&!state.demo)autoVersion()}
 function loadLocal(){try{const t=localStorage.getItem(LS);return t?sanitize(JSON.parse(t)):null}catch(_){return null}}
+/* ---------- Versionsverlauf ---------- */
+const LSV='switch-verkabelung-versions';
+const lvRead=()=>{try{return JSON.parse(localStorage.getItem(LSV)||'[]')}catch(_){return []}};
+function lvWrite(a){for(let i=0;i<5;i++){try{localStorage.setItem(LSV,JSON.stringify(a));return true}catch(_){const k=a.map((v,j)=>[v,j]).filter(([v])=>!v.name).pop();if(!k)return false;a.splice(k[1],1)}}return false}
+function lvAdd(name){const a=lvRead();a.unshift({id:'v'+Date.now(),updated:Date.now(),name:name||'',devices:state.devices.length,cables:state.cables.length,json:JSON.stringify(state)});
+  const auto=a.filter(v=>!v.name);while(a.length>30&&auto.length){const v=auto.pop();a.splice(a.indexOf(v),1)}return lvWrite(a)}
+function autoVersion(){const a=lvRead(),last=a.find(v=>!v.name);if(last&&Date.now()-last.updated<15*60e3)return;if(last&&last.json===JSON.stringify(state))return;lvAdd('')}
+const VER={
+  list:async()=>store.kind==='server'?(await fetch('api/versions',{cache:'no-store'}).then(r=>r.ok?r.json():[])):lvRead().map(({json,...v})=>({...v,named:!!v.name})),
+  get:async id=>{if(store.kind==='server'){const r=await fetch('api/versions/'+encodeURIComponent(id),{cache:'no-store'});if(!r.ok)throw new Error();return r.json()}const v=lvRead().find(x=>x.id===id);if(!v)throw new Error();return v},
+  add:async name=>{if(store.kind==='server'){if(store.dirty)await saveCloud();const r=await fetch('api/versions',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name})});return r.ok}return lvAdd(name||'Gespeicherter Stand')},
+  del:async id=>{if(store.kind==='server')return (await fetch('api/versions/'+encodeURIComponent(id),{method:'DELETE'})).ok;const a=lvRead().filter(v=>v.id!==id);return lvWrite(a)}};
+function diffPlans(A,B){const out=[],m=(a,b,key,name,lbl)=>{const am=new Map(a.map(x=>[x[key],x])),bm=new Map(b.map(x=>[x[key],x]));const add=b.filter(x=>!am.has(x[key])),del=a.filter(x=>!bm.has(x[key]));let ch=[],mv=0;
+    for(const x of b){const o=am.get(x[key]);if(!o)continue;const s1=JSON.stringify({...o,x:0,y:0}),s2=JSON.stringify({...x,x:0,y:0});if(s1!==s2)ch.push(x);else if(o.x!==x.x||o.y!==x.y)mv++}
+    const nm=l=>l.slice(0,6).map(x=>name(x)).join(', ')+(l.length>6?' …':'');
+    const P=n=>n+' '+(n===1?lbl[0]:lbl[1]);if(add.length)out.push(`<li class="da">+ ${P(add.length)} neu: ${esc(nm(add))}</li>`);if(del.length)out.push(`<li class="dd">− ${P(del.length)} entfernt: ${esc(nm(del))}</li>`);if(ch.length)out.push(`<li>~ ${P(ch.length)} geändert: ${esc(nm(ch))}</li>`);if(mv)out.push(`<li>${P(mv)} verschoben</li>`)};
+  m(A.devices,B.devices,'id',x=>x.name,['Gerät','Geräte']);m(A.cables,B.cables,'id',x=>x.label||'Kabel',['Kabel','Kabel']);m(A.racks,B.racks,'id',x=>x.name,['Schrank','Schränke']);m(A.rooms,B.rooms,'id',x=>x.name,['Raum','Räume']);m(A.vlans||[],B.vlans||[],'id',x=>'VLAN '+x.id,['VLAN','VLANs']);
+  if(A.name!==B.name)out.push(`<li>Projektname: „${esc(A.name)}“ → „${esc(B.name)}“</li>`);
+  return out.length?`<ul class="diff">${out.join('')}</ul>`:'<p class="note">Keine Unterschiede zum aktuellen Stand.</p>'}
+async function openVersions(){
+  const srv=store.kind==='server';
+  modal(`<div class="mbox wide" role="dialog" aria-modal="true" aria-labelledby="m-t"><div class="mh"><h2 id="m-t">Versionsverlauf</h2>${closeBtn}</div>
+  <p>${srv?'Der Server sichert den Plan automatisch, höchstens alle 10 Minuten. Benannte Stände bleiben dauerhaft erhalten.':'Gespeichert in diesem Browser: automatisch höchstens alle 15 Minuten beim Bearbeiten, dazu deine benannten Stände.'}</p>
+  <form class="vadd" id="vaddf"><input id="m-vn" maxlength="60" placeholder="Name, z. B. Vor Umbau Serverraum" aria-label="Name der Version"><button type="submit" class="btn pri">Aktuellen Stand speichern</button></form>
+  <div id="vlist"><p class="note">Lädt …</p></div></div>`);
+  $('#vaddf').onsubmit=async e=>{e.preventDefault();const ok=await VER.add($('#m-vn').value.trim());toast(ok?'Stand gespeichert':'Konnte nicht gespeichert werden');$('#m-vn').value='';showVersions()};
+  showVersions()}
+async function showVersions(){const box=$('#vlist');if(!box)return;let L=[];try{L=await VER.list()}catch(_){}
+  box.innerHTML=L.length?`<ul class="vers">${L.map(v=>`<li data-ver="${esc(v.id)}"><div class="vrow2"><span><b>${esc(v.name||'Automatische Sicherung')}</b><small>${new Date(v.updated).toLocaleString('de-DE',{dateStyle:'medium',timeStyle:'short'})} · ${pl(v.devices,'Gerät','Geräte')} · ${v.cables} Kabel</small></span><span class="vbtns"><button type="button" class="btn sm" data-vop="cmp">Vergleichen</button><button type="button" class="btn sm" data-vop="dl">JSON</button><button type="button" class="btn sm pri" data-vop="restore">Wiederherstellen</button>${v.named?`<button type="button" class="ib sm" data-vop="del" aria-label="Version löschen">×</button>`:''}</span></div><div class="vdiff"></div></li>`).join('')}</ul>`:'<p class="note">Noch keine Versionen vorhanden.</p>';
+  box.onclick=async e=>{const b=e.target.closest('[data-vop]');if(!b)return;const li=b.closest('[data-ver]'),id=li.dataset.ver;let v;try{v=await VER.get(id)}catch(_){toast('Version nicht lesbar');return}
+    let plan;try{plan=sanitize(JSON.parse(v.json))}catch(_){toast('Version ist beschädigt');return}
+    if(b.dataset.vop==='cmp'){const t=li.querySelector('.vdiff');t.innerHTML=t.innerHTML?'':'<p class="note">Seit dieser Version:</p>'+diffPlans(plan,state);return}
+    if(b.dataset.vop==='dl'){const txt=JSON.stringify(plan,null,2),fn=slug()+'-'+new Date(v.updated).toISOString().slice(0,16).replace(/[:T]/g,'-')+'.json';if(DL)save(fn,txt);else copyText(txt,'Version');return}
+    if(b.dataset.vop==='del'){if(await VER.del(id))showVersions();return}
+    if(b.dataset.vop==='restore'){closeModal();if(!(await ask('Version wiederherstellen?',`Der Plan wird durch „${v.name||'Automatische Sicherung'}“ vom ${new Date(v.updated).toLocaleString('de-DE')} ersetzt. Der aktuelle Stand wird vorher als Version gesichert.`,'Wiederherstellen')))return;
+      await VER.add('Vor Wiederherstellung');ck();const keepT=state.templates;state=plan;if(!state.templates||!state.templates.length)state.templates=keepT||[];state.demo=false;sel=null;MS.clear();LC.clear();touched();renderAll();fit();toast('Version wiederhergestellt – Strg+Z macht es rückgängig')}};
+}
 async function saveCloud(){
   if(!store.ref)return;if(store.busy){store.pending=true;return}
   store.busy=true;const body={json:JSON.stringify(state),updated:state.updated||Date.now(),v:3};if(store.force){body.force=true;store.force=false}

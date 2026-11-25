@@ -93,7 +93,7 @@ function writePlan(obj) {
       const name = 'plan-' + new Date().toISOString().replace(/[:.]/g, '-') + '.json';
       await fsp.copyFile(PLAN, path.join(BK, name)).catch(() => {});
       lastBackup = Date.now();
-      const files = (await fsp.readdir(BK)).filter(f => /^plan-.*\.json$/.test(f)).sort();
+      const files = (await fsp.readdir(BK)).filter(f => /^plan-.*\.json$/.test(f)).sort(); // benannte Versionen (named-*) bleiben
       for (const f of files.slice(0, Math.max(0, files.length - KEEP))) await fsp.unlink(path.join(BK, f)).catch(() => {});
     }
     const tmp = `${PLAN}.${process.pid}.tmp`;
@@ -128,6 +128,47 @@ async function apiPlan(req, res) {
   return send(res, 200, { updated });
 }
 
+// Versionen: automatische Sicherungen (plan-*.json) und benannte Stände (named-*.json)
+const VCACHE = new Map();
+const VID = /^(plan|named)-[0-9TZ-]+\.json$/;
+async function versionInfo(f) {
+  if (VCACHE.has(f)) return VCACHE.get(f);
+  const raw = JSON.parse(await fsp.readFile(path.join(BK, f), 'utf8'));
+  let devices = 0, cables = 0;
+  try { const p = JSON.parse(raw.json); devices = (p.devices || []).length; cables = (p.cables || []).length; } catch {}
+  const info = { id: f, updated: raw.updated || 0, name: raw.name || '', devices, cables, named: f.startsWith('named-') };
+  VCACHE.set(f, info);
+  return info;
+}
+async function apiVersions(req, res, rest) {
+  if (rest === '' && req.method === 'GET') {
+    const files = (await fsp.readdir(BK)).filter(f => VID.test(f));
+    const list = [];
+    for (const f of files) { try { list.push(await versionInfo(f)); } catch {} }
+    list.sort((a, b) => b.updated - a.updated || b.id.localeCompare(a.id));
+    return send(res, 200, list, { 'Cache-Control': 'no-store' });
+  }
+  if (rest === '' && req.method === 'POST') {
+    if (!cur) return send(res, 409, 'Noch kein Plan gespeichert');
+    let b = {};
+    try { b = JSON.parse((await readBody(req)) || '{}'); } catch { return send(res, 400, 'Ungültiges JSON'); }
+    const name = String(b.name || '').trim().slice(0, 60);
+    const f = 'named-' + new Date().toISOString().replace(/[:.]/g, '-') + '.json';
+    await (queue = queue.then(() => fsp.writeFile(path.join(BK, f), JSON.stringify({ ...cur, name: name || 'Gespeicherter Stand' }))).catch(() => {}));
+    return send(res, 200, await versionInfo(f));
+  }
+  if (req.method === 'GET' && VID.test(rest)) {
+    try { return send(res, 200, await fsp.readFile(path.join(BK, rest), 'utf8'), { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); }
+    catch { return send(res, 404, 'Nicht gefunden'); }
+  }
+  if (req.method === 'DELETE' && /^named-/.test(rest) && VID.test(rest)) {
+    await fsp.unlink(path.join(BK, rest)).catch(() => {});
+    VCACHE.delete(rest);
+    return send(res, 200, { ok: true });
+  }
+  return send(res, 405, 'Methode nicht erlaubt');
+}
+
 async function serveStatic(req, res, pathname) {
   if (req.method !== 'GET' && req.method !== 'HEAD') return send(res, 405, 'Methode nicht erlaubt', { Allow: 'GET, HEAD' });
   let rel;
@@ -158,6 +199,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/healthz') return send(res, 200, 'ok', { 'Cache-Control': 'no-store' });
     if (!authed(req)) return send(res, 401, 'Anmeldung erforderlich', { 'WWW-Authenticate': 'Basic realm="Switch-Verkabelung", charset="UTF-8"' });
     if (pathname === '/api/plan') return await apiPlan(req, res);
+    if (pathname === '/api/versions' || pathname.startsWith('/api/versions/')) return await apiVersions(req, res, pathname.slice('/api/versions'.length).replace(/^\//, ''));
     if (pathname.startsWith('/api/')) return send(res, 404, 'Nicht gefunden');
     return await serveStatic(req, res, pathname);
   } catch (e) {

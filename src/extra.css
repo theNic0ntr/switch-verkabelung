@@ -219,3 +219,13 @@ table.etab{width:100%;border-collapse:collapse;font-size:14px;margin-bottom:22px
 .chip.tpl{border-color:var(--ink);border-top-right-radius:0;border-bottom-right-radius:0;border-right:0}
 .tdel{min-height:36px;width:30px;border:1px solid var(--ink);border-radius:0 18px 18px 0;background:var(--bg);color:var(--mute);font:600 15px/1 inherit;cursor:pointer}
 .tdel:hover{color:#d0342c}
+/* --- versions --- */
+.vadd{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;margin:0 0 16px}
+.vers{list-style:none;margin:0;padding:0;display:grid;gap:8px;max-height:min(55vh,520px);overflow:auto}
+.vers>li{border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.vrow2{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px}
+.vrow2 b{display:block;font-size:15px}.vrow2 small{color:var(--mute);font-size:13px}
+.vbtns{display:flex;gap:6px;flex-wrap:wrap}
+.diff{margin:6px 0 0;padding-left:18px;font-size:14px;line-height:1.5}
+.diff .da{color:#15803d}.diff .dd{color:#b91c1c}
+@media(max-width:600px){.vadd{grid-template-columns:1fr}}
