@@ -1823,6 +1823,20 @@ $('#tp-svg').onclick=()=>{const R=topoSVG();if(!R){toast('Noch keine Topologie')
 function powerRows(){const rows=[...PW].map(([id,P])=>{const d=dev(id);return {dv:id,cells:[d.name,d.kind==='ups'?'USV':'PDU',d.kind==='ups'?`${Number(d.va).toLocaleString('de-DE')} VA · ${P.cap} W`:`${d.amp==='3x16'?'3 × 16':d.amp} A · ${P.cap} W`,Math.round(P.load)+' W',Math.round(P.pct)+' %',P.min!=null?P.min+' min':'',d.kind==='pdu'?`${P.plugs}/${(+d.o13||0)+(+d.o19||0)}`:String(P.plugs),P.list.map(x=>x.d.name+(x.d.kind==='pdu'?'':' ('+x.ab+')')).join(', ')],cls:P.pct>100?'over':P.pct>=80?'high':''}});
   const loose=state.devices.filter(d=>pwrDev(d)&&d.kind!=='pdu'&&!feedsOf(d).length),tot=state.devices.filter(d=>pwrDev(d)&&d.kind!=='pdu').reduce((a,d)=>a+devW(d),0);
   return {heads:['Quelle','Art','Kapazität','Last','Auslastung','Laufzeit','Stecker','Versorgt'],rows,num:[3,4,5,6],sub:`Gesamtverbrauch ca. ${Math.round(tot)} W · ${pl(loose.length,'Gerät','Geräte')} ohne USV/PDU`}}
+function matRows(){const M=new Map(),add=(g,art,det,n,u)=>{const k=g+'|'+art+'|'+det+'|'+u;const o=M.get(k)||{g,art,det,n:0,u};o.n+=n;M.set(k,o)};
+  for(const c of state.cables){const inst=c.a.s==='r'||c.b.s==='r',len=c.len===''?null:+c.len,col=c.color!=='auto'?COL[c.color].n:'';
+    if(c.med==='cu'){const sp=`${CAT[c.cat].n} ${c.shield}`;if(inst){add('Verlegekabel','Installationskabel '+sp,'',len||0,'m');if(len==null)add('Verlegekabel','Installationskabel '+sp,'ohne Längenangabe',1,'Strecken')}else add('Patchkabel','Patchkabel '+sp,[len!=null?de(String(len))+' m':'Länge offen',col].filter(Boolean).join(' · '),1,'Stück')}
+    else if(c.med==='fi'){const sp=`LWL ${FG[c.fg].n} ${c.ca}/${c.cb}${FG[c.fg].m==='sm'&&c.pol==='APC'?' APC':''}`;add(inst?'Verlegekabel':'Patchkabel',(inst?'LWL-Verlegekabel ':'LWL-Patchkabel ')+sp.replace('LWL ',''),[len!=null?de(String(len))+' m':'Länge offen',col].filter(Boolean).join(' · '),1,'Stück')}
+    else add('Direktkabel',`${MED[c.med].n}${c.med==='dac'?' '+c.dac:''}`,[ptype(c.a.p)?PT[ptype(c.a.p)].n:'',len!=null?de(String(len))+' m':'Länge offen'].filter(Boolean).join(' · '),1,'Stück');
+    if(c.med==='cu'||c.med==='fi')for(const k of ['ta','tb'])if(c[k])add('Transceiver',c[k],TR[c[k]]?TR[c[k]].ff.map(t=>PT[t].n).join('/'):'',1,'Stück')}
+  for(const d of state.devices){const vend=(STY[d.style]||{}).n||'';add('Geräte',d.kind==='host'||d.kind==='net'?subLbl(d):KIND[d.kind].n,[d.model,d.kind==='host'?'':vend.replace('-Stil','')].filter(Boolean).join(' · '),1,'Stück');
+    if(d.kind==='patch'&&d.pc.kj)add('Module',`Keystone-Modul ${CAT[d.cat].n}${d.shield?' geschirmt':''}`,'',d.pc.kj,'Stück');
+    if(d.kind==='fiber')for(const t of ['lc','sc','mpo'])if(d.pc[t])add('Module',`LWL-Kupplung ${PT[t].n} ${FG[d.fg].n}`,'',d.pc[t],'Stück');
+    if(d.kind==='server'&&d.bays){const DI=diskInfo(d);for(const x of DI.list)add('Festplatten',`${x.t} ${d.bayForm.replace('.',',')}″`,x.o.c?fmtCap(x.o):'Größe offen',1,'Stück')}}
+  for(const r of state.racks){const G=rgeom(r);add('Schränke',`Netzwerkschrank ${r.rsize}″`,r.minHe?r.minHe+' HE':`mind. ${G.n} HE`,1,'Stück')}
+  const ord=['Geräte','Schränke','Patchkabel','Verlegekabel','Direktkabel','Transceiver','Module','Festplatten'];
+  const rows=[...M.values()].sort((a,b)=>ord.indexOf(a.g)-ord.indexOf(b.g)||a.art.localeCompare(b.art,'de')||a.det.localeCompare(b.det,'de',{numeric:true})).map(o=>({cells:[o.g,o.u==='m'?de(String(+o.n.toFixed(1))):String(o.n),o.u,o.art,o.det]}));
+  return {heads:['Gruppe','Menge','Einheit','Artikel','Details'],rows,num:[1],sub:`${rows.length} Positionen · Kabel ${state.cables.length} · Geräte ${state.devices.length}`}}
 const TTL={kabel:'Patchliste',strecken:'Strecken',geraete:'Geräte',netze:'VLANs & IP-Adressen',strom:'Stromversorgung',material:'Materialliste'};
 function devRows(){const byName=(a,b)=>String(a.name).localeCompare(String(b.name),'de',{numeric:true});
   return [...state.devices].sort((a,b)=>catOrder.indexOf(catOf(a)[0])-catOrder.indexOf(catOf(b)[0])||byName(a,b)).map(d=>{const z=lcs(d),hv=HVL.get(d.id),rm=devRoom(d);
