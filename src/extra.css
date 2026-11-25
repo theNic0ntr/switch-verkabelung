@@ -206,3 +206,11 @@ table.etab{width:100%;border-collapse:collapse;font-size:14px;margin-bottom:22px
 .patch tr.over td:nth-child(5){color:#d0342c;font-weight:700}
 .patch tr.high td:nth-child(5){color:#b45309;font-weight:700}
 #l-pow{pointer-events:none}
+/* --- multi selection --- */
+#band{pointer-events:none;vector-effect:non-scaling-stroke}
+#cv.selmode{cursor:crosshair}
+.zoom button[aria-pressed=true]{background:#ffe600;color:#111}
+.mchips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 14px}
+.mchips .chip span{opacity:.6;margin-left:2px}
+.mset{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:end}
+.mset .btn{margin-bottom:12px}

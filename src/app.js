@@ -212,7 +212,7 @@ function lcSVG(d,L){const z=lcs(d);if(!z||z.s==='ok')return '';const C=LCC[z.s],
   let px,py;if(d.kind==='host'){px=W-pw;py=-27}else if(d.kind==='ap'){px=W/2-pw/2;py=Hh-8}else if(L.tower){px=W/2-pw/2;py=3}else{px=L.ear+10;py=Hh>=U?5:3}
   return s+`<g class="lcb"><rect x="${px}" y="${py}" width="${pw}" height="16" rx="8" fill="${C.c}" stroke="#111" stroke-opacity=".4"/><text x="${px+pw/2}" y="${py+11.6}" text-anchor="middle" font-size="10.4" font-weight="700" fill="${C.t}">${esc(txt)}</text></g>`}
 /* ---------- show / hide tree ---------- */
-let HIDL=new Set();const openV=new Set(['rooms','racks','devs','hosts']);
+let HIDL=new Set(),MS=new Set(),selMode=false;const openV=new Set(['rooms','racks','devs','hosts']);
 function visTree(){
   const byName=(a,b)=>String(a.name).localeCompare(String(b.name),'de',{numeric:true}),leaf=o=>({id:o.id,n:o.name,o}),D=state.devices;
   const kinds=Object.keys(KINDP).map(k=>({key:'k:'+k,n:KINDP[k],kids:D.filter(d=>d.kind===k).sort(byName).map(leaf)})).filter(g=>g.kids.length);
@@ -759,7 +759,7 @@ function renderCanvas(){
   const sd=sel&&sel.kind==='dev'?sel.id:null,sp=sel&&sel.kind==='port'?sel:null;
   $('#l-room').innerHTML=state.rooms.map(rm=>roomSVG(rm,{sel:sel&&sel.kind==='room'&&sel.id===rm.id})).join('');
   $('#l-rack').innerHTML=state.racks.map(r=>rackFrameSVG(r,{sel:sel&&sel.kind==='rack'&&sel.id===r.id})).join('');
-  $('#l-dev').innerHTML=state.devices.map(d=>devSVG(d,{sel:d.id===sd,selPort:sp&&sp.dev===d.id?sp.port:null,hl:HL})).join('');
+  $('#l-dev').innerHTML=state.devices.map(d=>devSVG(d,{sel:d.id===sd||MS.has(d.id),selPort:sp&&sp.dev===d.id?sp.port:null,hl:HL})).join('');
   $('#l-num').innerHTML=state.devices.map(d=>numSVG(d,{})).join('');
   $('#l-pow').innerHTML=powSVG();
   drawCables();
@@ -865,9 +865,23 @@ function renderInsp(){
   else if(sel&&sel.kind==='cable'&&state.cables.some(c=>c.id===sel.id))h=inspCab(state.cables.find(c=>c.id===sel.id));
   else if(sel&&sel.kind==='rack'&&rackOf(sel.id))h=inspRack(rackOf(sel.id));
   else if(sel&&sel.kind==='room'&&roomOf(sel.id))h=inspRoom(roomOf(sel.id));
+  else if(sel&&sel.kind==='multi'&&MS.size>1)h=inspMulti();
   else{sel=null;h=inspNone()}
   $('#ic').innerHTML=h;
 }
+function msToggle(id){if(!MS.size&&sel&&sel.kind==='dev'&&sel.id!==id)MS.add(sel.id);MS.has(id)?MS.delete(id):MS.add(id);msApply()}
+function msApply(){if(!MS.size)select(null);else if(MS.size===1){const o=[...MS][0];select({kind:'dev',id:o})}else select({kind:'multi'})}
+function inspMulti(){const L=[...MS].map(dev).filter(Boolean),free=L.filter(d=>!d.rack);
+  return `<div class="ih"><span class="kind">Mehrfachauswahl</span><h2 id="ih-t">${pl(L.length,'Gerät','Geräte')} ausgewählt</h2><p class="sub">${free.length<L.length?`${pl(L.length-free.length,'Gerät steckt','Geräte stecken')} im Schrank und ${L.length-free.length===1?'bleibt':'bleiben'} beim Verschieben und Ausrichten an ${L.length-free.length===1?'seinem':'ihrem'} Platz.`:'Umschalt + Klick fügt hinzu oder entfernt, Umschalt + Ziehen auf freier Fläche zieht einen Rahmen.'}</p></div>
+  <div class="mchips">${L.map(d=>`<button type="button" class="chip" data-act="mrem" data-id="${d.id}" title="Aus der Auswahl entfernen">${esc(trunc(d.name,24))} <span aria-hidden="true">×</span></button>`).join('')}</div>
+  ${free.length>1?`<h3>Ausrichten</h3><div class="row"><button type="button" class="btn" data-act="malign" data-m="top">Oben bündig</button><button type="button" class="btn" data-act="malign" data-m="left">Links bündig</button></div><div class="row"><button type="button" class="btn" data-act="malign" data-m="dh">Waagerecht verteilen</button><button type="button" class="btn" data-act="malign" data-m="dv">Senkrecht verteilen</button></div>`:''}
+  <h3>Für alle setzen</h3>
+  <div class="mset">${fld('f-my','Kaufjahr',`<input id="f-my" type="number" min="1980" max="2100" inputmode="numeric" placeholder="z. B. 2021">`)}<button type="button" class="btn" data-act="mset" data-k="year">Übernehmen</button></div>
+  ${state.devices.some(isSrc)?`<div class="mset">${fld('f-mpa','Netzteil A an',`<select id="f-mpa">${opts(srcOpts({id:'',kind:''}),'')}</select>`)}<button type="button" class="btn" data-act="mset" data-k="pa">Übernehmen</button></div>`:''}
+  <div class="row"><button type="button" class="btn" data-act="mdup">Duplizieren</button><button type="button" class="btn" data-act="mhide">Ausblenden</button><button type="button" class="btn danger" data-act="mdel">Löschen</button></div>`}
+async function msDelete(){const ids=new Set(MS);if(!ids.size)return;if(!(await ask(pl(ids.size,'Gerät','Geräte')+' löschen?','Die Geräte und alle ihre Kabel werden entfernt. Strg+Z holt sie zurück.','Löschen',true)))return;
+  ck();state.cables=state.cables.filter(c=>!ids.has(c.a.d)&&!ids.has(c.b.d));state.devices=state.devices.filter(d=>!ids.has(d.id));MS.clear();sel=null;touched();renderAll();toast(pl(ids.size,'Gerät','Geräte')+' gelöscht')}
+function msMove(dx,dy){const L=[...MS].map(dev).filter(d=>d&&!d.rack);if(!L.length)return;ck('msmove');for(const d of L){d.x+=dx;d.y+=dy}touched();renderAll()}
 function inspNone(){
   const tot=state.devices.reduce((a,d)=>a+total(d),0),used=state.devices.reduce((a,d)=>a+usedPorts(d),0);
   return `<div class="ih"><span class="kind">Projekt</span><h2>${esc(state.name)}</h2><p class="sub">${pl(state.racks.length,'Schrank','Schränke')} · ${pl(state.rooms.length,'Raum','Räume')}. Klicke auf ein Gerät, einen Port, ein Kabel, einen Schrank oder einen Raum.</p></div>
@@ -1087,10 +1101,10 @@ function inspCab(c){
 /* ================= edits ================= */
 function ck(key){const now=Date.now();if(key&&key===H.key&&now-H.t<1500){H.t=now;return}H.u.push(JSON.stringify(state));if(H.u.length>150)H.u.shift();H.r=[];H.key=key||null;H.t=now}
 function touched(){state.updated=Date.now();state.demo=false;store.dirty=true;clearTimeout(store.tl);store.tl=setTimeout(saveLocal,300);if(store.ref){clearTimeout(store.tc);setSave('saving');store.tc=setTimeout(saveCloud,1200)}else setSave('local')}
-function fixSel(){if(!sel)return;if(sel.kind==='dev'&&!dev(sel.id))sel=null;else if(sel.kind==='port'&&!(dev(sel.dev)&&pexists(dev(sel.dev),sel.port)))sel=null;else if(sel.kind==='cable'&&!state.cables.some(c=>c.id===sel.id))sel=null;else if(sel.kind==='rack'&&!rackOf(sel.id))sel=null;else if(sel.kind==='room'&&!roomOf(sel.id))sel=null}
+function fixSel(){for(const id of [...MS])if(!dev(id))MS.delete(id);if(sel&&sel.kind==='multi'&&MS.size<2){const o=[...MS][0];MS.clear();sel=o?{kind:'dev',id:o}:null}if(!sel)return;if(sel.kind==='dev'&&!dev(sel.id))sel=null;else if(sel.kind==='port'&&!(dev(sel.dev)&&pexists(dev(sel.dev),sel.port)))sel=null;else if(sel.kind==='cable'&&!state.cables.some(c=>c.id===sel.id))sel=null;else if(sel.kind==='rack'&&!rackOf(sel.id))sel=null;else if(sel.kind==='room'&&!roomOf(sel.id))sel=null}
 function undo(){if(!H.u.length)return;H.r.push(JSON.stringify(state));state=JSON.parse(H.u.pop());H.key=null;fixSel();touched();renderAll()}
 function redo(){if(!H.r.length)return;H.u.push(JSON.stringify(state));state=JSON.parse(H.r.pop());H.key=null;fixSel();touched();renderAll()}
-function select(s){sel=s;if(raidEdit&&!(s&&s.kind==='dev'&&s.id===raidEdit.dev))raidEdit=null;if(innerWidth<=1100)$('#rail').classList.remove('open');$('#insp').classList.toggle('min',!s&&innerWidth<=760);$('#itog').setAttribute('aria-expanded',String(!!s||innerWidth>760));renderAll()}
+function select(s){if(!s||s.kind!=='multi')MS.clear();sel=s;if(raidEdit&&!(s&&s.kind==='dev'&&s.id===raidEdit.dev))raidEdit=null;if(innerWidth<=1100)$('#rail').classList.remove('open');$('#insp').classList.toggle('min',!s&&innerWidth<=760);$('#itog').setAttribute('aria-expanded',String(!!s||innerWidth>760));renderAll()}
 function nextLabel(){let m=0;for(const c of state.cables){const r=/^K-(\d+)$/.exec(c.label);if(r)m=Math.max(m,+r[1])}return 'K-'+String(m+1).padStart(3,'0')}
 function pickSide(d,pid,other){const pf=other&&(other.kind==='host'||other.kind==='ap')?'r':'f',alt=pf==='f'?'r':'f';if(!cabOf(d.id,pid,pf))return pf;if(!cabOf(d.id,pid,alt))return alt;return null}
 function applyTr(c){
@@ -1309,7 +1323,9 @@ cv.addEventListener('pointerdown',e=>{
   if(e.pointerType==='mouse'&&e.button!==0)return;
   $('#rail').classList.remove('open');
   const t=e.target,pe=t.closest('[data-port]'),ce=t.closest('[data-cable]'),dg=t.closest('[data-dev]'),rk=t.closest('[data-rack]'),sl=t.closest('[data-slot]'),rh=t.closest('[data-rh]'),rm=t.closest('[data-room]');
-  const base={sx:e.clientX,sy:e.clientY,moved:false,pid:e.pointerId},w=toWorld(e);
+  const base={sx:e.clientX,sy:e.clientY,moved:false,pid:e.pointerId},w=toWorld(e),mod=e.shiftKey||e.ctrlKey||e.metaKey||selMode;
+  if(mod&&!(rh&&!dg)){if(dg){const d=dev(dg.dataset.dev);drag={...base,kind:'dev',id:d.id,ox:w.x-d.x,oy:w.y-d.y,orig:{x:d.x,y:d.y,rack:d.rack,u:d.u},tog:true}}else drag={...base,kind:'band',wx:w.x,wy:w.y,add:e.ctrlKey||e.metaKey||selMode}
+    try{cv.setPointerCapture(e.pointerId)}catch(_){}e.preventDefault();return}
   if(pe&&dg)drag={...base,kind:'port',dev:dg.dataset.dev,port:pe.dataset.port};
   else if(ce)drag={...base,kind:'cable',id:ce.dataset.cable};
   else if(dg){const d=dev(dg.dataset.dev),be=t.closest('[data-bay]');drag={...base,kind:'dev',id:d.id,ox:w.x-d.x,oy:w.y-d.y,orig:{x:d.x,y:d.y,rack:d.rack,u:d.u},bay:be?+be.dataset.bay:null}}
@@ -1335,6 +1351,8 @@ function onDrag(e){
   if(!drag.moved){if(Math.hypot(dx,dy)<5)return;drag.moved=true;startDrag()}
   if(drag.kind==='pan'){view.x=drag.vx+dx;view.y=drag.vy+dy;applyView();return}
   const w=toWorld(e);
+  if(drag.kind==='band'){const x=Math.min(w.x,drag.wx),y=Math.min(w.y,drag.wy),b=$('#band');b.style.display='';b.setAttribute('x',x);b.setAttribute('y',y);b.setAttribute('width',Math.abs(w.x-drag.wx));b.setAttribute('height',Math.abs(w.y-drag.wy));drag.bx=[x,y,x+Math.abs(w.x-drag.wx),y+Math.abs(w.y-drag.wy)];return}
+  if(drag.kind==='dev'&&drag.grp){const d=dev(drag.id),ddx=sn(w.x-drag.ox)-drag.orig.x,ddy=sn(w.y-drag.oy)-drag.orig.y;for(const m of drag.grp){m.d.x=m.x+ddx;m.d.y=m.y+ddy;document.querySelectorAll(`#l-dev [data-dev="${m.d.id}"], #l-num [data-dev="${m.d.id}"]`).forEach(g=>g.setAttribute('transform',`translate(${m.d.x} ${m.d.y})`))}drawCables();return}
   if(drag.kind==='dev'){const d=dev(drag.id);d.x=sn(w.x-drag.ox);d.y=sn(w.y-drag.oy);document.querySelectorAll(`#l-dev [data-dev="${d.id}"], #l-num [data-dev="${d.id}"]`).forEach(g=>g.setAttribute('transform',`translate(${d.x} ${d.y})`));
     const r=KIND[d.kind].rack?rackAt(w.x,w.y):null;drag.tr=r;if(r){drag.tu=clamp(Math.round((d.y-(r.y+HEAD))/U)+1,1,200);snapShow(r,drag.tu,d)}else snapShow(null);
     drawCables();return}
@@ -1347,6 +1365,7 @@ function startDrag(){
   hideTip();setHov(null);
   if(drag.kind==='pan')cv.classList.add('panning');
   if(drag.kind==='dev'||drag.kind==='rack'||drag.kind==='room'||drag.kind==='resize')ck();
+  if(drag.kind==='dev'&&MS.has(drag.id)&&MS.size>1&&!dev(drag.id).rack)drag.grp=[...MS].map(dev).filter(x=>x&&!x.rack).map(x=>({d:x,x:x.x,y:x.y}));
   if(drag.kind==='port'){
     const t=ptype(drag.port);let c=null;
     if(isPas(t)){const cf=cabOf(drag.dev,drag.port,'f'),cr=cabOf(drag.dev,drag.port,'r');if(cf&&cr)c=cf;else drag.fixed={d:drag.dev,p:drag.port,s:!cf&&!cr?null:cf?'r':'f'}}
@@ -1373,13 +1392,17 @@ function endDrag(e,cancel){
   if(!drag)return;const g=drag;drag=null;cancelAnimationFrame(raf);
   cv.classList.remove('wiring','panning');try{cv.releasePointerCapture(g.pid)}catch(_){}
   $('#tmpw').style.display='none';snapShow(null);if(g.tEl)g.tEl.classList.remove('tgt-ok','tgt-bad');
+  $('#band').style.display='none';
   if(cancel){
-    if(g.moved&&g.kind==='dev'){const d=dev(g.id);Object.assign(d,g.orig);H.u.pop()}
+    if(g.moved&&g.kind==='dev'&&g.grp){for(const m of g.grp){m.d.x=m.x;m.d.y=m.y}H.u.pop()}
+    else if(g.moved&&g.kind==='dev'){const d=dev(g.id);Object.assign(d,g.orig);H.u.pop()}
     if(g.moved&&g.kind==='rack'){Object.assign(rackOf(g.id),g.orig);H.u.pop()}
     if(g.moved&&g.kind==='room'){Object.assign(roomOf(g.id),g.orig);for(const m of g.mem){m.o.x=m.x;m.o.y=m.y}H.u.pop()}
     if(g.moved&&g.kind==='resize'){Object.assign(roomOf(g.id),g.orig);H.u.pop()}
     renderAll();return}
+  if(g.kind==='band'){if(g.moved&&g.bx){const [x1,y1,x2,y2]=g.bx,hit=state.devices.filter(d=>{if(HID.has(d.id))return false;const L=lay(d);return d.x<x2&&d.x+L.W>x1&&d.y<y2&&d.y+L.H>y1}).map(d=>d.id);if(!g.add)MS.clear();else if(!MS.size&&sel&&sel.kind==='dev')MS.add(sel.id);hit.forEach(id=>MS.add(id));msApply()}else if(!g.add&&sel)select(null);return}
   if(!g.moved){
+    if(g.tog){msToggle(g.id);return}
     if(g.kind==='port')select({kind:'port',dev:g.dev,port:g.port});
     else if(g.kind==='cable')select({kind:'cable',id:g.id});
     else if(g.kind==='dev'&&g.bay!=null&&raidEdit&&raidEdit.dev===g.id){raidToggle(dev(g.id),raidEdit.id,g.bay)}
@@ -1389,6 +1412,7 @@ function endDrag(e,cancel){
     else if(sel)select(null);
     return;
   }
+  if(g.kind==='dev'&&g.grp){touched();sel={kind:'multi'};renderAll();return}
   if(g.kind==='dev'){const d=dev(g.id);
     if(g.tr){if(!rackInsert(d,g.tr,g.tu)){Object.assign(d,g.orig)}else if(g.orig.rack!==d.rack)toast(`In „${g.tr.name}“ eingebaut – ${heTxt(d)}`)}
     else if(d.rack){d.rack=null;toast('Aus dem Schrank ausgebaut')}
@@ -1439,6 +1463,16 @@ ic.addEventListener('click',e=>{
       for(const p of ps){const o=d.ports[p.id]||(d.ports[p.id]={});if(v==='trunk'){o.vm='trunk';o.tv=state.vlans.map(x=>x.id)}else if(v===''){delete o.vm;delete o.tv;delete o.vlan}else{delete o.vm;delete o.tv;o.vlan=+v}if(!Object.keys(o).length)delete d.ports[p.id]}
       touched();renderAll();toast(`${pl(ps.length,'Port','Ports')} geändert`)}
     else if(a==='freeip'){const d=dev(sel.id),v=vlanOf(b.dataset.v),ip=v&&freeIp(v);if(!d||!ip){toast('Kein freies Subnetz gefunden');return}ck();d.ip=ip;touched();renderAll();toast('IP '+ip+' vergeben')}
+    else if(a==='mrem'){MS.delete(b.dataset.id);msApply()}
+    else if(a==='malign'){const L=[...MS].map(dev).filter(d=>d&&!d.rack),m=b.dataset.m;if(L.length<2)return;ck();
+      if(m==='top'){const y=Math.min(...L.map(d=>d.y));L.forEach(d=>d.y=y)}else if(m==='left'){const x=Math.min(...L.map(d=>d.x));L.forEach(d=>d.x=x)}
+      else{const h=m==='dh',k=h?'x':'y',sz=d=>h?lay(d).W:lay(d).H;L.sort((a,b)=>a[k]-b[k]);const span=L[L.length-1][k]+sz(L[L.length-1])-L[0][k],sum=L.reduce((a,d)=>a+sz(d),0),gap=Math.max(20,(span-sum)/(L.length-1));let p=L[0][k];for(const d of L){d[k]=sn(p);p+=sz(d)+gap}}
+      touched();renderAll()}
+    else if(a==='mset'){const k=b.dataset.k,L=[...MS].map(dev).filter(Boolean);if(k==='year'){const v=parseInt($('#f-my').value,10);if(!(v>=1980&&v<=2100)){toast('Bitte ein Jahr eingeben');return}ck();L.forEach(d=>d.year=v);toast('Kaufjahr '+v+' gesetzt')}
+      else if(k==='pa'){const v=$('#f-mpa').value;ck();let n=0;for(const d of L)if(pwrDev(d)&&d.id!==v&&srcOpts(d).some(o=>o[0]===v)){d.pa=v;n++}toast(pl(n,'Gerät','Geräten')+' zugeordnet')}touched();renderAll()}
+    else if(a==='mdup'){const L=[...MS].map(dev).filter(Boolean);ck();const nw=[];for(const d of L){const n=JSON.parse(JSON.stringify(d));n.id='d'+rid();n.name=trunc(d.name+' (Kopie)',40);if(n.rack){const r=rackOf(n.rack);n.rack=null;if(r){n.x=sn(r.x+rgeom(r).W+80);n.y=d.y}}else{n.x+=60;n.y+=60}state.devices.push(n);nw.push(n.id)}MS=new Set(nw);touched();select({kind:'multi'});toast(pl(nw.length,'Kopie','Kopien')+' angelegt')}
+    else if(a==='mhide'){const ids=[...MS];setHid(ids,true);MS.clear();sel=null;renderAll();toast('Ausgeblendet – über „Ansicht“ wieder einblenden')}
+    else if(a==='mdel')msDelete();
     else if(a==='hide'){const id=b.dataset.id,h=HIDL.has(id);setHid([id],!h);if(!h){sel=null;toast('Ausgeblendet – über „Ansicht“ oben wieder einblenden')}renderAll()}
     else if(a==='q'){setMode('plan');const r=$('#rail');if(getComputedStyle(r).position==='absolute')r.classList.add('open');$('#rq').value=b.dataset.q;renderRail();$('#rq').focus()}
     return}
@@ -1508,6 +1542,8 @@ document.addEventListener('keydown',e=>{
   if(mod&&k==='y'){e.preventDefault();redo();return}
   if(mode!=='plan')return;
   if(mod&&k==='d'&&sel&&sel.kind==='dev'){e.preventDefault();dupDev(dev(sel.id));return}
+  if(mod&&k==='a'){e.preventDefault();MS=new Set(state.devices.filter(d=>!HID.has(d.id)).map(d=>d.id));msApply();return}
+  if(sel&&sel.kind==='multi'){if(e.key==='Delete'||e.key==='Backspace'){e.preventDefault();msDelete();return}if(e.key.startsWith('Arrow')){e.preventDefault();const st=e.shiftKey?50:10;msMove(e.key==='ArrowLeft'?-st:e.key==='ArrowRight'?st:0,e.key==='ArrowUp'?-st:e.key==='ArrowDown'?st:0);return}}
   if((e.key==='Delete'||e.key==='Backspace')&&sel){e.preventDefault();
     if(sel.kind==='cable')delCable(sel.id);else if(sel.kind==='dev')delDev(dev(sel.id));else if(sel.kind==='rack')delRack(rackOf(sel.id));else if(sel.kind==='room')delRoom(roomOf(sel.id));else if(sel.kind==='port'){const c=cabOf(sel.dev,sel.port,'f')||cabOf(sel.dev,sel.port,'r');c&&delCable(c.id)}return}
   if(sel&&(sel.kind==='dev'||sel.kind==='rack'||sel.kind==='room')&&e.key.startsWith('Arrow')){
@@ -1814,6 +1850,7 @@ function renderTopo(fit){
 function topoApply(){$('#tworld').setAttribute('transform',`translate(${TV.x.toFixed(1)} ${TV.y.toFixed(1)}) scale(${TV.z.toFixed(4)})`)}
 function topoFit(){const r=$('#tstage').getBoundingClientRect();if(!TB||!r.width)return;TV.z=clamp(Math.min(r.width/TB.w,r.height/TB.h),.15,1.4);TV.x=(r.width-TB.w*TV.z)/2-TB.x*TV.z;TV.y=(r.height-TB.h*TV.z)/2-TB.y*TV.z;TV.ok=1;topoApply()}
 $('#tp-fit').onclick=topoFit;
+$('#z-sel').onclick=()=>{selMode=!selMode;$('#z-sel').setAttribute('aria-pressed',String(selMode));cv.classList.toggle('selmode',selMode);toast(selMode?'Auswahlmodus: Geräte antippen oder einen Rahmen ziehen':'Auswahlmodus aus')};
 $('#topo').addEventListener('click',e=>{const h=e.target.closest('[data-th]'),c=e.target.closest('[data-tc]');if(h){ck('view');state.view.topoHosts=h.dataset.th;touched();renderTopo(true)}if(c){ck('view');state.view.topoColor=c.dataset.tc;touched();renderTopo()}});
 $('#tsvg').addEventListener('wheel',e=>{e.preventDefault();const r=$('#tstage').getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top,f=Math.exp(-e.deltaY*.0015),z=clamp(TV.z*f,.1,3);TV.x=mx-(mx-TV.x)*z/TV.z;TV.y=my-(my-TV.y)*z/TV.z;TV.z=z;topoApply()},{passive:false});
 $('#tsvg').addEventListener('pointerdown',e=>{tdrag={x:e.clientX,y:e.clientY,vx:TV.x,vy:TV.y,m:false,t:e.target};try{$('#tsvg').setPointerCapture(e.pointerId)}catch(_){}});
