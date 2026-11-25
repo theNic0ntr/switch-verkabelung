@@ -214,3 +214,8 @@ table.etab{width:100%;border-collapse:collapse;font-size:14px;margin-bottom:22px
 .mchips .chip span{opacity:.6;margin-left:2px}
 .mset{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:end}
 .mset .btn{margin-bottom:12px}
+/* --- templates --- */
+.tchip{display:inline-flex;align-items:center;gap:0}
+.chip.tpl{border-color:var(--ink);border-top-right-radius:0;border-bottom-right-radius:0;border-right:0}
+.tdel{min-height:36px;width:30px;border:1px solid var(--ink);border-radius:0 18px 18px 0;background:var(--bg);color:var(--mute);font:600 15px/1 inherit;cursor:pointer}
+.tdel:hover{color:#d0342c}

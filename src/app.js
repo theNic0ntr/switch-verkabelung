@@ -882,6 +882,12 @@ function inspMulti(){const L=[...MS].map(dev).filter(Boolean),free=L.filter(d=>!
 async function msDelete(){const ids=new Set(MS);if(!ids.size)return;if(!(await ask(pl(ids.size,'Gerät','Geräte')+' löschen?','Die Geräte und alle ihre Kabel werden entfernt. Strg+Z holt sie zurück.','Löschen',true)))return;
   ck();state.cables=state.cables.filter(c=>!ids.has(c.a.d)&&!ids.has(c.b.d));state.devices=state.devices.filter(d=>!ids.has(d.id));MS.clear();sel=null;touched();renderAll();toast(pl(ids.size,'Gerät','Geräte')+' gelöscht')}
 function msMove(dx,dy){const L=[...MS].map(dev).filter(d=>d&&!d.rack);if(!L.length)return;ck('msmove');for(const d of L){d.x+=dx;d.y+=dy}touched();renderAll()}
+const TPLX=['id','x','y','rack','u','name','ip','mac','user','location','notes','year','pa','pb','_u'];
+function tplCfg(d){const c=JSON.parse(JSON.stringify(d));for(const k of TPLX)delete c[k];c.ports={};for(const [k,v] of Object.entries(d.ports||{})){const o={...v};delete o.label;delete o.notes;if(Object.keys(o).length)c.ports[k]=o}if(c.disks)for(const v of Object.values(c.disks))delete v.ok;return c}
+function saveTemplate(d){
+  modal(`<form class="mbox" id="tplf" role="dialog" aria-modal="true" aria-labelledby="m-t"><div class="mh"><h2 id="m-t">Als Vorlage speichern</h2>${closeBtn}</div><p>Die Vorlage übernimmt Bauform, Ports, Port-Einstellungen, Optik und Festplatten – aber keine Namen, IPs oder Beschriftungen. Du findest sie unter „Hinzufügen“ bei ${esc(KIND[d.kind].n==='Host'?'Host':KIND[d.kind].n)}.</p>${fld('m-tn','Name der Vorlage',`<input id="m-tn" maxlength="40" value="${esc(d.model||d.name)}">`)}<div class="mf"><button type="button" class="btn" data-close>Abbrechen</button><button type="submit" class="btn pri">Speichern</button></div></form>`);
+  $('#m-tn').select();
+  $('#tplf').onsubmit=e=>{e.preventDefault();const n=$('#m-tn').value.trim().slice(0,40)||KIND[d.kind].n;ck();state.templates=state.templates||[];const ex=state.templates.find(t=>t.kind===d.kind&&t.name===n);if(ex)ex.cfg=tplCfg(d);else state.templates.push({id:'t'+rid(),name:n,kind:d.kind,cfg:tplCfg(d)});touched();closeModal();toast(`Vorlage „${n}“ ${ex?'aktualisiert':'gespeichert'}`)}}
 function inspNone(){
   const tot=state.devices.reduce((a,d)=>a+total(d),0),used=state.devices.reduce((a,d)=>a+usedPorts(d),0);
   return `<div class="ih"><span class="kind">Projekt</span><h2>${esc(state.name)}</h2><p class="sub">${pl(state.racks.length,'Schrank','Schränke')} · ${pl(state.rooms.length,'Raum','Räume')}. Klicke auf ein Gerät, einen Port, ein Kabel, einen Schrank oder einen Raum.</p></div>
@@ -993,7 +999,7 @@ function inspDev(d){
   ${lcBox(d)}
   ${fieldsHTML(d,'i')}
   ${fld('f-notes','Notizen',`<textarea id="f-notes" data-f="dev.notes" rows="2" maxlength="500">${esc(d.notes)}</textarea>`)}
-  <div class="row"><button type="button" class="btn" data-act="dup">Duplizieren</button>${hideBtn(d.id)}<button type="button" class="btn danger" data-act="deldev">Löschen</button></div>
+  <div class="row"><button type="button" class="btn" data-act="dup">Duplizieren</button><button type="button" class="btn" data-act="tplsave">Als Vorlage</button>${hideBtn(d.id)}<button type="button" class="btn danger" data-act="deldev">Löschen</button></div>
   ${netHTML(d,L)}
   ${powerHTML(d)}
   ${d.kind==='server'&&d.bays?diskHTML(d):''}
@@ -1463,6 +1469,7 @@ ic.addEventListener('click',e=>{
       for(const p of ps){const o=d.ports[p.id]||(d.ports[p.id]={});if(v==='trunk'){o.vm='trunk';o.tv=state.vlans.map(x=>x.id)}else if(v===''){delete o.vm;delete o.tv;delete o.vlan}else{delete o.vm;delete o.tv;o.vlan=+v}if(!Object.keys(o).length)delete d.ports[p.id]}
       touched();renderAll();toast(`${pl(ps.length,'Port','Ports')} geändert`)}
     else if(a==='freeip'){const d=dev(sel.id),v=vlanOf(b.dataset.v),ip=v&&freeIp(v);if(!d||!ip){toast('Kein freies Subnetz gefunden');return}ck();d.ip=ip;touched();renderAll();toast('IP '+ip+' vergeben')}
+    else if(a==='tplsave'){const d=dev(sel.id);d&&saveTemplate(d)}
     else if(a==='mrem'){MS.delete(b.dataset.id);msApply()}
     else if(a==='malign'){const L=[...MS].map(dev).filter(d=>d&&!d.rack),m=b.dataset.m;if(L.length<2)return;ck();
       if(m==='top'){const y=Math.min(...L.map(d=>d.y));L.forEach(d=>d.y=y)}else if(m==='left'){const x=Math.min(...L.map(d=>d.x));L.forEach(d=>d.x=x)}
@@ -1569,7 +1576,7 @@ function toggleMenu(open){const m=$('#menu');m.hidden=!open;$('#b-file').setAttr
 $('#b-file').onclick=e=>{e.stopPropagation();toggleMenu($('#menu').hidden)};
 document.addEventListener('click',e=>{if(!$('#menu').hidden&&!e.target.closest('.menuw'))toggleMenu(false)});
 $('#menu').addEventListener('click',e=>{const b=e.target.closest('[data-m]');if(!b)return;toggleMenu(false);menuAct(b.dataset.m)});
-const emptyState=()=>({v:3,name:'Neues Netzwerk',devices:[],cables:[],racks:[],rooms:[],view:{labelMode:'num',colorBy:'speed',hide:{cats:[],ids:[]}},life:{old:5,eol:10},vlans:[],updated:0,demo:false});
+const emptyState=()=>({v:3,name:'Neues Netzwerk',devices:[],cables:[],racks:[],rooms:[],view:{labelMode:'num',colorBy:'speed',hide:{cats:[],ids:[]}},life:{old:5,eol:10},vlans:[],templates:[],updated:0,demo:false});
 async function menuAct(m){
   if(['json','csv','csv2','svg','png'].includes(m))return exp(m);
   if(m==='open')return openImport();
@@ -1685,6 +1692,7 @@ function sanitize(o){
    const cats=new Set((Array.isArray(h.cats)?h.cats:[]).filter(okK).slice(0,100));if(ov_.hideHosts)cats.add('hosts');if(ov_.fadeRacks)cats.add('racks');if(ov_.fadeRooms)cats.add('rooms');
    out.view.hide={cats:[...cats],ids:(Array.isArray(h.ids)?h.ids:[]).filter(i=>all.has(i)).slice(0,5000)}}
   {const ids=new Set(out.devices.filter(isSrc).map(d=>d.id));for(const d of out.devices){if(!ids.has(d.pa)||d.pa===d.id)d.pa='';if(!ids.has(d.pb)||d.pb===d.id)d.pb=''}}
+  out.templates=[];if(!o._tpl&&Array.isArray(o.templates))for(const t of o.templates.slice(0,100)){if(!t||!KIND[t.kind]||!t.cfg||typeof t.cfg!=='object')continue;try{const x=sanitize({_tpl:1,devices:[{...t.cfg,kind:t.kind,id:'tplx'}]}).devices[0];if(!x||x.kind!==t.kind)continue;out.templates.push({id:okId(t.id)?t.id:'t'+rid(),name:S(t.name,40)||KIND[t.kind].n,kind:t.kind,cfg:tplCfg(x)})}catch(_){}}
   {out.vlans=[];const seen=new Set();for(const v of (Array.isArray(o.vlans)?o.vlans:[]).slice(0,400)){const id=Number(v&&v.id);if(!Number.isInteger(id)||id<1||id>4094||seen.has(id))continue;seen.add(id);out.vlans.push({id,name:S(v.name,40),color:/^#[0-9a-f]{6}$/i.test(v.color)?v.color:VLC[out.vlans.length%VLC.length],subnet:S(v.subnet,43),gw:S(v.gw,40)})}
    for(const d of out.devices)for(const pc of Object.values(d.ports))for(const id of [pc.vlan,...(pc.tv||[])])if(id&&!seen.has(id)){seen.add(id);out.vlans.push({id,name:'',color:VLC[out.vlans.length%VLC.length],subnet:'',gw:''})}
    out.vlans.sort((a,b)=>a.id-b.id)}
@@ -1745,7 +1753,7 @@ function openAdd(kind,target){
     if(total(D)<minPorts(D)){P.innerHTML='<p class="note">Mindestens ein Port nötig.</p>';return}const L=lay(D);P.innerHTML=`<svg viewBox="-8 -8 ${L.W+22} ${L.H+24}" font-family="Hanken Grotesk, Arial, sans-serif" role="img" aria-label="Vorschau">${devSVG(D,{})}${numSVG(D,{})}</svg>`};
   const draw=()=>{
     form.querySelectorAll('[data-kind]').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.kind===addKind)));
-    $('#presets').innerHTML=(PRESETS[addKind]||[]).map((p,i)=>`<button type="button" class="chip" data-pre="${i}">${esc(p[0])}</button>`).join('');
+    $('#presets').innerHTML=(PRESETS[addKind]||[]).map((p,i)=>`<button type="button" class="chip" data-pre="${i}">${esc(p[0])}</button>`).join('')+(state.templates||[]).filter(t=>t.kind===addKind).map(t=>`<span class="tchip"><button type="button" class="chip tpl" data-tpl="${t.id}" title="Eigene Vorlage">★ ${esc(t.name)}</button><button type="button" class="tdel" data-tdel="${t.id}" aria-label="Vorlage ${esc(t.name)} löschen">×</button></span>`).join('');
     const fid=document.activeElement&&form.contains(document.activeElement)?document.activeElement.id:null;
     $('#aform').innerHTML=`<div class="mgrid"><div>${fieldsHTML(D,'a','L')}</div><div>${fieldsHTML(D,'a','R')}</div></div>`;
     if(fid&&document.getElementById(fid))document.getElementById(fid).focus();
@@ -1769,6 +1777,8 @@ function openAdd(kind,target){
   form.addEventListener('click',e=>{
     const kb=e.target.closest('[data-kind]');if(kb&&!kb.disabled){addKind=kb.dataset.kind;D=draft(addKind,target);auto=true;draw();return}
     const st=e.target.closest('[data-step]');if(st){const t=st.dataset.step;D.pc[t]=clamp((D.pc[t]||0)+ +st.dataset.d,0,maxc(D,t));draw();return}
+    const tp=e.target.closest('[data-tpl]');if(tp){const t=(state.templates||[]).find(x=>x.id===tp.dataset.tpl);if(t){const o=JSON.parse(JSON.stringify(t.cfg));D.pc={};Object.assign(D,o);if(D.rack&&D.size==='frei')D.rack='';draw()}return}
+    const td=e.target.closest('[data-tdel]');if(td){const t=(state.templates||[]).find(x=>x.id===td.dataset.tdel);if(t){ck();state.templates=state.templates.filter(x=>x!==t);touched();toast('Vorlage „'+t.name+'“ gelöscht');draw()}return}
     const pr=e.target.closest('[data-pre]');if(pr){const o=JSON.parse(JSON.stringify(PRESETS[addKind][+pr.dataset.pre][1]));if(o.pc)D.pc={};Object.assign(D,o);if(o.sub)autoName();if(o.name)auto=false;if(D.rack&&D.size==='frei')D.rack='';draw()}
   });
   form.addEventListener('submit',e=>{e.preventDefault();
