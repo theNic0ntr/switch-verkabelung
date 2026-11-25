@@ -1,0 +1,70 @@
+</head>
+<body>
+<div class="app">
+<header class="top">
+  <div class="brand">
+    <svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true"><rect x="1" y="3" width="24" height="20" rx="3" fill="none" stroke="#fff" stroke-width="2"/><path d="M6 9h4V7h6v2h4v9H6z" fill="#fff"/></svg>
+    <h1>Switch-Verkabelung</h1>
+  </div>
+  <input id="proj" class="proj" aria-label="Projektname" maxlength="80">
+  <div class="tabs" role="tablist" aria-label="Ansicht">
+    <button type="button" role="tab" id="t-plan" aria-selected="true">Plan</button>
+    <button type="button" role="tab" id="t-list" aria-selected="false">Patchliste</button>
+  </div>
+  <div class="visw">
+    <button type="button" class="vbtn" id="b-vis" aria-haspopup="dialog" aria-expanded="false" aria-controls="vpop"><svg class="eo" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg><svg class="ec" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 5.1A10.6 10.6 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-3.2 4.1M6.6 6.6C3.8 8.4 2 12 2 12s3.6 7 10 7a9.7 9.7 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg><span id="vis-l">Ansicht</span><svg class="vch" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
+    <div class="vpop" id="vpop" role="dialog" aria-label="Ein- und ausblenden" hidden>
+      <div class="vph"><b>Ein- und ausblenden</b><button type="button" class="link" id="vall">Alles einblenden</button></div>
+      <input type="search" id="vq" placeholder="Filtern: Name, Person, IP …" aria-label="Liste filtern" autocomplete="off">
+      <ul class="vtree" id="vtree"></ul>
+    </div>
+  </div>
+  <div class="acts">
+    <button type="button" class="ib only-narrow" id="b-rail" aria-label="Geräte und Hinweise" title="Geräte und Hinweise"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg></button>
+    <button type="button" class="ib" id="b-undo" aria-label="Rückgängig" title="Rückgängig (Strg+Z)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></svg></button>
+    <button type="button" class="ib" id="b-redo" aria-label="Wiederholen" title="Wiederholen (Strg+Y)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 14 5-5-5-5"/><path d="M20 9H9a5 5 0 0 0 0 10h3"/></svg></button>
+    <button type="button" class="btn pri" id="b-add" aria-label="Hinzufügen"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg><span class="bl">Hinzufügen</span></button>
+    <div class="menuw">
+      <button type="button" class="btn ghost" id="b-file" aria-haspopup="menu" aria-expanded="false">Datei<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="m6 9 6 6 6-6"/></svg></button>
+      <div class="menu" id="menu" role="menu" hidden></div>
+    </div>
+    <span class="save" id="save" role="status" title=""></span>
+  </div>
+</header>
+<main class="main" id="main">
+  <aside class="rail" id="rail" aria-label="Geräte und Hinweise">
+    <div class="rsearch"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input type="search" id="rq" placeholder="Suchen: Gerät, Person, IP, Port …" aria-label="Geräte durchsuchen" autocomplete="off"></div>
+    <p class="rres" id="rres" role="status"></p>
+    <section id="sec-rooms"><div class="rh"><h2>Räume</h2><span class="cnt" id="n-room"></span></div><ul class="devlist" id="roomlist"></ul></section>
+    <section id="sec-racks"><div class="rh"><h2>Schränke</h2><span class="cnt" id="n-rack"></span></div><ul class="devlist" id="racklist"></ul></section>
+    <section id="sec-devs"><div class="rh"><h2>Geräte nach Kategorie</h2><span class="cnt" id="n-dev"></span></div><div id="catlist"></div></section>
+    <section id="sec-cab" hidden><div class="rh"><h2>Kabel</h2><span class="cnt" id="n-cab"></span></div><ul class="warnlist" id="cablist"></ul></section>
+    <section id="sec-warn"><div class="rh"><h2>Hinweise</h2><span class="cnt" id="n-warn"></span></div><ul class="warnlist" id="warnlist"></ul></section>
+    <section id="sec-leg"><div class="rh"><h2>Legende</h2></div><ul class="legend" id="legend"></ul></section>
+  </aside>
+  <div class="stage" id="stage">
+    <svg id="cv" aria-label="Verkabelungsplan">
+      <defs id="defs"></defs>
+      <g id="world"><g id="l-room"></g><g id="l-rack"></g><g id="l-hit"></g><g id="l-dev"></g><g id="l-cab"></g><g id="l-plug"></g><g id="l-lab"></g><g id="tmpw" style="display:none"><path id="tmpE" fill="none" stroke="#111" stroke-width="8" stroke-linecap="round"/><path id="tmp" fill="none" stroke="#ffe600" stroke-width="4.5" stroke-linecap="round"/></g><rect id="snap" rx="6" fill="#ffe600" fill-opacity=".18" stroke="#ffe600" stroke-width="6" stroke-dasharray="16 10" style="display:none"/></g>
+    </svg>
+    <div class="empty" id="empty" hidden><div class="box"><h2>Noch nichts im Plan</h2><p>Lege Räume, Schränke und Geräte an – Switches, Patchpanels, Server, USVs, Access Points oder Hosts – und verbinde ihre Ports per Ziehen.</p><button type="button" class="btn pri" id="b-add2">Hinzufügen</button></div></div>
+    <p class="hint" id="hint"></p>
+    <div class="zoom" role="group" aria-label="Zoom">
+      <button type="button" id="z-arr" title="Wie im Rack stapeln" aria-label="Wie im Rack stapeln"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="6" rx="1"/><rect x="3" y="14" width="18" height="6" rx="1"/></svg></button>
+      <button type="button" id="z-out" aria-label="Verkleinern"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 12h14"/></svg></button>
+      <button type="button" id="z-lbl" class="zl" title="Auf 100 % setzen">100 %</button>
+      <button type="button" id="z-in" aria-label="Vergrößern"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+      <button type="button" id="z-fit" title="Alles anzeigen" aria-label="Alles anzeigen"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+    </div>
+  </div>
+  <aside class="insp" id="insp" aria-label="Eigenschaften"><button type="button" class="itog" id="itog" aria-expanded="true">Eigenschaften</button><div id="ic"></div></aside>
+  <section class="tview" id="tview" hidden>
+    <div class="tbar"><h2 id="t-h">Patchliste</h2><p class="sub" id="t-sub"></p><div class="vt" role="tablist" aria-label="Liste"><button type="button" role="tab" data-tm="kabel" aria-selected="true">Kabel</button><button type="button" role="tab" data-tm="strecken" aria-selected="false">Strecken</button></div><input type="search" id="q" placeholder="Suchen: Gerät, Port, Beschriftung …" aria-label="Liste durchsuchen"><button type="button" class="btn" id="b-csv">CSV</button></div>
+    <div class="scroll"><table class="patch"><thead id="pth"></thead><tbody id="ptb"></tbody></table></div>
+  </section>
+</main>
+</div>
+<div class="tip" id="tip" hidden></div>
+<div class="modal" id="modal" hidden></div>
+<div class="toasts" id="toasts" aria-live="polite"></div>
+<input type="file" id="file" accept=".json,application/json" hidden>
