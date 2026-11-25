@@ -10,6 +10,14 @@ Netzwerk-Verkabelung im Browser planen und dokumentieren. Switches, Firewalls, P
 - **Prüfungen:** Geschwindigkeit, Transceiver-Reichweite, Faser- und Steckertyp, PoE, 100-m-Grenze bei Kupfer, LAG/STP.
 - **Lebenszyklus:** Für jedes Gerät lässt sich ein Kaufjahr eintragen. Veraltete Geräte werden orange markiert (Standard: ab 5 Jahren), Geräte am Lebensende (EOL) rot (Standard: ab 10 Jahren). Die Schwellen sind fürs ganze Projekt und pro Gerät einstellbar.
 - **Suche und Kategorien:** Die Suche findet Geräte, Personen, IPs und Port-Beschriftungen. Über „Ansicht“ lassen sich ganze Kategorien oder einzelne Räume, Schränke, Geräte und Hosts ausblenden.
+- **VLANs und IP-Adressen:** VLANs mit Farbe, Subnetz und Gateway; Ports als Access oder Trunk (Native + getaggt), auch für ganze Portbereiche. Prüfungen entlang der Strecke, doppelte IPs, falsches Subnetz, nächste freie IP. Hosts erscheinen dauerhaft in ihrer VLAN-Farbe, Port-VLANs und RAID-Farben nur am ausgewählten Gerät.
+- **Logische Topologie:** automatisch erzeugtes L2-Diagramm ohne Patchpanels, Hosts einzeln, gruppiert oder ausgeblendet, eingefärbt nach Tempo oder VLAN.
+- **Stromversorgung:** PDUs, Leistungsaufnahme je Gerät (sonst geschätzt, inkl. PoE), Netzteile A/B an USV oder PDU, Last und Laufzeit der USV, Hinweise bei Überlast oder fehlender Redundanz.
+- **Listen:** Kabel, Strecken, Geräte, VLANs & IPs, Strom und Materialliste (Patchkabel, Verlegekabel in Metern, Transceiver, Module, Platten) – jeweils als CSV.
+- **Mehrfachauswahl:** Umschalt + Klick, Auswahlrahmen, Auswahlmodus für Touch; gemeinsam verschieben, ausrichten, duplizieren, löschen.
+- **Vorlagen:** konfigurierte Geräte als eigene Vorlage speichern und wiederverwenden.
+- **Versionsverlauf:** benannte Stände, automatische Sicherungen, Vergleich mit dem aktuellen Stand, Wiederherstellen.
+- **PDF und Etiketten:** komplette Dokumentation als PDF (Plan, Schränke, Topologie, alle Listen); Etiketten für Kabel, Ports und Geräte auf A4-Bögen, für Etikettendrucker oder als Kabelfahne, wahlweise mit QR-Code. In der Server-Version öffnet der QR-Code das Objekt direkt (`#dev-…`, `#cab-…`, `#port-…`).
 - **Export:** Patchliste und Strecken als CSV, der Plan als SVG oder PNG, das Projekt als JSON.
 
 ## Auf einem Server betreiben (Docker)
@@ -57,7 +65,7 @@ netz.example.de {
 
 ### Sicherungen und Wiederherstellen
 
-Vor dem Überschreiben legt der Server eine Kopie unter `/data/backups/` ab, höchstens alle 10 Minuten. Zusätzlich kannst du jederzeit über **Datei → Projekt speichern** eine JSON-Datei sichern und über **Datei → Projekt laden** wieder einspielen.
+Vor dem Überschreiben legt der Server eine Kopie unter `/data/backups/` ab, höchstens alle 10 Minuten. Benannte Stände aus **Datei → Versionsverlauf** liegen ebenfalls dort (`named-*.json`) und werden nicht automatisch gelöscht. Zusätzlich kannst du jederzeit über **Datei → Projekt speichern** eine JSON-Datei sichern und über **Datei → Projekt laden** wieder einspielen.
 
 So kommst du an die Dateien im Volume:
 
@@ -87,6 +95,7 @@ DATA_DIR=./data node server/server.js
 
 ```
 src/          Quellen der App: head.html, base.css, extra.css, body.html, app.js, Schriften
+src/vendor/   jsPDF, jsPDF-AutoTable, qrcode-generator (MIT, werden erst bei Bedarf geladen)
 scripts/      build.mjs fügt alles zu einer HTML-Datei zusammen
 server/       server.js – liefert die App aus und speichert den Plan (nur Node-Bordmittel)
 dist/         Build-Ergebnis (nicht im Repository)
@@ -99,4 +108,4 @@ dist/         Build-Ergebnis (nicht im Repository)
 
 ## Lizenz
 
-Code: alle Rechte vorbehalten. Schrift: Hanken Grotesk, SIL Open Font License 1.1 (`src/fonts/OFL.txt`).
+Code: alle Rechte vorbehalten. Schrift: Hanken Grotesk, SIL Open Font License 1.1 (`src/fonts/OFL.txt`). Mitgelieferte Bibliotheken: MIT, siehe `src/vendor/LICENSES.txt`.
