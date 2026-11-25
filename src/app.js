@@ -999,7 +999,7 @@ function inspDev(d){
   ${lcBox(d)}
   ${fieldsHTML(d,'i')}
   ${fld('f-notes','Notizen',`<textarea id="f-notes" data-f="dev.notes" rows="2" maxlength="500">${esc(d.notes)}</textarea>`)}
-  <div class="row"><button type="button" class="btn" data-act="dup">Duplizieren</button><button type="button" class="btn" data-act="tplsave">Als Vorlage</button>${hideBtn(d.id)}<button type="button" class="btn danger" data-act="deldev">Löschen</button></div>
+  <div class="row"><button type="button" class="btn" data-act="dup">Duplizieren</button><button type="button" class="btn" data-act="tplsave">Als Vorlage</button>${store.kind==='server'?`<button type="button" class="btn" data-act="qr" data-k="dev" data-id="${d.id}">QR-Code</button>`:''}${hideBtn(d.id)}<button type="button" class="btn danger" data-act="deldev">Löschen</button></div>
   ${netHTML(d,L)}
   ${powerHTML(d)}
   ${d.kind==='server'&&d.bays?diskHTML(d):''}
@@ -1469,6 +1469,7 @@ ic.addEventListener('click',e=>{
       for(const p of ps){const o=d.ports[p.id]||(d.ports[p.id]={});if(v==='trunk'){o.vm='trunk';o.tv=state.vlans.map(x=>x.id)}else if(v===''){delete o.vm;delete o.tv;delete o.vlan}else{delete o.vm;delete o.tv;o.vlan=+v}if(!Object.keys(o).length)delete d.ports[p.id]}
       touched();renderAll();toast(`${pl(ps.length,'Port','Ports')} geändert`)}
     else if(a==='freeip'){const d=dev(sel.id),v=vlanOf(b.dataset.v),ip=v&&freeIp(v);if(!d||!ip){toast('Kein freies Subnetz gefunden');return}ck();d.ip=ip;touched();renderAll();toast('IP '+ip+' vergeben')}
+    else if(a==='qr'){showQR(b.dataset.k,b.dataset.id)}
     else if(a==='tplsave'){const d=dev(sel.id);d&&saveTemplate(d)}
     else if(a==='mrem'){MS.delete(b.dataset.id);msApply()}
     else if(a==='malign'){const L=[...MS].map(dev).filter(d=>d&&!d.rack),m=b.dataset.m;if(L.length<2)return;ck();
@@ -1568,7 +1569,7 @@ function buildMenu(){
   const can=!!DL;
   const items=[['json',can?'Projekt speichern (.json)':'Projekt als JSON kopieren'],['open','Projekt laden …'],['-'],['csv',can?'Patchliste als CSV':'Patchliste kopieren (CSV)'],['csv2',can?'Strecken als CSV':'Strecken kopieren (CSV)'],['svg',can?'Plan als SVG-Bild':'Plan als SVG kopieren']];
   if(can)items.push(['png','Plan als PNG-Bild']);
-  items.push(['-'],['versions','Versionsverlauf …'],['-'],['example','Beispielprojekt laden'],['new','Neues leeres Projekt']);
+  items.push(['-'],['pdf','PDF-Dokumentation'],['labels','Etiketten drucken …'],['-'],['versions','Versionsverlauf …'],['-'],['example','Beispielprojekt laden'],['new','Neues leeres Projekt']);
   $('#menu').innerHTML=items.map(([k,t])=>k==='-'?'<hr>':`<button type="button" role="menuitem" data-m="${k}">${t}</button>`).join('');
   $('#b-csv').textContent=can?'CSV herunterladen':'CSV kopieren';
 }
@@ -1581,6 +1582,8 @@ async function menuAct(m){
   if(['json','csv','csv2','svg','png'].includes(m))return exp(m);
   if(m==='open')return openImport();
   if(m==='versions')return openVersions();
+  if(m==='pdf')return makeDoc();
+  if(m==='labels')return openLabels();
   if(m==='example'){if(state.devices.length&&!state.demo&&!(await ask('Beispiel laden?','Das aktuelle Projekt wird ersetzt. Mit Strg+Z holst du es zurück.','Beispiel laden')))return;ck();state=demo();sel=null;LC.clear();touched();state.demo=true;renderAll();fit();return}
   if(m==='new'){if((state.devices.length||state.racks.length||state.rooms.length)&&!(await ask('Neues Projekt?','Das aktuelle Projekt wird geleert. Mit Strg+Z holst du es zurück.','Leeren',true)))return;ck();state=emptyState();sel=null;touched();renderAll();fit()}
 }
@@ -1604,9 +1607,9 @@ function csv(kind){
   else rows=[['Kabel','Von Gerät','Von Port','Nach Gerät','Nach Port','Medium','Transceiver','Länge','Link','Hinweis','Farbe','Notiz'],...cableRows().map(r=>[...r.cells,COL[r.c.color].n,r.c.notes])];
   return '﻿'+rows.map(r=>r.map(q).join(';')).join('\r\n');
 }
-function buildSVG(){const keep=[HID,FD,FR,FM,HL];HID=new Set();FD=new Set();FR=new Set();FM=new Set();HL=null;try{return buildSVG_()}finally{[HID,FD,FR,FM,HL]=keep}}
-function buildSVG_(){
-  const b=bbox(),pad=36,x=b.x1-pad,y=b.y1-pad-44,w=Math.ceil(b.x2-b.x1+pad*2),h=Math.ceil(b.y2-b.y1+pad*2+44),cs=cablesSVG({exp:true});
+function buildSVG(crop){const keep=[HID,FD,FR,FM,HL,SDV];HID=new Set();FD=new Set();FR=new Set();FM=new Set();HL=null;SDV=null;try{return buildSVG_(crop)}finally{[HID,FD,FR,FM,HL,SDV]=keep}}
+function buildSVG_(crop){
+  const b=crop||bbox(),pad=crop?0:36,x=b.x1-pad,y=b.y1-pad-(crop?0:44),w=Math.ceil(b.x2-b.x1+pad*2),h=Math.ceil(b.y2-b.y1+pad*2+(crop?0:44)),cs=cablesSVG({exp:true});
   const rooms=state.rooms.map(rm=>roomSVG(rm,{})).join(''),racks=state.racks.map(r=>rackFrameSVG(r,{})).join(''),devs=state.devices.map(d=>devSVG(d,{})).join(''),nums=state.devices.map(d=>numSVG(d,{})).join('');
   return {w,h,svg:`<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="${x.toFixed(1)} ${y.toFixed(1)} ${w} ${h}" font-family="Hanken Grotesk, Arial, Helvetica, sans-serif"><defs>${defsSVG()}</defs><rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#e4e4e0"/><text x="${b.x1}" y="${b.y1-pad-10}" font-size="22" font-weight="700" fill="#111">${esc(state.name)}</text><text x="${b.x2}" y="${b.y1-pad-10}" text-anchor="end" font-size="13" fill="#5b5b56">${state.devices.length} Geräte · ${state.racks.length} Schränke · ${state.cables.length} Kabel · Stand ${new Date().toLocaleDateString('de-DE')}</text>${rooms}${racks}${devs}${cs.vis}${cs.plug}${cs.lab}${nums}</svg>`};
 }
@@ -1625,6 +1628,7 @@ async function exp(kind){
   else copyText(text,label);
 }
 async function save(filename,data){
+  if(!DL&&!window.claude)DL=fileSaver();
   if(!DL){toast('Download ist in dieser Ansicht nicht verfügbar');return}
   try{await DL.save({filename,data});toast('Datei übergeben: '+filename)}
   catch(e){const c=e&&e.code;if(c==='declined')return;toast(c==='rate_limited'?'Bitte kurz warten und noch einmal versuchen':c==='host_unavailable'?'Diese App kann keine Dateien speichern – im Browser öffnen':'Download nicht möglich')}
@@ -1933,6 +1937,113 @@ const openRow=tr=>{setMode('plan');if(tr.dataset.dv){select({kind:'dev',id:tr.da
 $('#ptb').addEventListener('click',e=>{const tr=e.target.closest('tr[data-cab],tr[data-dv]');tr&&openRow(tr)});
 $('#ptb').addEventListener('keydown',e=>{const tr=e.target.closest('tr[data-cab],tr[data-dv]');if(tr&&e.key==='Enter')openRow(tr)});
 
+/* ================= PDF-Dokumentation & Etiketten ================= */
+const VEND={};
+function loadScript(src){return VEND[src]||(VEND[src]=new Promise((ok,no)=>{const el=document.createElement('script');el.src=src;el.onload=()=>ok();el.onerror=()=>{delete VEND[src];no(new Error(src))};document.head.append(el)}))}
+async function needPDF(){await loadScript('vendor/jspdf.umd.min.js');await loadScript('vendor/jspdf.plugin.autotable.min.js');if(!window.jspdf||!window.jspdf.jsPDF)throw new Error('jspdf');return window.jspdf.jsPDF}
+async function needQR(){await loadScript('vendor/qrcode.js');if(!window.qrcode)throw new Error('qr');return window.qrcode}
+const PDFMAP={'″':'"','′':"'",'↔':'<->','→':'->','←':'<-','−':'-','≈':'~','≥':'>=','≤':'<=','★':'*','✓':'ok',' ':' ',' ':' ','​':'','–':'-','—':'-'};
+const pT=t=>String(t??'').replace(/[″′↔→←−≈≥≤★✓  ​–—]/g,c=>PDFMAP[c]).replace(/[^\x00-\xff€„“”‘’•…™‰]/g,'?');
+function svgToJpeg(svg,w,h,maxPx){return new Promise((ok,no)=>{const sc=Math.min(2,maxPx/Math.max(w,h)),url=URL.createObjectURL(new Blob([svg],{type:'image/svg+xml'})),img=new Image();
+  img.onload=()=>{try{const c=document.createElement('canvas');c.width=Math.max(1,Math.round(w*sc));c.height=Math.max(1,Math.round(h*sc));const g=c.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,c.width,c.height);g.drawImage(img,0,0,c.width,c.height);ok({data:c.toDataURL('image/jpeg',.9),w:c.width,h:c.height})}catch(e){no(e)}finally{URL.revokeObjectURL(url)}};
+  img.onerror=e=>{URL.revokeObjectURL(url);no(e)};img.src=url})}
+function drawQR(doc,QR,text,x,y,size){const q=QR(0,'M');q.addData(text,'Byte');q.make();const n=q.getModuleCount(),c=size/n;doc.setFillColor(0,0,0);
+  for(let r=0;r<n;r++){let s=-1;for(let k=0;k<=n;k++){const on=k<n&&q.isDark(r,k);if(on&&s<0)s=k;else if(!on&&s>=0){doc.rect(x+s*c,y+r*c,(k-s)*c+.02,c+.02,'F');s=-1}}}}
+async function makeDoc(){
+  if(!DL&&!window.claude)DL=fileSaver();if(!DL){toast('Speichern ist in dieser Ansicht nicht möglich');return}
+  toast('PDF wird erstellt …');let JS;try{JS=await needPDF()}catch(_){toast('PDF-Bibliothek konnte nicht geladen werden');return}
+  analyze();
+  const doc=new JS({orientation:'landscape',unit:'mm',format:'a4',compress:true}),PW_=297,PH_=210,M=12,date=new Date().toLocaleDateString('de-DE');
+  const AT=(o)=>{const f=window.autoTable||(doc.autoTable&&((d,op)=>d.autoTable(op)));f(doc,{theme:'striped',styles:{font:'helvetica',fontSize:7.6,cellPadding:1.4,overflow:'linebreak'},headStyles:{fillColor:[17,17,17],textColor:255,fontStyle:'bold'},alternateRowStyles:{fillColor:[243,243,240]},margin:{top:22,left:M,right:M,bottom:14},...o,head:o.head.map(r=>r.map(pT)),body:o.body.map(r=>r.map(pT))})};
+  const H=(t,sub)=>{doc.setFont('helvetica','bold');doc.setFontSize(16);doc.setTextColor(17);doc.text(pT(t),M,17);if(sub){doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(100);doc.text(pT(sub),PW_-M,17,{align:'right'})}};
+  const toc=[];const page=(t,sub)=>{doc.addPage();toc.push([t,doc.getNumberOfPages()]);H(t,sub)};
+  // Deckblatt
+  doc.setFillColor(17,17,17);doc.rect(0,0,PW_,62,'F');doc.setFillColor(255,230,0);doc.rect(0,62,PW_,3,'F');
+  doc.setTextColor(255);doc.setFont('helvetica','bold');doc.setFontSize(30);doc.text(pT(state.name),M+4,32);doc.setFont('helvetica','normal');doc.setFontSize(13);doc.text('Netzwerkdokumentation · Stand '+date,M+4,46);
+  const used=state.devices.reduce((a,d)=>a+usedPorts(d),0),tot=state.devices.reduce((a,d)=>a+total(d),0),nE=state.devices.filter(d=>(lcs(d)||{}).s==='eol').length,nO=state.devices.filter(d=>(lcs(d)||{}).s==='old').length;
+  const K=[['Geräte',state.devices.length],['Kabel',state.cables.length],['Strecken',CH.length],['Ports belegt',used+'/'+tot],['Schränke',state.racks.length],['Räume',state.rooms.length],['VLANs',state.vlans.length],['Hinweise',ISS.filter(i=>i.s!=='info').length],['EOL / veraltet',nE+' / '+nO]];
+  K.forEach(([k,v],i)=>{const x=M+4+(i%5)*54,y=82+Math.floor(i/5)*30;doc.setDrawColor(210);doc.setFillColor(246,246,243);doc.roundedRect(x,y,50,24,2,2,'F');doc.setTextColor(17);doc.setFont('helvetica','bold');doc.setFontSize(17);doc.text(pT(String(v)),x+4,y+12);doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.setTextColor(100);doc.text(pT(k),x+4,y+19)});
+  // Gesamtplan
+  try{const P=buildSVG();page('Gesamtplan',`${state.devices.length} Geräte · ${state.cables.length} Kabel`);const I=await svgToJpeg(P.svg,P.w,P.h,7000);const s=Math.min((PW_-2*M)/P.w,(PH_-32)/P.h);doc.addImage(I.data,'JPEG',M+((PW_-2*M)-P.w*s)/2,24,P.w*s,P.h*s)}catch(_){}
+  // Schränke
+  for(const r of state.racks){const G=rgeom(r),crop={x1:r.x-12,y1:r.y-12,x2:r.x+G.W+12,y2:r.y+G.H+12};try{const P=buildSVG(crop);page('Schrank '+r.name,`${r.rsize}″ · ${G.n} HE · ${G.heUsed} HE belegt${rackRoom(r)?' · '+rackRoom(r).name:''}`);const I=await svgToJpeg(P.svg,P.w,P.h,3600);const iw=150,s=Math.min(iw/P.w,(PH_-32)/P.h);doc.addImage(I.data,'JPEG',M,24,P.w*s,P.h*s);
+      const occ=G.devs.map(d=>[heTxt(d).replace('HE ',''),d.name,d.kind==='net'?subLbl(d):KIND[d.kind].n,d.model||d.role||'',d.ip||'',d.year?String(d.year):'']);AT({startY:24,margin:{top:22,left:M+P.w*s+8,right:M,bottom:14},head:[['HE','Gerät','Art','Modell','IP','Kauf']],body:occ.length?occ:[['–','leer','','','','']]})}catch(_){}}
+  // Topologie
+  {const R=topoSVG();if(R){const b=R.box,svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${Math.ceil(b.w)}" height="${Math.ceil(b.h)}" viewBox="${b.x} ${b.y} ${b.w} ${b.h}" font-family="Arial, sans-serif"><rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" fill="#fff"/>${R.svg}</svg>`;try{page('Logische Topologie',`${R.M.nodes.size} Geräte · ${R.M.E.size} Verbindungen`);const I=await svgToJpeg(svg,b.w,b.h,5000);const s=Math.min((PW_-2*M)/b.w,(PH_-32)/b.h);doc.addImage(I.data,'JPEG',M+((PW_-2*M)-b.w*s)/2,24,b.w*s,b.h*s)}catch(_){}}}
+  // Tabellen
+  const tbl=(t,T)=>{if(!T.rows.length)return;page(t,T.sub||'');AT({startY:24,head:[T.heads],body:T.rows.map(r=>r.cells.map(String))})};
+  tbl('Geräte',tableData('geraete'));tbl('Patchliste',tableData('kabel'));tbl('Strecken',tableData('strecken'));
+  if(state.vlans.length){page('VLANs',`${state.vlans.length} VLANs`);AT({startY:24,head:[['ID','Name','Subnetz','Gateway','Farbe']],body:state.vlans.map(v=>[String(v.id),v.name,v.subnet,v.gw,v.color])});}
+  tbl('IP-Adressen',tableData('netze'));
+  if(PW.size)tbl('Stromversorgung',powerRows());
+  {const srv=state.devices.filter(d=>d.kind==='server'&&d.bays);if(srv.length){page('Laufwerke & RAID',pl(srv.length,'Server','Server'));const body=[];for(const d of srv){const DI=diskInfo(d);for(const x of DI.list){const r=raidOf(d,x.i);body.push([d.name,'Slot '+(x.i+1),d.bayForm.replace('.',',')+'″',x.t,x.o.c?fmtCap(x.o):'',r?r.name+' ('+RAIDL[r.lvl].n+')':'',x.out&&!x.ok?'prüfen':''])}}AT({startY:24,head:[['Server','Slot','Form','Typ','Größe','RAID','Hinweis']],body})}}
+  tbl('Materialliste',matRows());
+  if(ISS.length){page('Hinweise',`${ISS.length} Einträge`);AT({startY:24,head:[['Art','Hinweis']],body:ISS.map(i=>[i.s==='err'?'Fehler':i.s==='warn'?'Warnung':'Info',(i.c?(state.cables.find(c=>c.id===i.c)||{}).label+': ':'')+i.m]),columnStyles:{0:{cellWidth:22}}})}
+  // Inhaltsverzeichnis auf dem Deckblatt, Kopf/Fuß auf allen Seiten
+  doc.setPage(1);doc.setTextColor(17);doc.setFont('helvetica','bold');doc.setFontSize(12);doc.text('Inhalt',M+4,152);doc.setFont('helvetica','normal');doc.setFontSize(9.5);
+  toc.forEach(([t,p],i)=>{const col=Math.floor(i/9),y=160+(i%9)*5.2,x=M+4+col*90;doc.text(pT(t),x,y);doc.text(String(p),x+78,y,{align:'right'})});
+  const n=doc.getNumberOfPages();for(let i=2;i<=n;i++){doc.setPage(i);doc.setDrawColor(17);doc.setLineWidth(.4);doc.line(M,20,PW_-M,20);doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(120);doc.text(pT(state.name)+' · Netzwerkdokumentation · '+date,M,PH_-7);doc.text(`Seite ${i} von ${n}`,PW_-M,PH_-7,{align:'right'})}
+  await save(slug()+'-dokumentation.pdf',doc.output('blob'))}
+/* Etiketten */
+const LFMT={'a4-44':{n:'A4-Bogen 48,5 × 25,4 mm (44 Stück)',page:[210,297],w:48.5,h:25.4,cols:4,rows:11,gx:0,gy:0},'a4-65':{n:'A4-Bogen 38,1 × 21,2 mm (65 Stück)',page:[210,297],w:38.1,h:21.2,cols:5,rows:13,gx:2.5,gy:0},'roll62':{n:'Etikettendrucker 62 × 29 mm',page:[62,29],w:62,h:29,cols:1,rows:1,gx:0,gy:0},'tape12':{n:'Kabelfahne 12-mm-Band (70 mm)',page:[70,12],w:70,h:12,cols:1,rows:1,gx:0,gy:0,flag:1}};
+const LS2='switch-verkabelung-labels';
+function labelItems(o){const out=[],base=o.base.replace(/#.*$/,''),lk=(k,id)=>base+'#'+k+'-'+id;
+  const short=e=>{const d=dev(e.d);return `${d.name} · ${pname(d,e.p)}${e.s==='r'?' (hinten)':''}`};
+  if(o.what==='cab'){for(const c of [...state.cables].sort((a,b)=>String(a.label).localeCompare(String(b.label),'de',{numeric:true}))){if(o.only&&!c.label)continue;const t=c.label||'Kabel',A='A: '+short(c.a),B='B: '+short(c.b),txt=`${t}\n${A}\n${B}\n${cspec(c)}`;
+      const it={t,l:[A,B,cspec(c)],q:o.qr==='link'?lk('cab',c.id):txt};out.push(it);if(o.both)out.push({...it,l:[...it.l]})}}
+  else if(o.what==='port'){for(const d of state.devices){if(o.dev&&d.id!==o.dev)continue;for(const p of lay(d).ports){const cf=pconf(d,p.id);if(o.only&&!cf.label)continue;if(!o.only&&!cabOf(d.id,p.id,'f')&&!cabOf(d.id,p.id,'r')&&!cf.label)continue;
+      const c=cabOf(d.id,p.id,'f')||cabOf(d.id,p.id,'r');let far='';if(c){const ch=AN.get(c.id).ch,me=e=>e&&e.d===d.id&&e.p===p.id,fe=me(ch.A)?ch.B:me(ch.B)?ch.A:null;if(fe){const x=dev(fe.d);far='-> '+x.name+(x.user?' ('+x.user+')':'')}}
+      out.push({t:cf.label||pname(d,p.id),l:[`${d.name} · ${pname(d,p.id)}`,far].filter(Boolean),q:o.qr==='link'?lk('port',d.id+'-'+p.id):`${cf.label||pname(d,p.id)}\n${d.name} · ${pname(d,p.id)}\n${far}`})}}}
+  else{const L=o.sel&&MS.size?[...MS].map(dev):sel&&sel.kind==='dev'&&o.sel?[dev(sel.id)]:state.devices;for(const d of L.filter(Boolean)){if(o.cat&&catOf(d)[0]!==o.cat)continue;const loc=[d.rack?where(d):'',(devRoom(d)||{}).name].filter(Boolean).join(' · ');
+      out.push({t:d.name,l:[[d.kind==='host'||d.kind==='net'?subLbl(d):KIND[d.kind].n,d.model].filter(Boolean).join(' · '),d.ip,loc||d.location,d.user].filter(Boolean),q:o.qr==='link'?lk('dev',d.id):`${d.name}\n${[d.model,d.ip,loc,d.user].filter(Boolean).join('\n')}`})}}
+  return out}
+function fitText(doc,t,maxW,size,min,bold){doc.setFont('helvetica',bold?'bold':'normal');let s=size;doc.setFontSize(s);while(s>min&&doc.getTextWidth(t)>maxW){s-=.5;doc.setFontSize(s)}if(doc.getTextWidth(t)>maxW){while(t.length>1&&doc.getTextWidth(t+'…')>maxW)t=t.slice(0,-1);t+='…'}return t}
+function drawLabel(doc,QR,it,x,y,F,qr){const pad=F.h<15?1:1.6;let tx=x+pad,tw=F.w-2*pad;
+  const one=(x0,w0)=>{let qx=x0,ty=y+pad;if(qr){const qs=Math.min(F.h-2*pad,w0*.42);drawQR(doc,QR,it.q,x0,y+(F.h-qs)/2,qs);qx=x0+qs+1.6;w0-=qs+1.6}
+    const lines=F.h<15?[]:it.l.slice(0,F.h<23?2:3),ts=F.h<15?8.5:F.h<23?9.5:11;doc.setTextColor(0);const tt=fitText(doc,pT(it.t),w0,ts,5.5,true);const th=doc.getFontSize()*.3528;
+    const lh=Math.min(3.2,(F.h-2*pad-th-.6)/Math.max(1,lines.length)),ls=Math.max(5,Math.min(7.2,lh/.3528/1.15));let yy=F.h<15?y+F.h/2+th*.35:ty+th;doc.text(tt,qx,yy);
+    for(const l of lines){yy+=lh;doc.setTextColor(40);doc.text(fitText(doc,pT(l),w0,ls,Math.min(ls,5.6),false),qx,yy)}};
+  if(F.flag){const half=F.w*.36;one(x+pad,half);one(x+F.w-pad-half,half);doc.setDrawColor(180);doc.setLineDashPattern([.8,.8],0);doc.line(x+F.w/2,y+.5,x+F.w/2,y+F.h-.5);doc.setLineDashPattern([],0)}
+  else one(tx,tw)}
+async function makeLabels(o){
+  if(!DL&&!window.claude)DL=fileSaver();if(!DL){toast('Speichern ist in dieser Ansicht nicht möglich');return}
+  const items=labelItems(o);if(!items.length){toast('Keine passenden Etiketten');return}
+  let JS,QR=null;try{JS=await needPDF();if(o.qr!=='none')QR=await needQR()}catch(_){toast('Bibliothek konnte nicht geladen werden');return}
+  const F=LFMT[o.fmt],sheet=F.cols*F.rows>1,doc=new JS({orientation:F.page[0]>F.page[1]?'landscape':'portrait',unit:'mm',format:F.page,compress:true});
+  const left=(F.page[0]-(F.cols*F.w+(F.cols-1)*F.gx))/2,top=(F.page[1]-(F.rows*F.h+(F.rows-1)*F.gy))/2;let slot=sheet?clamp((+o.start||1)-1,0,F.cols*F.rows-1):0,first=true;
+  for(const it of items){if(!first&&(!sheet||slot>=F.cols*F.rows)){doc.addPage(F.page,F.page[0]>F.page[1]?'landscape':'portrait');slot=0}first=false;
+    const x=left+(slot%F.cols)*(F.w+F.gx),y=top+Math.floor(slot/F.cols)*(F.h+F.gy);if(o.frame){doc.setDrawColor(200);doc.setLineWidth(.15);doc.rect(x,y,F.w,F.h)}drawLabel(doc,QR,it,x,y,F,!!QR);slot++}
+  await save(slug()+'-etiketten.pdf',doc.output('blob'))}
+function openLabels(){
+  let o={what:'cab',fmt:'a4-44',qr:store.kind==='server'?'link':'text',both:true,only:false,frame:true,start:1,dev:'',cat:'',sel:false,base:store.kind==='server'?location.origin+location.pathname:''};
+  try{Object.assign(o,JSON.parse(localStorage.getItem(LS2)||'{}'),{dev:'',sel:false})}catch(_){}
+  if(store.kind==='server'&&!o.base)o.base=location.origin+location.pathname;
+  const pdev=state.devices.filter(d=>lay(d).ports.length);
+  const draw=()=>{const n=labelItems(o).length,F=LFMT[o.fmt],per=F.cols*F.rows,pages=per>1?Math.ceil((n+(+o.start||1)-1)/per):n;
+    $('#lbody').innerHTML=`<fieldset class="seg" style="grid-template-columns:repeat(3,minmax(0,1fr))"><legend>Was</legend>${[['cab','Kabel'],['port','Ports'],['dev','Geräte']].map(([k,t])=>`<label><input type="radio" name="lw" data-lo="what" value="${k}"${o.what===k?' checked':''}><span>${t}</span></label>`).join('')}</fieldset>
+    ${o.what==='cab'?`<label class="chk"><input type="checkbox" data-lo="both"${o.both?' checked':''}> Zwei Etiketten je Kabel (beide Enden)</label><label class="chk"><input type="checkbox" data-lo="only"${o.only?' checked':''}> Nur Kabel mit Nummer</label>`:''}
+    ${o.what==='port'?fld('lb-dev','Gerät',`<select id="lb-dev" data-lo="dev">${opts([['','Alle Geräte'],...pdev.map(d=>[d.id,d.name])],o.dev)}</select>`)+`<label class="chk"><input type="checkbox" data-lo="only"${o.only?' checked':''}> Nur beschriftete Ports (sonst alle belegten)</label>`:''}
+    ${o.what==='dev'?fld('lb-cat','Kategorie',`<select id="lb-cat" data-lo="cat">${opts([['','Alle Kategorien'],...catOrder.filter(k=>state.devices.some(d=>catOf(d)[0]===k)).map(k=>[k,(state.devices.find(d=>catOf(d)[0]===k)&&catOf(state.devices.find(d=>catOf(d)[0]===k))[1])||k])],o.cat)}</select>`)+((MS.size||sel&&sel.kind==='dev')?`<label class="chk"><input type="checkbox" data-lo="sel"${o.sel?' checked':''}> Nur ausgewählte Geräte</label>`:''):''}
+    ${fld('lb-fmt','Format',`<select id="lb-fmt" data-lo="fmt">${opts(Object.entries(LFMT).map(([k,v])=>[k,v.n]),o.fmt)}</select>`)}
+    ${per>1?`<div class="grid2">${fld('lb-start','Erstes freies Etikett auf dem Bogen',`<input id="lb-start" data-lo="start" type="number" min="1" max="${per}" value="${o.start}">`)}<label class="chk" style="align-self:end"><input type="checkbox" data-lo="frame"${o.frame?' checked':''}> Schnittlinien</label></div>`:''}
+    <fieldset class="seg" style="grid-template-columns:repeat(3,minmax(0,1fr))"><legend>QR-Code</legend>${[['none','Ohne'],['text','Mit Angaben'],['link','Mit Link']].map(([k,t])=>`<label><input type="radio" name="lq" data-lo="qr" value="${k}"${o.qr===k?' checked':''}><span>${t}</span></label>`).join('')}</fieldset>
+    ${o.qr==='link'?fld('lb-base','Adresse deiner Server-Installation',`<input id="lb-base" data-lo="base" value="${esc(o.base)}" placeholder="https://netz.example.de/">`)+'<p class="note">Der QR-Code öffnet dann direkt das Kabel, den Port oder das Gerät in der App.</p>':o.qr==='text'?'<p class="note">Der QR-Code enthält Nummer und beide Enden als Text – lesbar mit jeder Kamera-App, auch ohne Netz.</p>':''}
+    <p class="lcount"><b>${pl(n,'Etikett','Etiketten')}</b>${per>1?` auf ${pl(pages,'Bogen','Bögen')}`:''}</p>`};
+  modal(`<form class="mbox" id="lform" role="dialog" aria-modal="true" aria-labelledby="m-t"><div class="mh"><h2 id="m-t">Etiketten drucken</h2>${closeBtn}</div><div id="lbody"></div><div class="mf"><button type="button" class="btn" data-close>Abbrechen</button><button type="submit" class="btn pri">PDF erstellen</button></div></form>`);
+  const rd=el=>{const k=el.dataset.lo;if(!k)return;if(el.type==='radio'&&!el.checked)return;o[k]=el.type==='checkbox'?el.checked:el.value;if(k==='what'){o.only=false}};
+  $('#lform').addEventListener('change',e=>{rd(e.target);draw()});$('#lform').addEventListener('input',e=>{if(e.target.dataset.lo==='base'||e.target.dataset.lo==='start')rd(e.target)});
+  $('#lform').onsubmit=async e=>{e.preventDefault();if(o.qr==='link'&&!/^https?:\/\//.test(o.base)){toast('Bitte die Adresse der Installation eintragen');return}try{localStorage.setItem(LS2,JSON.stringify({...o,dev:'',sel:false}))}catch(_){}closeModal();toast('Etiketten werden erstellt …');await makeLabels(o)};
+  draw()}
+/* Direktlinks #dev-…, #cab-…, #port-…-… (für QR-Codes) */
+function openHash(){const h=decodeURIComponent(location.hash.slice(1));let m;
+  if((m=/^dev-([A-Za-z0-9_-]+)$/.exec(h))&&dev(m[1])){setMode('plan');select({kind:'dev',id:m[1]});centerOn(dev(m[1]))}
+  else if((m=/^cab-([A-Za-z0-9_-]+)$/.exec(h))&&state.cables.some(c=>c.id===m[1])){setMode('plan');select({kind:'cable',id:m[1]});centerCable(m[1])}
+  else if((m=/^port-([A-Za-z0-9_]+)-([a-z]\d{1,3})$/.exec(h))&&dev(m[1])&&pexists(dev(m[1]),m[2])){setMode('plan');select({kind:'port',dev:m[1],port:m[2]});centerOn(dev(m[1]))}}
+window.addEventListener('hashchange',openHash);
+async function showQR(kind,id){let QR;try{QR=await needQR()}catch(_){toast('QR-Bibliothek konnte nicht geladen werden');return}const url=location.origin+location.pathname+'#'+kind+'-'+id,q=QR(0,'M');q.addData(url,'Byte');q.make();
+  modal(`<div class="mbox" role="dialog" aria-modal="true" aria-labelledby="m-t"><div class="mh"><h2 id="m-t">QR-Code</h2>${closeBtn}</div><div class="qrbox">${q.createSvgTag({cellSize:6,margin:2,scalable:true})}</div><p class="note">Öffnet ${kind==='dev'?'das Gerät':kind==='cab'?'das Kabel':'den Port'} direkt in der App:</p><p><code>${esc(url)}</code></p><div class="mf"><button type="button" class="btn" id="m-cp">Link kopieren</button><button type="button" class="btn pri" data-close>Fertig</button></div></div>`);
+  $('#m-cp').onclick=()=>copyText(url,'Link')}
+
 /* ================= saving ================= */
 function setSave(s){const m={local:['Im Browser gespeichert','#8a8a85'],cloud:[store.kind==='server'?'Auf dem Server gespeichert':'Gespeichert','#3ddc6a'],conflict:['Nicht gespeichert – Konflikt','#ff6b5f'],offline:['Server nicht erreichbar','#ff6b5f'],saving:['Speichert …','#ffe600'],err:['Speichern fehlgeschlagen','#ff6b5f'],demo:['Beispiel','#8a8a85'],boot:['Lädt …','#8a8a85']}[s]||['',''];const el=$('#save');el.textContent=m[0];el.title=m[0];el.style.setProperty('--sc',m[1])}
 function saveLocal(){try{localStorage.setItem(LS,JSON.stringify(state))}catch(_){}if(store.kind!=='server'&&!state.demo)autoVersion()}
@@ -2008,6 +2119,7 @@ async function initServer(){
   try{const b=await api('GET');
     if(b){store.base=+b.updated||0;const lu=state.demo?-1:(state.updated||0);
       if(lu<=store.base)applyRemote(b);else{setSave('saving');saveCloud()}}
+    if(location.hash.length>1)openHash();
     else if(!state.demo){setSave('saving');saveCloud()}else setSave('demo');
   }catch(e){setSave(e&&e.code==='auth'?'err':'offline')}
   document.addEventListener('visibilitychange',pullServer);setInterval(pullServer,30000);
@@ -2086,6 +2198,7 @@ function start(hot){
   if(innerWidth<=760){$('#insp').classList.add('min');$('#itog').setAttribute('aria-expanded','false')}
   renderAll();
   if(hot&&hot.view&&Number.isFinite(hot.view.z)){view=hot.view;applyView()}else requestAnimationFrame(fit);
+  if(location.hash.length>1&&!window.SV_SERVER)requestAnimationFrame(()=>requestAnimationFrame(openHash));
   try{window.claude&&window.claude.hot&&window.claude.hot.snapshot&&window.claude.hot.snapshot(()=>({state,view}))}catch(_){}
   initCloud(0);
   let rt=0;new ResizeObserver(()=>{clearTimeout(rt);rt=setTimeout(()=>{if(!drag)applyView()},60)}).observe(stage);

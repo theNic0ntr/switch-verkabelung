@@ -229,3 +229,8 @@ table.etab{width:100%;border-collapse:collapse;font-size:14px;margin-bottom:22px
 .diff{margin:6px 0 0;padding-left:18px;font-size:14px;line-height:1.5}
 .diff .da{color:#15803d}.diff .dd{color:#b91c1c}
 @media(max-width:600px){.vadd{grid-template-columns:1fr}}
+/* --- labels / qr --- */
+.lcount{margin:4px 0 0;font-size:15px}
+.qrbox{display:grid;place-items:center;margin:4px 0 12px}
+.qrbox svg{width:min(240px,70vw);height:auto;background:#fff;padding:6px;border-radius:8px}
+code{font-size:13px;overflow-wrap:anywhere}

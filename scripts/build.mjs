@@ -1,6 +1,6 @@
 // Baut die App aus src/ zusammen.
 //   dist/public/   – Version für den eigenen Server (Docker): Schriften lokal, Speicherung über /api/plan
-//   dist/artifact.html – Einzeldatei mit Google Fonts (z. B. für claude.ai-Artifacts)
+//   dist/artifact.html – Seite mit Google Fonts (z. B. für claude.ai-Artifacts), lädt dist/vendor/* bei Bedarf
 import { readFileSync, writeFileSync, mkdirSync, copyFileSync, readdirSync, rmSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -41,5 +41,9 @@ writeFileSync(join(dist, 'public', 'index.html'),
 writeFileSync(join(dist, 'public', 'fonts', 'fonts.css'), fontCss);
 for (const f of readdirSync(join(root, 'src', 'fonts'))) copyFileSync(join(root, 'src', 'fonts', f), join(dist, 'public', 'fonts', f));
 copyFileSync(join(root, 'src', 'favicon.svg'), join(dist, 'public', 'favicon.svg'));
+for (const dir of [join(dist, 'public', 'vendor'), join(dist, 'vendor')]) {
+  mkdirSync(dir, { recursive: true });
+  for (const f of readdirSync(join(root, 'src', 'vendor'))) copyFileSync(join(root, 'src', 'vendor', f), join(dir, f));
+}
 
 console.log('gebaut: dist/public/index.html, dist/artifact.html');
