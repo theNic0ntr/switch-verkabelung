@@ -22,6 +22,7 @@ Netzwerk-Verkabelung im Browser planen und dokumentieren. Switches, Firewalls, P
 - **PDF und Etiketten:** komplette Dokumentation als PDF (Plan, Schränke, Topologie, alle Listen); Etiketten für Kabel, Ports und Geräte auf A4-Bögen, für Etikettendrucker oder als Kabelfahne, wahlweise mit QR-Code. In der Server-Version öffnet der QR-Code das Objekt direkt (`#dev-…`, `#cab-…`, `#port-…`).
 - **Patchlegung:** wird automatisch aus dem Plan erzeugt – nach Raum und Schrank gegliedert, je Switch eine Tabelle mit Port, Patch (Kürzel des Patchpanels + Port, z. B. 11.6), VLAN, Geräteklasse und Nutzer. Hat ein Patchpanel-Port eine eigene Beschriftung, steht genau diese in der Spalte Patch; sonst wird sie aus Kürzel und Port gebildet. Das Kürzel lässt sich am Patchpanel festlegen, sonst wird je Schrank von oben durchnummeriert.
 - **Export:** Patchliste und Patchlegung als CSV, der Plan als SVG oder PNG, das Projekt als JSON.
+- **Mehrere Pläne:** Oben links wählst du den Plan, legst neue an, benennst um, duplizierst oder löschst. Das mitgelieferte Beispiel bleibt immer als Tutorial erhalten: Darin kannst du alles ausprobieren, gespeichert wird nichts. Mit „Beispiel als eigenen Plan speichern“ wird daraus ein echter Plan. Im Menü siehst du, wer gerade in welchem Plan arbeitet. Ein Link mit `?plan=<id>` öffnet direkt einen bestimmten Plan, die QR-Codes auf Etiketten enthalten ihn automatisch.
 - **Live zusammenarbeiten:** Jede Änderung wird sofort gespeichert und erscheint bei allen, die den Plan offen haben. Arbeiten zwei Leute gleichzeitig, werden ihre Änderungen je Gerät, Kabel und Feld zusammengeführt. Gleichzeitige Änderungen an verschiedenen Dingen gehen also nicht verloren; am selben Feld gilt die zuletzt gespeicherte. Oben rechts siehst du, wer gerade im Plan ist. Im Plan erscheinen ihre Mauszeiger mit Namen und Farbe, außerdem das Gerät, das jemand gerade verschiebt, als Umriss an der neuen Stelle, das Kabel, das jemand zieht, und was gerade ausgewählt ist. Rückgängig (Strg+Z) nimmt nur deine eigenen Schritte zurück.
 
 ## Screenshots
@@ -36,6 +37,10 @@ Alle Bilder zeigen das Beispielprojekt, das beim ersten Start geladen wird.
 <tr>
 <td><img src="docs/screenshots/patchlegung.png" alt="Patchlegung, gegliedert nach Raum, Schrank und Switch"><br><b>Patchlegung:</b> je Raum, Schrank und Switch eine Tabelle mit Port, Patch, VLAN, Gerät und Nutzer.</td>
 <td><img src="docs/screenshots/topologie.png" alt="Automatisch erzeugte logische Topologie mit Firewall, Switches, Server und Hosts"><br><b>Logische Topologie:</b> automatisch aus dem Plan erzeugt, eingefärbt nach Tempo oder VLAN.</td>
+</tr>
+<tr>
+<td><img src="docs/screenshots/plaene.png" alt="Menü oben links mit mehreren Plänen, dem Beispiel als Tutorial und Aktionen wie Neuer Plan"><br><b>Mehrere Pläne:</b> oben links wechseln, anlegen, umbenennen, duplizieren oder löschen; das Beispiel bleibt als Tutorial.</td>
+<td></td>
 </tr>
 <tr>
 <td><img src="docs/screenshots/vlans-ips.png" alt="Liste der VLANs mit Subnetz und Belegung sowie aller IP-Adressen"><br><b>VLANs und IP-Adressen:</b> Subnetz, Gateway, Belegung und Prüfung jeder IP.</td>
@@ -57,7 +62,7 @@ cd switch-verkabelung
 docker compose up -d --build
 ```
 
-Die App läuft danach auf `http://<server>:8080`. Der Plan wird auf dem Server gespeichert, also im Docker-Volume `daten` unter `/data/plan.json`, und ist damit in jedem Browser gleich. Änderungen anderer kommen live über eine dauerhafte Verbindung (`/api/live`, Server-Sent Events) an und werden mit deinen eigenen zusammengeführt.
+Die App läuft danach auf `http://<server>:8080`. Die Pläne werden auf dem Server gespeichert, also im Docker-Volume `daten` unter `/data/plans/<id>.json`, und sind damit in jedem Browser gleich. Ein bisheriges `/data/plan.json` wird beim ersten Start automatisch zum ersten Plan (die alte Datei bleibt als `plan.json.migriert` liegen). Änderungen anderer kommen live über eine dauerhafte Verbindung (`/api/live`, Server-Sent Events) an und werden mit deinen eigenen zusammengeführt.
 
 ### Anmeldung einschalten
 
@@ -87,14 +92,14 @@ Bei nginx darf die Live-Verbindung nicht gepuffert werden. Der Server schickt da
 | `PORT` | `8080` | Port im Container |
 | `AUTH_USERS` | – | Mehrere Konten: `name:passwort,name2:passwort2` (Komma oder Zeilenumbruch, kein Komma im Passwort) |
 | `AUTH_USER` / `AUTH_PASSWORD` | – | Ein einzelnes Konto, nur zusammen gesetzt |
-| `DATA_DIR` | `/data` | Ablage für `plan.json` und Sicherungen |
+| `DATA_DIR` | `/data` | Ablage für die Pläne (`plans/`), Sicherungen (`backups/<id>/`) und gelöschte Pläne (`papierkorb/`) |
 | `BACKUPS` | `50` | Anzahl der aufbewahrten Sicherungen (`0` = keine) |
 | `BACKUP_MINUTES` | `10` | Höchstens eine Sicherung pro Zeitraum |
 | `MAX_PLAN_MB` | `20` | Maximale Größe eines Plans |
 
 ### Sicherungen und Wiederherstellen
 
-Vor dem Überschreiben legt der Server eine Kopie unter `/data/backups/` ab, höchstens alle 10 Minuten. Benannte Stände aus **Datei → Versionsverlauf** liegen ebenfalls dort (`named-*.json`) und werden nicht automatisch gelöscht. Zusätzlich kannst du jederzeit über **Datei → Projekt speichern** eine JSON-Datei sichern und über **Datei → Projekt laden** wieder einspielen.
+Vor dem Überschreiben legt der Server je Plan eine Kopie unter `/data/backups/<id>/` ab, höchstens alle 10 Minuten. Benannte Stände aus **Datei → Versionsverlauf** liegen ebenfalls dort (`named-*.json`) und werden nicht automatisch gelöscht. Gelöschte Pläne landen in `/data/papierkorb/`; zum Zurückholen die Datei wieder als `/data/plans/<id>.json` ablegen und den Container neu starten. Zusätzlich kannst du jederzeit über **Datei → Projekt speichern** eine JSON-Datei sichern und über **Datei → Projekt laden** als neuen Plan wieder einspielen.
 
 So kommst du an die Dateien im Volume:
 

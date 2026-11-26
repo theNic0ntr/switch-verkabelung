@@ -766,7 +766,7 @@ function renderCanvas(){
   drawCables();
   $('#empty').hidden=state.devices.length+state.racks.length+state.rooms.length>0;
   lvSel();renderPeers();
-  $('#hint').textContent=state.demo?'Beispielprojekt zum Ausprobieren – unter „Datei“ startest du ein leeres Projekt.':'Port anklicken zeigt die ganze Strecke · Port auf Port ziehen steckt ein Kabel · Geräte in Schränke ziehen';
+  $('#hint').textContent=PL.cur==='demo'?'Beispiel zum Ausprobieren – Änderungen werden nicht gespeichert. Oben links legst du einen eigenen Plan an.':'Port anklicken zeigt die ganze Strecke · Port auf Port ziehen steckt ein Kabel · Geräte in Schränke ziehen';
 }
 function powSVG(){if(!SDV)return '';const d=dev(SDV);if(!d||HID.has(d.id))return '';const pairs=[];
   for(const id of feedsOf(d))pairs.push([d,dev(id),d.pa===id?'A':'B']);
@@ -835,7 +835,7 @@ function renderRail(){
 function renderLegend(){
   $('#legend').innerHTML=Object.values(SP).map(s=>`<li><i style="--c:${s.c}"></i>${s.n}</li>`).join('')+`<li><svg width="26" height="8" aria-hidden="true"><path d="M3 4H25" stroke="#5b5b56" stroke-width="4.6" stroke-linecap="round" stroke-dasharray="0.1 7"/></svg>Verlegekabel (Panel-Rückseite)</li><li><i class="dash"></i>Kein Link</li><li><i style="--c:#ffe600;height:8px;outline:1.5px solid #111"></i>Gewählte Strecke</li><li><i class="sev err">!</i>Hinweis am Kabel</li><li><svg width="26" height="12" aria-hidden="true">${bolt(10,1.5)}</svg>PoE</li><li><svg width="26" height="12" aria-hidden="true"><circle cx="13" cy="6" r="5" fill="#2f7de1" stroke="#111" stroke-width="1.4"/></svg>Belegt – Gegenstelle ausgeblendet</li><li><svg width="26" height="12" aria-hidden="true"><rect x="1.5" y="1.5" width="23" height="9" rx="2" fill="none" stroke="#f08c00" stroke-width="3"/></svg>Veraltet (Kaufjahr)</li><li><svg width="26" height="12" aria-hidden="true"><rect x="1.5" y="1.5" width="23" height="9" rx="2" fill="none" stroke="#d6312b" stroke-width="3"/></svg>EOL – Lebensende</li><li><svg width="26" height="12" aria-hidden="true"><rect x="1" y="1" width="24" height="10" rx="1.5" fill="#fff" stroke="#000" stroke-opacity=".35"/></svg>Port-Beschriftung (Patchpanel)</li>`;
 }
-function renderTop(){const nh=HIDL.size,bv=$('#b-vis');bv.classList.toggle('act',nh>0);$('#vis-l').textContent=nh?nh+' ausgeblendet':'Ansicht';bv.title=nh?nh+' Objekte ausgeblendet – hier wieder einblenden':'Räume, Schränke, Geräte und Hosts ein- und ausblenden';renderVis();$('#b-undo').disabled=!H.u.length;$('#b-redo').disabled=!H.r.length;if(document.activeElement!==$('#proj'))$('#proj').value=state.name}
+function renderTop(){const nh=HIDL.size,bv=$('#b-vis');bv.classList.toggle('act',nh>0);$('#vis-l').textContent=nh?nh+' ausgeblendet':'Ansicht';bv.title=nh?nh+' Objekte ausgeblendet – hier wieder einblenden':'Räume, Schränke, Geräte und Hosts ein- und ausblenden';renderVis();$('#b-undo').disabled=!H.u.length;$('#b-redo').disabled=!H.r.length;const pn=PL.cur==='demo'?'Beispiel (Tutorial)':state.name||'Plan';if($('#pl-name').textContent!==pn){$('#pl-name').textContent=pn;$('#b-plans').title='Pläne – aktuell: '+pn}}
 
 /* ================= inspector ================= */
 const fld=(id,label,inner)=>`<label class="fld" for="${id}"><span>${label}</span>${inner}</label>`;
@@ -1128,7 +1128,7 @@ function mergeInto(B,M,T){const strip=o=>{const x={...o};for(const k of [...COLL
 function ck(key){const now=Date.now();if(key&&key===H.key&&now-H.t<1500){H.t=now;return}const j=JSON.stringify(state),top=H.u[H.u.length-1];if(top&&top.post==null)top.post=j;H.u.push({pre:j,post:null});if(H.u.length>150)H.u.shift();H.r=[];H.key=key||null;H.t=now}
 function hSeal(){const top=H.u[H.u.length-1];if(top&&top.post==null)top.post=JSON.stringify(state);H.key=null}
 function hApply(from,to){const R=sanitize(mergeInto(JSON.parse(from),JSON.parse(to),state));R.updated=state.updated;return R}
-function touched(){state.updated=Date.now();state.demo=false;store.dirty=true;clearTimeout(store.tl);store.tl=setTimeout(saveLocal,300);if(store.ref&&!SY.ro){clearTimeout(store.tc);setSave('saving');store.tc=setTimeout(saveCloud,250)}else if(!store.ref)setSave('local')}
+function touched(){if(PL.cur==='demo'){state.updated=Date.now();setSave('demo');return}state.updated=Date.now();state.demo=false;store.dirty=true;clearTimeout(store.tl);store.tl=setTimeout(saveLocal,300);if(store.ref&&!SY.ro){clearTimeout(store.tc);setSave('saving');store.tc=setTimeout(saveCloud,250)}else if(!store.ref)setSave('local')}
 function fixSel(){for(const id of [...MS])if(!dev(id))MS.delete(id);if(sel&&sel.kind==='multi'&&MS.size<2){const o=[...MS][0];MS.clear();sel=o?{kind:'dev',id:o}:null}if(!sel)return;if(sel.kind==='dev'&&!dev(sel.id))sel=null;else if(sel.kind==='port'&&!(dev(sel.dev)&&pexists(dev(sel.dev),sel.port)))sel=null;else if(sel.kind==='cable'&&!state.cables.some(c=>c.id===sel.id))sel=null;else if(sel.kind==='rack'&&!rackOf(sel.id))sel=null;else if(sel.kind==='room'&&!roomOf(sel.id))sel=null}
 function undo(){const e=H.u.pop();if(!e)return;if(e.post==null)e.post=JSON.stringify(state);state=hApply(e.post,e.pre);H.r.push(e);H.key=null;LC.clear();fixSel();touched();renderAll()}
 function redo(){const e=H.r.pop();if(!e)return;state=hApply(e.pre,e.post);H.u.push(e);H.key=null;LC.clear();fixSel();touched();renderAll()}
@@ -1521,7 +1521,6 @@ $('#rail').addEventListener('click',e=>{const b=e.target.closest('button');if(!b
   else if(b.dataset.dv){setMode('plan');select({kind:'dev',id:b.dataset.dv});centerOn(dev(b.dataset.dv))}
   else if(b.dataset.cab){setMode('plan');select({kind:'cable',id:b.dataset.cab});centerCable(b.dataset.cab)}
 });
-$('#proj').addEventListener('input',e=>{ck('proj');state.name=e.target.value.slice(0,80);touched();if(!sel)renderInsp()});
 $('#b-undo').onclick=undo;$('#b-redo').onclick=redo;
 function renderVis(){const P=$('#vpop');if(P.hidden)return;
   const T=visTree(),H=HIDL,q=norm($('#vq').value.trim());
@@ -1565,6 +1564,7 @@ document.addEventListener('keydown',e=>{
     if(!$('#vpop').hidden){toggleVis(false);$('#b-vis').focus();return}
     if(!$('#modal').hidden){closeModal();return}
     if(!$('#menu').hidden){toggleMenu(false);return}
+    if(!$('#plmenu').hidden){togglePlans(false);return}
     if(drag){endDrag(e,true);return}
     if(sel)select(null);return}
   const t=e.target;if(/INPUT|TEXTAREA|SELECT/.test(t.tagName)||!$('#modal').hidden)return;
@@ -1593,7 +1593,7 @@ function buildMenu(){
   const can=!!DL;
   const items=[['json',can?'Projekt speichern (.json)':'Projekt als JSON kopieren'],['open','Projekt laden …'],['-'],['csv',can?'Patchliste als CSV':'Patchliste kopieren (CSV)'],['csv2',can?'Patchlegung als CSV':'Patchlegung kopieren (CSV)'],['svg',can?'Plan als SVG-Bild':'Plan als SVG kopieren']];
   if(can)items.push(['png','Plan als PNG-Bild']);
-  items.push(['-'],['pdf','PDF-Dokumentation'],['labels','Etiketten drucken …'],['-'],['versions','Versionsverlauf …'],['-'],['example','Beispielprojekt laden'],['new','Neues leeres Projekt']);
+  items.push(['-'],['pdf','PDF-Dokumentation'],['labels','Etiketten drucken …'],['-'],['versions','Versionsverlauf …'],['-'],['new','Neuer Plan …'],['example','Beispiel (Tutorial) öffnen']);
   $('#menu').innerHTML=items.map(([k,t])=>k==='-'?'<hr>':`<button type="button" role="menuitem" data-m="${k}">${t}</button>`).join('');
   $('#b-csv').textContent=can?'CSV herunterladen':'CSV kopieren';
 }
@@ -1608,8 +1608,8 @@ async function menuAct(m){
   if(m==='versions')return openVersions();
   if(m==='pdf')return makeDoc();
   if(m==='labels')return openLabels();
-  if(m==='example'){if(state.devices.length&&!state.demo&&!(await ask('Beispiel laden?','Das aktuelle Projekt wird ersetzt. Mit Strg+Z holst du es zurück.','Beispiel laden')))return;ck();state=demo();sel=null;LC.clear();touched();state.demo=true;renderAll();fit();return}
-  if(m==='new'){if((state.devices.length||state.racks.length||state.rooms.length)&&!(await ask('Neues Projekt?','Das aktuelle Projekt wird geleert. Mit Strg+Z holst du es zurück.','Leeren',true)))return;ck();state=emptyState();sel=null;touched();renderAll();fit()}
+  if(m==='example')return openPlan('demo');
+  if(m==='new')return planDialog('new');
 }
 const slug=()=>(state.name||'netzwerk').toLowerCase().replace(/ä/g,'ae').replace(/ö/g,'oe').replace(/ü/g,'ue').replace(/ß/g,'ss').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||'netzwerk';
 const portCell=e=>{const d=dev(e.d),l=pconf(d,e.p).label;return `${pname(d,e.p)}${e.s==='r'?' (Rück)':''}${l?' – '+l:''}`};
@@ -1699,7 +1699,7 @@ async function copyText(text,label){
 const closeBtn='<button type="button" class="ib" data-close aria-label="Schließen"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button>';
 function openImport(){
   modal(`<div class="mbox" role="dialog" aria-modal="true" aria-labelledby="m-t"><div class="mh"><h2 id="m-t">Projekt laden</h2>${closeBtn}</div>
-  <p>Wähle eine gespeicherte .json-Datei oder füge ihren Inhalt ein. Das aktuelle Projekt wird ersetzt – Strg+Z holt es zurück.</p>
+  <p>Wähle eine gespeicherte .json-Datei oder füge ihren Inhalt ein. Es wird als neuer Plan angelegt, der aktuelle bleibt unverändert.</p>
   <button type="button" class="btn wide" id="m-file">Datei wählen …</button>
   <label class="fld" for="m-json" style="margin-top:12px"><span>Oder JSON einfügen</span><textarea id="m-json" rows="6" spellcheck="false"></textarea></label>
   <p class="merr" id="m-err" role="alert"></p>
@@ -1710,7 +1710,7 @@ function openImport(){
 $('#file').addEventListener('change',async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;try{importText(await f.text())}catch(_){const m=$('#m-err');m&&(m.textContent='Datei konnte nicht gelesen werden.')}});
 function importText(t){
   let s;try{s=sanitize(JSON.parse(t))}catch(_){const m=$('#m-err');if(m)m.textContent='Das ist keine gültige Projektdatei dieser App.';else toast('Keine gültige Projektdatei');return}
-  ck();state=s;state.demo=false;sel=null;LC.clear();touched();closeModal();setMode('plan');renderAll();fit();toast(`Geladen: ${s.devices.length} Geräte, ${s.racks.length} Schränke, ${s.cables.length} Kabel`);
+  closeModal();setMode('plan');createPlan(s.name&&s.name!=='Netzwerk'?s.name:'Importierter Plan',s);
 }
 function sanitize(o){
   if(!o||typeof o!=='object'||!Array.isArray(o.devices))throw new Error('bad');
@@ -2054,7 +2054,7 @@ async function makeDoc(){
 /* Etiketten */
 const LFMT={'a4-44':{n:'A4-Bogen 48,5 × 25,4 mm (44 Stück)',page:[210,297],w:48.5,h:25.4,cols:4,rows:11,gx:0,gy:0},'a4-65':{n:'A4-Bogen 38,1 × 21,2 mm (65 Stück)',page:[210,297],w:38.1,h:21.2,cols:5,rows:13,gx:2.5,gy:0},'roll62':{n:'Etikettendrucker 62 × 29 mm',page:[62,29],w:62,h:29,cols:1,rows:1,gx:0,gy:0},'tape12':{n:'Kabelfahne 12-mm-Band (70 mm)',page:[70,12],w:70,h:12,cols:1,rows:1,gx:0,gy:0,flag:1}};
 const LS2='switch-verkabelung-labels';
-function labelItems(o){const out=[],base=o.base.replace(/#.*$/,''),lk=(k,id)=>base+'#'+k+'-'+id;
+function labelItems(o){const out=[];let base=o.base.replace(/#.*$/,'');if(store.kind==='server'&&PL.cur&&PL.cur!=='demo'){try{const u=new URL(base);u.searchParams.set('plan',PL.cur);base=u.href}catch(_){}}const lk=(k,id)=>base+'#'+k+'-'+id;
   const short=e=>{const d=dev(e.d);return `${d.name} · ${pname(d,e.p)}${e.s==='r'?' (hinten)':''}`};
   if(o.what==='cab'){for(const c of [...state.cables].sort((a,b)=>String(a.label).localeCompare(String(b.label),'de',{numeric:true}))){if(o.only&&!c.label)continue;const t=c.label||'Kabel',A='A: '+short(c.a),B='B: '+short(c.b),txt=`${t}\n${A}\n${B}\n${cspec(c)}`;
       const it={t,l:[A,B,cspec(c)],q:o.qr==='link'?lk('cab',c.id):txt};out.push(it);if(o.both)out.push({...it,l:[...it.l]})}}
@@ -2112,21 +2112,25 @@ async function showQR(kind,id){let QR;try{QR=await needQR()}catch(_){toast('QR-B
   $('#m-cp').onclick=()=>copyText(url,'Link')}
 
 /* ================= saving ================= */
-function setSave(s){const m={local:['Im Browser gespeichert','#8a8a85'],cloud:[store.kind==='server'?'Auf dem Server gespeichert':'Gespeichert','#3ddc6a'],conflict:['Nicht gespeichert – Konflikt','#ff6b5f'],offline:['Server nicht erreichbar','#ff6b5f'],saving:['Speichert …','#ffe600'],err:['Speichern fehlgeschlagen','#ff6b5f'],demo:['Beispiel','#8a8a85'],boot:['Lädt …','#8a8a85'],ro:['Nur Ansicht','#8a8a85']}[s]||['',''];const el=$('#save');el.textContent=m[0];el.title=m[0];el.style.setProperty('--sc',m[1])}
-function saveLocal(){try{localStorage.setItem(LS,JSON.stringify(state))}catch(_){}if(store.kind!=='server'&&!state.demo)autoVersion()}
-function loadLocal(){try{const t=localStorage.getItem(LS);return t?sanitize(JSON.parse(t)):null}catch(_){return null}}
+function setSave(s){const m={local:['Im Browser gespeichert','#8a8a85'],cloud:[store.kind==='server'?'Auf dem Server gespeichert':'Gespeichert','#3ddc6a'],conflict:['Nicht gespeichert – Konflikt','#ff6b5f'],offline:['Server nicht erreichbar','#ff6b5f'],saving:['Speichert …','#ffe600'],err:['Speichern fehlgeschlagen','#ff6b5f'],demo:['Beispiel – wird nicht gespeichert','#8a8a85'],boot:['Lädt …','#8a8a85'],ro:['Nur Ansicht','#8a8a85']}[s]||['',''];const el=$('#save');el.textContent=m[0];el.title=m[0];el.style.setProperty('--sc',m[1])}
+function saveLocal(){if(!PL.cur||PL.cur==='demo')return;const j=JSON.stringify(state);try{localStorage.setItem(lsPlan(PL.cur),j)}catch(_){}
+  if(PL.be==='local')idxPut({id:PL.cur,name:state.name,updated:state.updated||Date.now(),devices:state.devices.length,cables:state.cables.length});
+  if(store.kind!=='server')autoVersion()}
+function loadLocal(id){try{const t=localStorage.getItem(lsPlan(id));return t?sanitize(JSON.parse(t)):null}catch(_){return null}}
 /* ---------- Versionsverlauf ---------- */
 const LSV='switch-verkabelung-versions';
-const lvRead=()=>{try{return JSON.parse(localStorage.getItem(LSV)||'[]')}catch(_){return []}};
-function lvWrite(a){for(let i=0;i<5;i++){try{localStorage.setItem(LSV,JSON.stringify(a));return true}catch(_){const k=a.map((v,j)=>[v,j]).filter(([v])=>!v.name).pop();if(!k)return false;a.splice(k[1],1)}}return false}
+const lvKey=()=>LSV+'-'+PL.cur;
+const lvRead=()=>{try{return JSON.parse(localStorage.getItem(lvKey())||'[]')}catch(_){return []}};
+function lvWrite(a){for(let i=0;i<5;i++){try{localStorage.setItem(lvKey(),JSON.stringify(a));return true}catch(_){const k=a.map((v,j)=>[v,j]).filter(([v])=>!v.name).pop();if(!k)return false;a.splice(k[1],1)}}return false}
 function lvAdd(name){const a=lvRead();a.unshift({id:'v'+Date.now(),updated:Date.now(),name:name||'',devices:state.devices.length,cables:state.cables.length,json:JSON.stringify(state)});
   const auto=a.filter(v=>!v.name);while(a.length>30&&auto.length){const v=auto.pop();a.splice(a.indexOf(v),1)}return lvWrite(a)}
 function autoVersion(){const a=lvRead(),last=a.find(v=>!v.name);if(last&&Date.now()-last.updated<15*60e3)return;if(last&&last.json===JSON.stringify(state))return;lvAdd('')}
+const vUrl=id=>'api/plans/'+encodeURIComponent(PL.cur)+'/versions'+(id?'/'+encodeURIComponent(id):'');
 const VER={
-  list:async()=>store.kind==='server'?(await fetch('api/versions',{cache:'no-store'}).then(r=>r.ok?r.json():[])):lvRead().map(({json,...v})=>({...v,named:!!v.name})),
-  get:async id=>{if(store.kind==='server'){const r=await fetch('api/versions/'+encodeURIComponent(id),{cache:'no-store'});if(!r.ok)throw new Error();return r.json()}const v=lvRead().find(x=>x.id===id);if(!v)throw new Error();return v},
-  add:async name=>{if(store.kind==='server'){if(store.dirty)await saveCloud();const r=await fetch('api/versions',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name})});return r.ok}return lvAdd(name||'Gespeicherter Stand')},
-  del:async id=>{if(store.kind==='server')return (await fetch('api/versions/'+encodeURIComponent(id),{method:'DELETE'})).ok;const a=lvRead().filter(v=>v.id!==id);return lvWrite(a)}};
+  list:async()=>store.kind==='server'?(await fetch(vUrl(),{cache:'no-store'}).then(r=>r.ok?r.json():[])):lvRead().map(({json,...v})=>({...v,named:!!v.name})),
+  get:async id=>{if(store.kind==='server'){const r=await fetch(vUrl(id),{cache:'no-store'});if(!r.ok)throw new Error();return r.json()}const v=lvRead().find(x=>x.id===id);if(!v)throw new Error();return v},
+  add:async name=>{if(store.kind==='server'){if(store.dirty)await saveCloud();const r=await fetch(vUrl(),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name})});return r.ok}return lvAdd(name||'Gespeicherter Stand')},
+  del:async id=>{if(store.kind==='server')return (await fetch(vUrl(id),{method:'DELETE'})).ok;const a=lvRead().filter(v=>v.id!==id);return lvWrite(a)}};
 function diffPlans(A,B){const out=[],m=(a,b,key,name,lbl)=>{const am=new Map(a.map(x=>[x[key],x])),bm=new Map(b.map(x=>[x[key],x]));const add=b.filter(x=>!am.has(x[key])),del=a.filter(x=>!bm.has(x[key]));let ch=[],mv=0;
     for(const x of b){const o=am.get(x[key]);if(!o)continue;const s1=JSON.stringify({...o,x:0,y:0}),s2=JSON.stringify({...x,x:0,y:0});if(s1!==s2)ch.push(x);else if(o.x!==x.x||o.y!==x.y)mv++}
     const nm=l=>l.slice(0,6).map(x=>name(x)).join(', ')+(l.length>6?' …':'');
@@ -2134,7 +2138,7 @@ function diffPlans(A,B){const out=[],m=(a,b,key,name,lbl)=>{const am=new Map(a.m
   m(A.devices,B.devices,'id',x=>x.name,['Gerät','Geräte']);m(A.cables,B.cables,'id',x=>x.label||'Kabel',['Kabel','Kabel']);m(A.racks,B.racks,'id',x=>x.name,['Schrank','Schränke']);m(A.rooms,B.rooms,'id',x=>x.name,['Raum','Räume']);m(A.vlans||[],B.vlans||[],'id',x=>'VLAN '+x.id,['VLAN','VLANs']);
   if(A.name!==B.name)out.push(`<li>Projektname: „${esc(A.name)}“ → „${esc(B.name)}“</li>`);
   return out.length?`<ul class="diff">${out.join('')}</ul>`:'<p class="note">Keine Unterschiede zum aktuellen Stand.</p>'}
-async function openVersions(){
+async function openVersions(){if(PL.cur==='demo'){toast('Im Beispiel gibt es keinen Versionsverlauf – speichere es zuerst als eigenen Plan');return}
   const srv=store.kind==='server';
   modal(`<div class="mbox wide" role="dialog" aria-modal="true" aria-labelledby="m-t"><div class="mh"><h2 id="m-t">Versionsverlauf</h2>${closeBtn}</div>
   <p>${srv?'Der Server sichert den Plan automatisch, höchstens alle 10 Minuten. Benannte Stände bleiben dauerhaft erhalten.':'Gespeichert in diesem Browser: automatisch höchstens alle 15 Minuten beim Bearbeiten, dazu deine benannten Stände.'}</p>
@@ -2157,19 +2161,22 @@ async function showVersions(){const box=$('#vlist');if(!box)return;let L=[];try{
    eigenen, noch nicht übertragenen Änderungen je Objekt und Feld darauf angewendet (mergeInto). */
 const SY={cid:(rid()+rid()).slice(0,14),rev:null,synced:null,pend:null,hist:new Map(),ro:false,n:0,inspStale:false};
 const LSB='switch-verkabelung-sync';
-function sbSave(){if(!store.kind)return;try{localStorage.setItem(LSB,JSON.stringify({k:store.kind,rev:SY.rev,json:SY.synced}))}catch(_){}}
-function sbLoad(){try{const o=JSON.parse(localStorage.getItem(LSB)||'null');return o&&o.k===store.kind&&typeof o.json==='string'?o:null}catch(_){return null}}
+function sbSave(){if(!store.kind||!PL.cur||PL.cur==='demo')return;try{localStorage.setItem(LSB+'-'+PL.cur,JSON.stringify({k:store.kind,rev:SY.rev,json:SY.synced}))}catch(_){}}
+function sbLoad(){try{const o=JSON.parse(localStorage.getItem(LSB+'-'+PL.cur)||'null');return o&&o.k===store.kind&&typeof o.json==='string'?o:null}catch(_){return null}}
 function histAdd(rev,json){if(rev==null)return;SY.hist.set(rev,json);while(SY.hist.size>40)SY.hist.delete(SY.hist.keys().next().value)}
 async function saveCloud(){
   if(!store.ref||SY.ro)return;if(store.busy){store.pending=true;return}
   const json=JSON.stringify(state);
   if(json===SY.synced){store.dirty=false;setSave('cloud');return}
-  store.busy=true;store.pending=false;
+  store.busy=true;store.pending=false;const pid=PL.cur;
   try{if(json.length>(store.max||240000))throw {code:'too_big'};
-    const r=await store.ref.push(json);
+    const r=await store.ref.push(json,pid);
+    if(PL.cur!==pid){store.busy=false;return}
     SY.rev=r.rev;SY.synced=json;histAdd(r.rev,json);sbSave();if(JSON.stringify(state)===json)store.dirty=false;setSave('cloud')}
   catch(e){const c=e&&e.code;
+    if(PL.cur!==pid){store.busy=false;return}
     if(c==='conflict'&&e.cur){store.busy=false;onRemote(e.cur);return}
+    if(c==='gone'){store.busy=false;planGone(pid);return}
     if(c==='unavailable'){await new Promise(r=>setTimeout(r,700+Math.random()*900));store.pending=true}
     else if(c==='too_big'){setSave('err');toast(store.kind==='server'?'Projekt ist zu groß für den Server':'Projekt ist zu groß für den Online-Speicher – bitte als JSON sichern')}
     else if(c==='quota_exceeded'){setSave('err');toast('Online-Speicher ist voll – Projekt als JSON sichern')}
@@ -2198,7 +2205,7 @@ function onRemote(doc){
   state=next;SY.rev=doc.rev??SY.rev;SY.synced=rj;histAdd(doc.rev,rj);LC.clear();fixSel();
   const ae=document.activeElement,editing=!!(ae&&$('#insp').contains(ae)&&/^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName)),keep=editing&&prevSel===(sel&&JSON.stringify(sel));
   renderAll(keep);if(keep)SY.inspStale=true;
-  try{localStorage.setItem(LS,JSON.stringify(state))}catch(_){}sbSave();
+  saveLocal();sbSave();
   if(JSON.stringify(state)!==rj){store.dirty=true;saveCloud()}else{store.dirty=false;setSave(SY.ro?'ro':'cloud')}
 }
 $('#insp').addEventListener('focusout',()=>setTimeout(()=>{if(SY.inspStale&&!$('#insp').contains(document.activeElement)){SY.inspStale=false;renderInsp()}},0));
@@ -2211,57 +2218,166 @@ function firstRemote(doc){
   if(!state.demo&&!lb&&(state.updated||0)>remote.updated){remote.view=state.view;SY.rev=doc.rev;SY.synced=JSON.stringify(remote);histAdd(doc.rev,SY.synced);setSave('saving');saveCloud();return}
   if(!state.demo)remote.view=state.view;
   state=remote;sel=null;MS.clear();H.u=[];H.r=[];LC.clear();SY.rev=doc.rev;SY.synced=JSON.stringify(state);histAdd(doc.rev,SY.synced);
-  try{localStorage.setItem(LS,SY.synced)}catch(_){}sbSave();renderAll();fit();setSave(SY.ro?'ro':'cloud');
+  saveLocal();sbSave();renderAll();if(PL.fit){PL.fit=false;fit()}setSave(SY.ro?'ro':'cloud');
 }
 /* eigener Server (Docker): Speicherung über /api/plan */
 function fileSaver(){return {save:async({filename,data})=>{const type=/\.json$/.test(filename)?'application/json':/\.csv$/.test(filename)?'text/csv;charset=utf-8':/\.svg$/.test(filename)?'image/svg+xml':'application/octet-stream';
   const blob=data instanceof Blob?data:new Blob([data],{type}),u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download=filename;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),5000)}}}
-async function api(method,body){let r;try{r=await fetch('api/plan',{method,cache:'no-store',headers:body?{'Content-Type':'application/json'}:{},body:body?JSON.stringify(body):undefined})}catch(_){throw {code:'offline'}}
-  if(r.status===204)return null;if(r.status===409)throw {code:'conflict',cur:await r.json().catch(()=>null)};if(r.status===413)throw {code:'too_big'};if(r.status===401)throw {code:'auth'};if(r.status>=500)throw {code:'unavailable'};if(!r.ok)throw {code:'http'};return r.json()}
+async function api(method,body,id){let r;try{r=await fetch('api/plans/'+encodeURIComponent(id||PL.cur),{method,cache:'no-store',headers:body?{'Content-Type':'application/json'}:{},body:body?JSON.stringify(body):undefined})}catch(_){throw {code:'offline'}}
+  if(r.status===204)return null;if(r.status===409)throw {code:'conflict',cur:await r.json().catch(()=>null)};if(r.status===413)throw {code:'too_big'};if(r.status===401)throw {code:'auth'};if(r.status===404)throw {code:'gone'};if(r.status>=500)throw {code:'unavailable'};if(!r.ok)throw {code:'http'};return r.json()}
 async function pullServer(){if(store.kind!=='server'||store.busy||document.hidden||(LV.es&&LV.es.readyState===1))return;
-  try{const b=await api('GET');if(b&&+b.updated!==SY.rev)onRemote({json:b.json,updated:b.updated,rev:+b.updated})}catch(_){}}
+  loadPlanList();if(!PL.cur||PL.cur==='demo')return;const id=PL.cur;
+  try{const b=await api('GET',null,id);if(PL.cur===id&&b&&+b.updated!==SY.rev)onRemote({json:b.json,updated:b.updated,rev:+b.updated})}catch(_){}}
+/* ================= Mehrere Pläne =================
+   Das Beispiel ist ein fester Tutorial-Plan („demo“): man kann darin ausprobieren, gespeichert wird nichts.
+   Eigene Pläne liegen je nach Betrieb auf dem Server (/api/plans), im Artifact-Speicher (plans/<id>, planmeta/<id>)
+   oder im Browser (localStorage). */
+const PL={cur:null,list:[],be:'local',gen:0,fit:false,unsub:null,db:null,user:null,metaT:new Map()};
+const LSI='switch-verkabelung-plans',LSC='switch-verkabelung-cur',lsPlan=id=>'switch-verkabelung-plan-'+id;
+const idxRead=()=>{try{return JSON.parse(localStorage.getItem(LSI)||'[]')}catch(_){return []}};
+function idxPut(m){const a=idxRead().filter(x=>x.id!==m.id);a.push(m);try{localStorage.setItem(LSI,JSON.stringify(a))}catch(_){}if(PL.be==='local'){PL.list=a;renderPlans()}}
+function idxDel(id){try{localStorage.setItem(LSI,JSON.stringify(idxRead().filter(x=>x.id!==id)));localStorage.removeItem(lsPlan(id))}catch(_){}}
+/* einmalig: bisher gab es nur einen Plan im Browser – er wird zum Plan „main“ */
+function migrateLocal(){try{if(localStorage.getItem(LSI)!=null)return;const list=[],old=localStorage.getItem(LS);
+  if(old){const o=JSON.parse(old);if(o&&!o.demo&&Array.isArray(o.devices)){localStorage.setItem(lsPlan('main'),old);list.push({id:'main',name:o.name||'Mein Plan',updated:o.updated||Date.now(),devices:o.devices.length,cables:(o.cables||[]).length});
+    const sb=localStorage.getItem(LSB);if(sb)localStorage.setItem(LSB+'-main',sb);const v=localStorage.getItem(LSV);if(v)localStorage.setItem(LSV+'-main',v);localStorage.setItem(LSC,'main')}}
+  localStorage.setItem(LSI,JSON.stringify(list))}catch(_){}}
+const pmeta=()=>({name:state.name,devices:state.devices.length,cables:state.cables.length});
+const ago=t=>{const s=(Date.now()-t)/1000;return !t?'':s<60?'gerade eben':s<3600?'vor '+Math.round(s/60)+' Min.':s<86400?'vor '+Math.round(s/3600)+' Std.':new Date(t).toLocaleDateString('de-DE',{day:'numeric',month:'short',year:new Date(t).getFullYear()===new Date().getFullYear()?undefined:'numeric'})};
+function setPlanUrl(id){try{const u=new URL(location.href);if(id&&id!=='demo')u.searchParams.set('plan',id);else u.searchParams.delete('plan');history.replaceState(null,'',u.pathname+u.search+u.hash)}catch(_){}}
+async function waitSaved(){for(let i=0;i<100&&store.busy;i++)await new Promise(r=>setTimeout(r,50));if(store.dirty&&store.ref&&PL.cur&&PL.cur!=='demo'&&!SY.ro){clearTimeout(store.tc);await saveCloud();for(let i=0;i<100&&store.busy;i++)await new Promise(r=>setTimeout(r,50))}}
+async function openPlan(id,force){
+  if(!force&&id===PL.cur)return;
+  await waitSaved();
+  const g=++PL.gen;if(PL.unsub){try{PL.unsub()}catch(_){}PL.unsub=null}
+  SY.rev=null;SY.synced=null;SY.pend=null;SY.hist.clear();store.dirty=false;store.pending=false;clearTimeout(store.tc);
+  PL.cur=id;try{localStorage.setItem(LSC,id)}catch(_){}setPlanUrl(id);
+  H.u=[];H.r=[];H.key=null;sel=null;MS.clear();LC.clear();raidEdit=null;
+  if(LV.send)lvSet({pl:id,s:null,d:null});
+  if(id==='demo'){state=sanitize(demo());state.demo=true;renderAll();fit();renderPlans();peersChanged();setSave('demo');return}
+  const m=PL.list.find(x=>x.id===id),cached=loadLocal(id);
+  state=cached||{...emptyState(),name:(m&&m.name)||'Plan'};state.demo=false;
+  renderAll();fit();renderPlans();peersChanged();
+  if(PL.be==='local'||!store.ref&&PL.be!=='shared'){setSave('local');return}
+  setSave('boot');PL.fit=!cached;
+  if(PL.be==='server'){try{const b=await api('GET',null,id);if(g!==PL.gen)return;firstRemote({json:b.json,updated:+b.updated,rev:+b.updated})}
+    catch(e){if(g!==PL.gen)return;if(e&&e.code==='gone')planGone(id);else setSave(e&&e.code==='auth'?'err':'offline')}}
+  else if(PL.be==='shared')sharedOpen(id,g);
+}
+/* der geöffnete Plan wurde gelöscht (von dir in einem anderen Fenster oder von jemand anderem) */
+function planGone(id,who){if(PL.cur!==id||PL.deleting===id)return;PL.list=PL.list.filter(x=>x.id!==id);try{localStorage.removeItem(lsPlan(id))}catch(_){}
+  toast(who?`${who} hat diesen Plan gelöscht`:'Dieser Plan existiert nicht mehr');const n=PL.list[0];openPlan(n?n.id:'demo',true)}
+function pickStart(){const q=new URLSearchParams(location.search).get('plan'),ok=id=>id&&PL.list.some(x=>x.id===id);let last=null;try{last=localStorage.getItem(LSC)}catch(_){}
+  return ok(q)?q:ok(last)?last:last==='demo'?'demo':PL.list.length?PL.list.slice().sort((a,b)=>(b.updated||0)-(a.updated||0))[0].id:'demo'}
+async function loadPlanList(){if(PL.be!=='server')return;try{const r=await fetch('api/plans',{cache:'no-store'});if(r.ok){PL.list=await r.json();renderPlans()}}catch(_){}}
+async function createPlan(name,src){
+  if(SY.ro){toast('Nur Ansicht – du kannst keine Pläne anlegen');return}
+  const s=src?sanitize(JSON.parse(JSON.stringify(src))):emptyState();s.name=String(name||'Neuer Plan').slice(0,80);s.demo=false;s.updated=Date.now();if(!src)s.templates=clone(state.templates||[]);
+  const json=JSON.stringify(s);let id;
+  try{
+    if(PL.be==='server'){const r=await fetch('api/plans',{method:'POST',cache:'no-store',headers:{'Content-Type':'application/json'},body:JSON.stringify({json})});if(!r.ok)throw new Error(await r.text());id=(await r.json()).id}
+    else if(PL.be==='shared'){if(json.length>240000)throw new Error('zu groß');id=rid();await PL.db.doc(planPath(id)).set({json,updated:s.updated,rev:SY.cid+'.0',parent:null,by:SY.cid,v:3});await PL.db.doc('planmeta/'+id).set({...metaOf(s),updated:s.updated})}
+    else{id=rid();localStorage.setItem(lsPlan(id),json);idxPut({id,...metaOf(s),updated:s.updated})}
+  }catch(e){toast('Plan konnte nicht angelegt werden');return}
+  try{localStorage.setItem(lsPlan(id),json)}catch(_){}
+  if(!PL.list.some(x=>x.id===id))PL.list.unshift({id,...metaOf(s),updated:s.updated});
+  await openPlan(id);toast(`Plan „${s.name}“ angelegt`)}
+const metaOf=s=>({name:s.name,devices:s.devices.length,cables:s.cables.length});
+async function deletePlan(id){
+  const m=PL.list.find(x=>x.id===id);if(!m)return;
+  if(!(await ask('Plan löschen?',`„${m.name}“ wird für alle gelöscht.${PL.be==='server'?' Auf dem Server bleibt eine Kopie im Papierkorb-Ordner.':''}`,'Löschen',true)))return;
+  PL.deleting=id;if(PL.cur===id){PL.gen++;if(PL.unsub){try{PL.unsub()}catch(_){}PL.unsub=null}store.dirty=false;clearTimeout(store.tc)}
+  try{if(PL.be==='server'){const r=await fetch('api/plans/'+encodeURIComponent(id),{method:'DELETE'});if(!r.ok&&r.status!==404)throw 0}
+    else if(PL.be==='shared'){await PL.db.doc('planmeta/'+id).delete();await PL.db.doc(planPath(id)).delete()}
+    else idxDel(id)}catch(_){PL.deleting=null;toast('Löschen hat nicht geklappt');if(PL.cur===id)openPlan(id,true);return}
+  try{localStorage.removeItem(lsPlan(id));localStorage.removeItem(LSB+'-'+id)}catch(_){}
+  PL.list=PL.list.filter(x=>x.id!==id);if(PL.cur===id){store.dirty=false;const n=PL.list[0];await openPlan(n?n.id:'demo',true)}else renderPlans();toast(`„${m.name}“ gelöscht`)}
+function planDialog(kind){
+  const cur=PL.cur==='demo'?null:state.name,t={new:['Neuer Plan','Anlegen'],ren:['Plan umbenennen','Umbenennen'],dup:['Plan duplizieren','Kopie anlegen'],adopt:['Beispiel als eigenen Plan speichern','Speichern']}[kind];
+  const val=kind==='ren'?state.name:kind==='dup'?state.name+' (Kopie)':kind==='adopt'?'Mein Plan':'Neuer Plan';
+  modal(`<form class="mbox" id="plf" role="dialog" aria-modal="true" aria-labelledby="m-t"><div class="mh"><h2 id="m-t">${t[0]}</h2>${closeBtn}</div>
+    ${kind==='new'?'<p>Ein leerer Plan, den alle mit Zugang sehen und bearbeiten können. Deine Vorlagen werden übernommen.</p>':kind==='adopt'?'<p>Übernimmt das Beispiel mit deinen Änderungen als eigenen Plan, der gespeichert wird.</p>':kind==='dup'?'<p>Legt eine Kopie des aktuellen Plans an.</p>':''}
+    <label class="fld"><span>Name</span><input id="m-pn" maxlength="80" required value="${esc(val)}"></label>
+    ${kind==='new'&&cur?`<label class="chk"><input type="checkbox" id="m-pcopy"> Inhalt von „${esc(cur)}“ übernehmen</label>`:''}
+    <div class="mf"><button type="button" class="btn" data-close>Abbrechen</button><button type="submit" class="btn pri">${t[1]}</button></div></form>`);
+  const f=$('#m-pn');f.focus();f.select();
+  $('#plf').onsubmit=e=>{e.preventDefault();const n=f.value.trim().slice(0,80);if(!n)return;const cp=$('#m-pcopy'),copy=!!(cp&&cp.checked);closeModal();
+    if(kind==='ren'){if(n!==state.name){ck('proj');state.name=n;touched();renderAll()}return}
+    createPlan(n,kind==='new'&&!copy?null:state)}}
+function renderPlans(){
+  const nm=PL.cur==='demo'?'Beispiel (Tutorial)':state&&state.name||'Plan';$('#pl-name').textContent=nm;$('#b-plans').title='Pläne – aktuell: '+nm;
+  const box=$('#plmenu');if(box.hidden)return;
+  const here=id=>[...LV.peers.values()].filter(p=>p.p&&p.p.pl===id);
+  const av=L=>L.length?`<span class="plppl">${L.slice(0,4).map(p=>`<span class="pav" style="--pc:${esc(p.color)};--pt:${ink(p.color)}" title="${esc(p.name)}">${esc(initials(p.name))}</span>`).join('')}${L.length>4?`<span class="pav more">+${L.length-4}</span>`:''}</span>`:'';
+  const L=PL.list.slice().sort((a,b)=>(b.updated||0)-(a.updated||0));
+  const item=x=>{const on=x.id===PL.cur,mm=on&&PL.cur!=='demo'?{...x,...metaOf(state)}:x;return `<button type="button" role="menuitemradio" aria-checked="${on}" class="pli${on?' on':''}" data-pl="${esc(x.id)}"><span class="plt"><b>${esc(mm.name||'Plan')}</b><small>${pl(mm.devices||0,'Gerät','Geräte')} · ${pl(mm.cables||0,'Kabel','Kabel')}${x.updated?' · '+ago(x.updated):''}</small></span>${av(here(x.id))}</button>`};
+  box.innerHTML=`<div class="plh">Pläne</div>${L.length?L.map(item).join(''):'<p class="note">Noch keine eigenen Pläne – leg den ersten an.</p>'}
+    <hr><button type="button" role="menuitemradio" aria-checked="${PL.cur==='demo'}" class="pli demo${PL.cur==='demo'?' on':''}" data-pl="demo"><span class="plt"><b>Beispiel (Tutorial)</b><small>Zum Ausprobieren – Änderungen werden nicht gespeichert</small></span></button>
+    <hr><button type="button" role="menuitem" class="pla pri" data-pa="new"${SY.ro?' disabled':''}>+ Neuer Plan</button>
+    ${PL.cur==='demo'?`<button type="button" role="menuitem" class="pla" data-pa="adopt"${SY.ro?' disabled':''}>Beispiel als eigenen Plan speichern</button>`:PL.cur?`<button type="button" role="menuitem" class="pla" data-pa="ren">Umbenennen …</button><button type="button" role="menuitem" class="pla" data-pa="dup"${SY.ro?' disabled':''}>Duplizieren</button><button type="button" role="menuitem" class="pla danger" data-pa="del"${SY.ro?' disabled':''}>Löschen …</button>`:''}`}
+function togglePlans(open){const m=$('#plmenu');m.hidden=!open;$('#b-plans').setAttribute('aria-expanded',String(open));
+  if(open){const r=$('#b-plans').getBoundingClientRect(),narrow=innerWidth<=600;Object.assign(m.style,narrow?{position:'fixed',left:'12px',right:'12px',width:'auto',top:Math.round(r.bottom+6)+'px'}:{position:'',left:'',right:'',width:'',top:''})}
+  if(open){if(PL.be==='server')loadPlanList();renderPlans();(m.querySelector('.pli.on')||m.querySelector('button'))?.focus()}}
+$('#b-plans').onclick=e=>{e.stopPropagation();togglePlans($('#plmenu').hidden)};
+document.addEventListener('click',e=>{if(!$('#plmenu').hidden&&!e.target.closest('.plansw'))togglePlans(false)});
+$('#plmenu').addEventListener('click',e=>{const b=e.target.closest('[data-pl],[data-pa]');if(!b||b.disabled)return;togglePlans(false);
+  if(b.dataset.pl)return openPlan(b.dataset.pl);const a=b.dataset.pa;if(a==='del')return deletePlan(PL.cur);planDialog(a)});
+$('#plmenu').addEventListener('keydown',e=>{if(e.key==='Escape'){togglePlans(false);$('#b-plans').focus();return}if(e.key!=='ArrowDown'&&e.key!=='ArrowUp')return;e.preventDefault();const B=[...$('#plmenu').querySelectorAll('button:not([disabled])')],i=B.indexOf(document.activeElement);B[(i+(e.key==='ArrowDown'?1:-1)+B.length)%B.length].focus()});
+
 async function initServer(){
-  DL=fileSaver();buildMenu();store.kind='server';store.max=20e6;
-  store.ref={push:async json=>{try{const r=await api('PUT',{json,updated:state.updated||Date.now(),base:SY.rev??null,cid:SY.cid});return {rev:+r.updated}}
+  DL=fileSaver();buildMenu();store.kind='server';store.max=20e6;PL.be='server';
+  store.ref={push:async(json,id)=>{try{const r=await api('PUT',{json,updated:state.updated||Date.now(),base:SY.rev??null,cid:SY.cid},id);return {rev:+r.updated}}
     catch(e){if(e&&e.code==='conflict'&&e.cur&&typeof e.cur.json==='string')e.cur={json:e.cur.json,updated:+e.cur.updated,rev:+e.cur.updated};throw e}}};
   let me={user:'',auth:false};try{const r=await fetch('api/me',{cache:'no-store'});if(r.ok)me=await r.json()}catch(_){}
-  try{const b=await api('GET');
-    if(b)firstRemote({json:b.json,updated:+b.updated,rev:+b.updated});
-    else if(!state.demo){setSave('saving');saveCloud()}else setSave('demo');
-    if(location.hash.length>1)openHash();
-  }catch(e){setSave(e&&e.code==='auth'?'err':'offline')}
+  try{const r=await fetch('api/plans',{cache:'no-store'});if(r.status===401)throw {code:'auth'};if(!r.ok)throw {code:'http'};PL.list=await r.json()}
+  catch(e){setSave(e&&e.code==='auth'?'err':'offline');PL.list=[]}
   liveServer(me);
+  await openPlan(pickStart(),true);
+  if(location.hash.length>1)openHash();
   document.addEventListener('visibilitychange',()=>{if(document.hidden){if(store.dirty)saveCloud()}else pullServer()});
   setInterval(pullServer,30000);
 }
+/* Artifact: gemeinsamer Speicher – Plan „main“ liegt aus Kompatibilität unter shared/plan */
+const planPath=id=>id==='main'?'shared/plan':'plans/'+id;
+function sharedOpen(id,g){const ref=PL.db.doc(planPath(id));
+  store.ref={push:async(json,pid)=>{const rev=SY.cid+'.'+(++SY.n),body={json,updated:state.updated||Date.now(),rev,parent:SY.rev??null,by:SY.cid,v:3};await PL.db.doc(planPath(pid)).set(body);metaSync(pid);return {rev}}};
+  let first=true;const to=setTimeout(()=>{if(first&&g===PL.gen)setSave('local')},10000);
+  const norm=d=>({json:d.json,updated:+d.updated||0,rev:d.rev??null,parent:d.parent??null});
+  PL.unsub=ref.onSnapshot(snap=>{if(g!==PL.gen)return;
+    if(first){if(!snap.exists&&snap.metadata&&snap.metadata.fromCache)return;first=false;clearTimeout(to);
+      const d=snap.exists&&snap.data();if(d&&typeof d.json==='string'){firstRemote(norm(d));return}
+      planGone(id);return}
+    if(!snap.exists){planGone(id);return}const d=snap.data();if(!d||d.by===SY.cid||typeof d.json!=='string')return;onRemote(norm(d));
+  },()=>{clearTimeout(to);if(first&&g===PL.gen){first=false;setSave('local')}})}
+/* Liste der Pläne aktuell halten: nur wenn sich Name oder Umfang ändert, sonst höchstens alle 5 Minuten */
+async function metaSync(id){if(!PL.db||PL.cur!==id)return;const m=metaOf(state),x=PL.list.find(p=>p.id===id),t=PL.metaT.get(id)||0;
+  if(x&&x.name===m.name&&x.devices===m.devices&&x.cables===m.cables&&Date.now()-t<300000)return;PL.metaT.set(id,Date.now());
+  try{await PL.db.doc('planmeta/'+id).set({...m,updated:state.updated||Date.now()})}catch(_){}}
 async function initCloud(tries){
   if(window.SV_SERVER)return initServer();
   const C=window.claude;
-  if(!C||typeof C.use!=='function'){if((tries||0)<6)return setTimeout(()=>initCloud((tries||0)+1),500);DL=fileSaver();buildMenu();setSave(state.demo?'demo':'local');return}
+  const local=()=>{PL.be='local';PL.list=idxRead();openPlan(pickStart(),true)};
+  if(!C||typeof C.use!=='function'){if((tries||0)<6)return setTimeout(()=>initCloud((tries||0)+1),500);DL=fileSaver();buildMenu();local();return}
   const use=n=>Promise.resolve().then(()=>C.use(n)).catch(()=>null);
   const [db,user,dl,room]=await Promise.all([use('db'),use('user'),use('downloads'),use('room')]);
   DL=dl||null;buildMenu();
-  if(!db||!user){setSave(state.demo?'demo':'local');return}
-  let id=null;try{id=await user.id()}catch(_){}
-  if(!id){setSave(state.demo?'demo':'local');return}
-  let ref;try{ref=db.doc('shared/plan')}catch(_){setSave('local');return}
-  store.kind='shared';store.max=240000;
+  if(!db||!user){local();return}
+  let uid=null;try{uid=await user.id()}catch(_){}
+  if(!uid){local();return}
+  store.kind='shared';store.max=240000;PL.be='shared';PL.db=db;PL.user=user;
   try{SY.ro=(await user.can('data.write'))===false}catch(_){}
-  store.ref={push:async json=>{const rev=SY.cid+'.'+(++SY.n),body={json,updated:state.updated||Date.now(),rev,parent:SY.rev??null,by:SY.cid,v:3};await ref.set(body);return {rev}}};
   initRoom(room,user);
-  let first=true;const to=setTimeout(()=>{if(first)setSave(state.demo?'demo':'local')},10000);
-  const norm=d=>({json:d.json,updated:+d.updated||0,rev:d.rev??null,parent:d.parent??null});
-  ref.onSnapshot(async snap=>{
-    if(first){if(!snap.exists&&snap.metadata&&snap.metadata.fromCache)return;first=false;clearTimeout(to);
-      if(snap.exists){const d=snap.data();if(d&&typeof d.json==='string'){firstRemote(norm(d));return}}
-      /* noch kein gemeinsamer Plan: der Eigentümer übernimmt seinen bisherigen privaten Plan */
-      let own=false;try{own=await user.isOwner()}catch(_){}
-      if(own){try{const ps=await db.doc('data/users/'+id+'/plan').get();if(ps.exists){const b=ps.data(),pv=sanitize(JSON.parse(b.json));pv.updated=+b.updated||pv.updated||0;
-        if(state.demo||pv.updated>=(state.updated||0)){state=pv;state.demo=false;sel=null;H.u=[];H.r=[];LC.clear();renderAll();fit()}}}catch(_){}}
-      if(own&&!state.demo&&!SY.ro){setSave('saving');saveCloud()}else setSave(SY.ro?'ro':state.demo?'demo':'local');
-      return}
-    if(!snap.exists)return;const d=snap.data();if(!d||d.by===SY.cid||typeof d.json!=='string')return;onRemote(norm(d));
-  },e=>{clearTimeout(to);if(first){first=false;setSave(state.demo?'demo':'local')}});
+  let first=true;const to=setTimeout(()=>{if(first){first=false;local()}},10000);
+  db.collection('planmeta').onSnapshot(async snap=>{
+    PL.list=snap.docs.filter(d=>d.exists).map(d=>{const x=d.data()||{};return {id:d.id,name:String(x.name||'Plan').slice(0,80),devices:+x.devices||0,cables:+x.cables||0,updated:+x.updated||0}});
+    if(!first){if(PL.cur&&PL.cur!=='demo'&&!PL.list.some(x=>x.id===PL.cur)){/* gelöscht – das Plan-Dokument meldet sich gleich */}renderPlans();return}
+    if(snap.metadata&&snap.metadata.fromCache&&!snap.size)return;first=false;clearTimeout(to);
+    if(!PL.list.length&&!SY.ro){/* Umstieg: bisheriger gemeinsamer Plan oder privater Plan des Eigentümers wird zu „main“ */
+      try{let ps=await db.doc('shared/plan').get(),b=ps.exists&&ps.data();
+        if(!(b&&typeof b.json==='string')&&(await user.isOwner())){const pp=await db.doc('data/users/'+uid+'/plan').get();const pb=pp.exists&&pp.data();if(pb&&typeof pb.json==='string'){b={json:pb.json,updated:+pb.updated||Date.now(),rev:SY.cid+'.m',parent:null,by:SY.cid,v:3};await db.doc('shared/plan').set(b)}}
+        if(b&&typeof b.json==='string'){const s=sanitize(JSON.parse(b.json)),m={...metaOf(s),updated:+b.updated||Date.now()};await db.doc('planmeta/main').set(m);PL.list=[{id:'main',...m}]}}catch(_){}}
+    openPlan(pickStart(),true);
+  },()=>{clearTimeout(to);if(first){first=false;local()}});
 }
 
 /* ================= Präsenz: wer ist da, wo ist die Maus, was wird gerade bewegt ================= */
@@ -2284,11 +2400,11 @@ function lvSel(){if(!LV.send)return;const k=!sel?'':sel.kind==='dev'?'dev:'+sel.
 function peersChanged(){renderPeople();cancelAnimationFrame(LV.raf);LV.raf=requestAnimationFrame(renderPeers)}
 const ink=c=>{const n=parseInt(String(c).slice(1),16);if(!Number.isFinite(n))return '#fff';const r=n>>16&255,g=n>>8&255,b=n&255;return (r*299+g*587+b*114)/1000>150?'#111':'#fff'};
 const initials=n=>{const p=String(n||'?').trim().split(/[\s._-]+/).filter(Boolean);return ((p[0]||'?')[0]+(p.length>1?p[p.length-1][0]:(p[0]||'')[1]||'')).toUpperCase()};
-function renderPeople(){const el=$('#people');if(!el)return;const L=[...LV.peers.values()].filter(p=>!p.self);
+function renderPeople(){const el=$('#people');if(!el)return;const L=[...LV.peers.values()].filter(p=>!p.self&&samePlan(p));if(!$('#plmenu').hidden)renderPlans();
   if(!LV.me||(!L.length&&!LV.send)){el.hidden=true;el.innerHTML='';return}
   const av=(p,me)=>`<span class="pav${me?' me':''}" style="--pc:${esc(p.color)};--pt:${ink(p.color)}" title="${esc(me?p.name+' (du)'+(LV.auth||store.kind==='shared'?'':' – klicken zum Ändern'):p.name+(p.p&&p.p.m&&p.p.m!=='plan'?' · '+({topo:'Topologie',list:'Listen'}[p.p.m]||''):''))}">${esc(initials(p.name))}</span>`;
   el.hidden=false;el.innerHTML=`${L.slice(0,6).map(p=>av(p,false)).join('')}${L.length>6?`<span class="pav more">+${L.length-6}</span>`:''}<button type="button" class="pme" id="pme" aria-label="Du: ${esc(LV.me.name)}">${av(LV.me,true)}</button>`;
-  el.title=L.length?pl(L.length+1,'Person','Personen')+' im Plan: '+[LV.me.name+' (du)',...L.map(p=>p.name)].join(', '):'Nur du bist gerade im Plan'}
+  el.title=PL.cur==='demo'?'Im Beispiel arbeitet jeder für sich':L.length?pl(L.length+1,'Person','Personen')+' im Plan: '+[LV.me.name+' (du)',...L.map(p=>p.name)].join(', '):'Nur du bist gerade im Plan'}
 $('#people').addEventListener('click',e=>{if(!e.target.closest('#pme')||LV.auth||store.kind!=='server')return;
   modal(`<form class="mbox" id="nmf" role="dialog" aria-modal="true" aria-labelledby="m-t"><div class="mh"><h2 id="m-t">Dein Name</h2>${closeBtn}</div><p>So sehen dich die anderen an deinem Mauszeiger.</p><label class="fld"><span>Name</span><input id="m-nm" maxlength="30" value="${esc(LV.me.name)}" required></label><div class="mf"><button type="submit" class="btn pri">Übernehmen</button></div></form>`);
   $('#m-nm').select();$('#nmf').onsubmit=ev=>{ev.preventDefault();const n=$('#m-nm').value.trim().slice(0,30);if(!n)return;try{localStorage.setItem(LSN,n)}catch(_){}LV.me.name=n;LV.me.color=colorFor(n);lvSet({n,c:LV.me.color});closeModal();renderPeople()}});
@@ -2300,10 +2416,11 @@ function liveServer(me){
   const from=x=>{const p=x.p&&typeof x.p==='object'?x.p:{},nm=(x.user||(typeof p.n==='string'?p.n:'')||'Gast').slice(0,40);return {name:nm,color:x.user?colorFor(x.user):(/^#[0-9a-f]{6}$/i.test(p.c)?p.c:colorFor(nm)),p}};
   let es;try{es=new EventSource('api/live?cid='+encodeURIComponent(SY.cid))}catch(_){return}LV.es=es;
   es.addEventListener('hello',e=>{let h;try{h=JSON.parse(e.data)}catch(_){return}LV.peers=new Map((h.peers||[]).map(x=>[x.cid,from(x)]));LV.ready=true;LV.last=Date.now();LV.send({...LV.mine});peersChanged();
-    if(h.rev&&h.rev!==SY.rev&&!store.busy)api('GET').then(b=>{if(b&&+b.updated!==SY.rev)onRemote({json:b.json,updated:+b.updated,rev:+b.updated})}).catch(()=>{})});
+    const id=PL.cur,rv=h.revs&&id&&h.revs[id];if(rv&&rv!==SY.rev&&SY.rev!=null&&!store.busy)api('GET',null,id).then(b=>{if(PL.cur===id&&b&&+b.updated!==SY.rev)onRemote({json:b.json,updated:+b.updated,rev:+b.updated})}).catch(()=>{});loadPlanList()});
+  es.addEventListener('plans',e=>{let x;try{x=JSON.parse(e.data)}catch(_){return}if(Array.isArray(x.list)){PL.list=x.list;renderPlans()}if(x.deleted&&x.deleted===PL.cur)planGone(PL.cur,x.user||'Jemand')});
   es.addEventListener('presence',e=>{try{const x=JSON.parse(e.data);if(x.cid!==SY.cid){LV.peers.set(x.cid,from(x));peersChanged()}}catch(_){}});
   es.addEventListener('leave',e=>{try{LV.peers.delete(JSON.parse(e.data).cid);peersChanged()}catch(_){}});
-  es.addEventListener('plan',e=>{let x;try{x=JSON.parse(e.data)}catch(_){return}if(x.cid===SY.cid)return;onRemote({json:x.json,updated:+x.updated,rev:+x.updated})});
+  es.addEventListener('plan',e=>{let x;try{x=JSON.parse(e.data)}catch(_){return}if(x.cid===SY.cid||x.id!==PL.cur||SY.rev==null)return;onRemote({json:x.json,updated:+x.updated,rev:+x.updated})});
   es.onerror=()=>{LV.ready=false;if(LV.peers.size){LV.peers.clear();peersChanged()}};
   peersChanged();
 }
@@ -2317,12 +2434,13 @@ function initRoom(room,user){
   peersChanged();
 }
 /* Präsenz der anderen im Plan zeichnen – in Weltkoordinaten, Beschriftungen in Bildschirmgröße */
-function renderPeers(){const g=$('#l-peer');if(!g)return;if(mode!=='plan'||!LV.peers.size){g.innerHTML='';return}
+const samePlan=P=>!!PL.cur&&PL.cur!=='demo'&&P.p&&P.p.pl===PL.cur;
+function renderPeers(){const g=$('#l-peer');if(!g)return;if(mode!=='plan'||!LV.peers.size||PL.cur==='demo'){g.innerHTML='';return}
   const k=1/view.z,f=v=>(+v).toFixed(1);let s='';
   const tag=(x,y,txt,col)=>{const w=Math.min(260,txt.length*6.7+14);return `<g transform="translate(${f(x)} ${f(y)}) scale(${k.toFixed(4)})"><rect width="${w}" height="20" rx="5" fill="${col}"/><text x="7" y="14" font-size="12" font-weight="600" fill="${ink(col)}">${esc(txt)}</text></g>`};
   const box=(x,y,w,h,col,o)=>`<rect x="${f(x)}" y="${f(y)}" width="${f(w)}" height="${f(h)}" rx="${f(6*k)}" fill="${o.fill?col:'none'}" fill-opacity="${o.fill||0}" stroke="${col}" stroke-width="${f((o.sw||3)*k)}"${o.dash?` stroke-dasharray="${f(10*k)} ${f(6*k)}"`:''}/>`;
   const devBox=id=>{const d=dev(id);if(!d||HID.has(d.id))return null;const L=lay(d);return {x:d.x,y:d.y,w:L.W,h:L.H,d}};
-  for(const P of LV.peers.values()){const p=P.p||{},col=/^#[0-9a-f]{6}$/i.test(P.color)?P.color:'#888';if(p.m&&p.m!=='plan')continue;let act='';
+  for(const P of LV.peers.values()){const p=P.p||{},col=/^#[0-9a-f]{6}$/i.test(P.color)?P.color:'#888';if((p.m&&p.m!=='plan')||!samePlan(P))continue;let act='';
     const D=p.d&&typeof p.d==='object'?p.d:null,busy=new Set();
     try{
       if(D&&D.k==='dev'&&Array.isArray(D.l)){D.l.forEach(([id,x,y],i)=>{const b=devBox(id);if(!b||!Number.isFinite(x)||!Number.isFinite(y))return;busy.add(id);
@@ -2387,8 +2505,10 @@ function demo(){
 function start(hot){
   let s=null;
   if(hot&&hot.state){try{s=sanitize(hot.state)}catch(_){}}
-  if(!s)s=loadLocal();
-  if(!s)s=sanitize(demo());
+  migrateLocal();
+  let last=null;try{last=localStorage.getItem(LSC)}catch(_){}
+  if(!s&&last&&last!=='demo'){s=loadLocal(last);if(s)PL.cur=last}
+  if(!s){s=sanitize(demo());s.demo=true;PL.cur='demo'}
   state=s;
   $('#defs').innerHTML=defsSVG();renderLegend();buildMenu();setSave('boot');
   if(innerWidth<=760){$('#insp').classList.add('min');$('#itog').setAttribute('aria-expanded','false')}

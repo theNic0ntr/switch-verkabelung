@@ -15,9 +15,11 @@ const PASS = process.env.AUTH_PASSWORD || '';
 const MAX = (Number(process.env.MAX_PLAN_MB) || 20) * 1024 * 1024;
 const KEEP = Math.max(0, Number(process.env.BACKUPS ?? 50));
 const BACKUP_EVERY = Math.max(0, Number(process.env.BACKUP_MINUTES ?? 10)) * 60e3;
-const PLAN = path.join(DATA, 'plan.json');
-const BK = path.join(DATA, 'backups');
-
+const OLD_PLAN = path.join(DATA, 'plan.json');           // vor mehreren Plänen: ein einziger Plan
+const PLANS = path.join(DATA, 'plans');                  // je Plan eine Datei <id>.json
+const BKROOT = path.join(DATA, 'backups');               // Sicherungen je Plan unter backups/<id>/
+const TRASH = path.join(DATA, 'papierkorb');             // gelöschte Pläne
+const PID = /^[a-z0-9]{3,24}$/;
 if (Boolean(USER) !== Boolean(PASS)) {
   console.error('AUTH_USER und AUTH_PASSWORD müssen zusammen gesetzt werden.');
   process.exit(1);
@@ -40,14 +42,31 @@ if (!fs.existsSync(path.join(PUB, 'index.html'))) {
   console.error(`App nicht gefunden in ${PUB} – vorher "node scripts/build.mjs" ausführen.`);
   process.exit(1);
 }
-fs.mkdirSync(BK, { recursive: true });
+for (const d of [PLANS, BKROOT, TRASH]) fs.mkdirSync(d, { recursive: true });
 
-let cur = null; // { json: string, updated: number }
-try {
-  cur = JSON.parse(fs.readFileSync(PLAN, 'utf8'));
-} catch (e) {
-  if (e.code !== 'ENOENT') console.error('plan.json konnte nicht gelesen werden:', e.message);
+// Umstieg: der bisherige einzelne Plan wird zum Plan „main“, seine Sicherungen ziehen mit um
+if (fs.existsSync(OLD_PLAN) && !fs.existsSync(path.join(PLANS, 'main.json'))) {
+  fs.copyFileSync(OLD_PLAN, path.join(PLANS, 'main.json'));
+  fs.renameSync(OLD_PLAN, OLD_PLAN + '.migriert');
+  const dst = path.join(BKROOT, 'main');
+  fs.mkdirSync(dst, { recursive: true });
+  for (const f of fs.readdirSync(BKROOT)) if (/^(plan|named)-.*\.json$/.test(f)) fs.renameSync(path.join(BKROOT, f), path.join(dst, f));
+  console.log('Bisherigen Plan als „main“ übernommen.');
 }
+
+const plans = new Map(); // id -> { json, updated, by, meta: { name, devices, cables } }
+function metaOf(json) {
+  try { const p = JSON.parse(json); return { name: String(p.name || 'Plan').slice(0, 80), devices: (p.devices || []).length, cables: (p.cables || []).length }; }
+  catch { return { name: 'Plan', devices: 0, cables: 0 }; }
+}
+for (const f of fs.readdirSync(PLANS)) {
+  const id = f.replace(/\.json$/, '');
+  if (!f.endsWith('.json') || !PID.test(id)) continue;
+  try { const o = JSON.parse(fs.readFileSync(path.join(PLANS, f), 'utf8')); plans.set(id, { json: o.json, updated: +o.updated || 0, by: o.by || '', meta: metaOf(o.json) }); }
+  catch (e) { console.error(`${f} konnte nicht gelesen werden:`, e.message); }
+}
+const planList = () => [...plans].map(([id, p]) => ({ id, ...p.meta, updated: p.updated, by: p.by })).sort((a, b) => b.updated - a.updated);
+const newId = () => { let id; do { id = crypto.randomBytes(6).toString('base64url').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 8); } while (!PID.test(id) || plans.has(id)); return id; };
 
 const TYPES = {
   '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
@@ -105,49 +124,85 @@ function readBody(req, limit = MAX + 4096) {
 
 // Schreibvorgänge nacheinander ausführen
 let queue = Promise.resolve();
-let lastBackup = 0;
-function writePlan(obj) {
+const lastBackup = new Map();
+const bkDir = id => path.join(BKROOT, id);
+function writePlan(id, obj) {
+  const file = path.join(PLANS, id + '.json');
   const job = queue.then(async () => {
-    if (cur && KEEP > 0 && Date.now() - lastBackup >= BACKUP_EVERY) {
-      const name = 'plan-' + new Date().toISOString().replace(/[:.]/g, '-') + '.json';
-      await fsp.copyFile(PLAN, path.join(BK, name)).catch(() => {});
-      lastBackup = Date.now();
-      const files = (await fsp.readdir(BK)).filter(f => /^plan-.*\.json$/.test(f)).sort(); // benannte Versionen (named-*) bleiben
-      for (const f of files.slice(0, Math.max(0, files.length - KEEP))) await fsp.unlink(path.join(BK, f)).catch(() => {});
+    const had = plans.get(id);
+    if (had && KEEP > 0 && Date.now() - (lastBackup.get(id) || 0) >= BACKUP_EVERY) {
+      const dir = bkDir(id);
+      await fsp.mkdir(dir, { recursive: true });
+      await fsp.copyFile(file, path.join(dir, 'plan-' + new Date().toISOString().replace(/[:.]/g, '-') + '.json')).catch(() => {});
+      lastBackup.set(id, Date.now());
+      const files = (await fsp.readdir(dir)).filter(f => /^plan-.*\.json$/.test(f)).sort(); // benannte Versionen (named-*) bleiben
+      for (const f of files.slice(0, Math.max(0, files.length - KEEP))) await fsp.unlink(path.join(dir, f)).catch(() => {});
     }
-    const tmp = `${PLAN}.${process.pid}.tmp`;
+    const tmp = `${file}.${process.pid}.tmp`;
     await fsp.writeFile(tmp, JSON.stringify(obj));
-    await fsp.rename(tmp, PLAN);
-    cur = obj;
+    await fsp.rename(tmp, file);
+    plans.set(id, { json: obj.json, updated: obj.updated, by: obj.by || '', meta: metaOf(obj.json) });
   });
   queue = job.catch(() => {});
   return job;
 }
 
-async function apiPlan(req, res) {
+function validPlan(json) {
+  if (typeof json !== 'string' || json.length > MAX) return false;
+  try { const p = JSON.parse(json); return !!p && typeof p === 'object' && Array.isArray(p.devices); } catch { return false; }
+}
+
+async function apiPlan(req, res, id) {
+  const cur = plans.get(id);
   if (req.method === 'GET' || req.method === 'HEAD') {
-    if (!cur) return send(res, 204, null, { 'Cache-Control': 'no-store' });
-    return send(res, 200, cur, { 'Cache-Control': 'no-store' });
+    if (!cur) return send(res, 404, 'Plan nicht gefunden', { 'Cache-Control': 'no-store' });
+    return send(res, 200, { json: cur.json, updated: cur.updated }, { 'Cache-Control': 'no-store' });
   }
-  if (req.method !== 'PUT') return send(res, 405, 'Methode nicht erlaubt', { Allow: 'GET, PUT' });
+  if (req.method === 'DELETE') {
+    if (!cur) return send(res, 404, 'Plan nicht gefunden');
+    await (queue = queue.then(() => fsp.rename(path.join(PLANS, id + '.json'), path.join(TRASH, `${id}-${new Date().toISOString().replace(/[:.]/g, '-')}.json`))).catch(() => {}));
+    plans.delete(id);
+    bcast('plans', { list: planList(), deleted: id, user: req.user || '' });
+    return send(res, 200, { ok: true });
+  }
+  if (req.method !== 'PUT') return send(res, 405, 'Methode nicht erlaubt', { Allow: 'GET, PUT, DELETE' });
   if (!String(req.headers['content-type'] || '').startsWith('application/json')) return send(res, 415, 'JSON erwartet');
   let b;
   try { b = JSON.parse(await readBody(req)); } catch (e) { return send(res, e.status || 400, e.status ? 'Plan ist zu groß' : 'Ungültiges JSON'); }
-  if (!b || typeof b.json !== 'string' || b.json.length > MAX) return send(res, 400, 'Feld "json" fehlt oder ist zu groß');
-  try {
-    const plan = JSON.parse(b.json);
-    if (!plan || typeof plan !== 'object' || !Array.isArray(plan.devices)) throw new Error();
-  } catch { return send(res, 400, 'Das ist kein Plan dieser App'); }
-  if (cur && !b.force && b.base !== cur.updated) return send(res, 409, cur);
-  const updated = Math.max(Date.now(), (cur ? cur.updated : 0) + 1);
+  if (!b || !validPlan(b.json)) return send(res, 400, 'Das ist kein Plan dieser App');
+  if (!cur) return send(res, 404, 'Plan nicht gefunden – wurde er gelöscht?');
+  if (b.base !== cur.updated) return send(res, 409, { json: cur.json, updated: cur.updated });
+  const updated = Math.max(Date.now(), cur.updated + 1);
   const cid = typeof b.cid === 'string' && CID.test(b.cid) ? b.cid : '';
-  try { await writePlan({ json: b.json, updated }); } catch (e) {
+  const before = cur.meta.name;
+  try { await writePlan(id, { json: b.json, updated, by: req.user || '' }); } catch (e) {
     console.error('Speichern fehlgeschlagen:', e.message);
     return send(res, 500, 'Speichern fehlgeschlagen');
   }
   send(res, 200, { updated });
   // allen anderen offenen Browsern den neuen Stand schicken
-  bcast('plan', { json: b.json, updated, cid, user: req.user || '' }, cid);
+  bcast('plan', { id, json: b.json, updated, cid, user: req.user || '' }, cid);
+  bcast('plans', { list: planList() }, plans.get(id).meta.name === before ? cid : undefined);
+}
+
+async function apiPlans(req, res, rest) {
+  const [id, sub, vid, extra] = rest.split('/');
+  if (!id) {
+    if (req.method === 'GET') return send(res, 200, planList(), { 'Cache-Control': 'no-store' });
+    if (req.method !== 'POST') return send(res, 405, 'Methode nicht erlaubt', { Allow: 'GET, POST' });
+    let b;
+    try { b = JSON.parse(await readBody(req)); } catch (e) { return send(res, e.status || 400, 'Ungültiges JSON'); }
+    if (!b || !validPlan(b.json)) return send(res, 400, 'Das ist kein Plan dieser App');
+    if (plans.size >= 500) return send(res, 409, 'Zu viele Pläne');
+    const nid = newId(), updated = Date.now();
+    await writePlan(nid, { json: b.json, updated, by: req.user || '' });
+    bcast('plans', { list: planList(), user: req.user || '' });
+    return send(res, 201, { id: nid, updated });
+  }
+  if (!PID.test(id) || extra !== undefined) return send(res, 404, 'Nicht gefunden');
+  if (sub === undefined) return apiPlan(req, res, id);
+  if (sub === 'versions') return apiVersions(req, res, id, vid || '');
+  return send(res, 404, 'Nicht gefunden');
 }
 
 // ---------- Live: Server-Sent Events für Planänderungen und Präsenz ----------
@@ -168,7 +223,7 @@ function apiLive(req, res, url) {
   res.write('retry: 2000\n\n');
   const c = { res, user: req.user || '', p: {} };
   LIVE.set(cid, c);
-  sse(res, 'hello', { cid, user: c.user, auth: AUTH, rev: cur ? cur.updated : 0, peers: [...LIVE].filter(([k]) => k !== cid).map(([k, v]) => peer(k, v)) });
+  sse(res, 'hello', { cid, user: c.user, auth: AUTH, revs: Object.fromEntries([...plans].map(([k, v]) => [k, v.updated])), peers: [...LIVE].filter(([k]) => k !== cid).map(([k, v]) => peer(k, v)) });
   bcast('presence', peer(cid, c), cid);
   req.socket.setTimeout(0);
   req.on('close', () => { if (LIVE.get(cid) === c) { LIVE.delete(cid); bcast('leave', { cid }); } });
@@ -188,42 +243,45 @@ async function apiPresence(req, res) {
   return send(res, 204, null);
 }
 
-// Versionen: automatische Sicherungen (plan-*.json) und benannte Stände (named-*.json)
+// Versionen je Plan: automatische Sicherungen (plan-*.json) und benannte Stände (named-*.json)
 const VCACHE = new Map();
 const VID = /^(plan|named)-[0-9TZ-]+\.json$/;
-async function versionInfo(f) {
-  if (VCACHE.has(f)) return VCACHE.get(f);
-  const raw = JSON.parse(await fsp.readFile(path.join(BK, f), 'utf8'));
+async function versionInfo(id, f) {
+  const key = id + '/' + f;
+  if (VCACHE.has(key)) return VCACHE.get(key);
+  const raw = JSON.parse(await fsp.readFile(path.join(bkDir(id), f), 'utf8'));
   let devices = 0, cables = 0;
   try { const p = JSON.parse(raw.json); devices = (p.devices || []).length; cables = (p.cables || []).length; } catch {}
   const info = { id: f, updated: raw.updated || 0, name: raw.name || '', devices, cables, named: f.startsWith('named-') };
-  VCACHE.set(f, info);
+  VCACHE.set(key, info);
   return info;
 }
-async function apiVersions(req, res, rest) {
+async function apiVersions(req, res, id, rest) {
+  const dir = bkDir(id);
   if (rest === '' && req.method === 'GET') {
-    const files = (await fsp.readdir(BK)).filter(f => VID.test(f));
+    const files = (await fsp.readdir(dir).catch(() => [])).filter(f => VID.test(f));
     const list = [];
-    for (const f of files) { try { list.push(await versionInfo(f)); } catch {} }
+    for (const f of files) { try { list.push(await versionInfo(id, f)); } catch {} }
     list.sort((a, b) => b.updated - a.updated || b.id.localeCompare(a.id));
     return send(res, 200, list, { 'Cache-Control': 'no-store' });
   }
   if (rest === '' && req.method === 'POST') {
+    const cur = plans.get(id);
     if (!cur) return send(res, 409, 'Noch kein Plan gespeichert');
     let b = {};
-    try { b = JSON.parse((await readBody(req)) || '{}'); } catch { return send(res, 400, 'Ungültiges JSON'); }
+    try { b = JSON.parse((await readBody(req, 8192)) || '{}'); } catch { return send(res, 400, 'Ungültiges JSON'); }
     const name = String(b.name || '').trim().slice(0, 60);
     const f = 'named-' + new Date().toISOString().replace(/[:.]/g, '-') + '.json';
-    await (queue = queue.then(() => fsp.writeFile(path.join(BK, f), JSON.stringify({ ...cur, name: name || 'Gespeicherter Stand' }))).catch(() => {}));
-    return send(res, 200, await versionInfo(f));
+    await (queue = queue.then(async () => { await fsp.mkdir(dir, { recursive: true }); await fsp.writeFile(path.join(dir, f), JSON.stringify({ json: cur.json, updated: cur.updated, name: name || 'Gespeicherter Stand' })); }).catch(() => {}));
+    return send(res, 200, await versionInfo(id, f));
   }
   if (req.method === 'GET' && VID.test(rest)) {
-    try { return send(res, 200, await fsp.readFile(path.join(BK, rest), 'utf8'), { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); }
+    try { return send(res, 200, await fsp.readFile(path.join(dir, rest), 'utf8'), { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); }
     catch { return send(res, 404, 'Nicht gefunden'); }
   }
   if (req.method === 'DELETE' && /^named-/.test(rest) && VID.test(rest)) {
-    await fsp.unlink(path.join(BK, rest)).catch(() => {});
-    VCACHE.delete(rest);
+    await fsp.unlink(path.join(dir, rest)).catch(() => {});
+    VCACHE.delete(id + '/' + rest);
     return send(res, 200, { ok: true });
   }
   return send(res, 405, 'Methode nicht erlaubt');
@@ -260,11 +318,13 @@ const server = http.createServer(async (req, res) => {
     const user = login(req);
     if (user === null) return send(res, 401, 'Anmeldung erforderlich', { 'WWW-Authenticate': 'Basic realm="Switch-Verkabelung", charset="UTF-8"' });
     req.user = user;
-    if (pathname === '/api/plan') return await apiPlan(req, res);
+    if (pathname === '/api/plans' || pathname.startsWith('/api/plans/')) return await apiPlans(req, res, pathname.slice('/api/plans'.length).replace(/^\//, ''));
+    // ältere Adressen (ein einziger Plan) zeigen auf „main“
+    if (pathname === '/api/plan') return await apiPlan(req, res, 'main');
     if (pathname === '/api/me') return send(res, 200, { user, auth: AUTH }, { 'Cache-Control': 'no-store' });
     if (pathname === '/api/live') return apiLive(req, res, new URL(req.url, 'http://x'));
     if (pathname === '/api/presence') return await apiPresence(req, res);
-    if (pathname === '/api/versions' || pathname.startsWith('/api/versions/')) return await apiVersions(req, res, pathname.slice('/api/versions'.length).replace(/^\//, ''));
+    if (pathname === '/api/versions' || pathname.startsWith('/api/versions/')) return await apiVersions(req, res, 'main', pathname.slice('/api/versions'.length).replace(/^\//, ''));
     if (pathname.startsWith('/api/')) return send(res, 404, 'Nicht gefunden');
     return await serveStatic(req, res, pathname);
   } catch (e) {
