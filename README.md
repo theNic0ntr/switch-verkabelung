@@ -2,6 +2,8 @@
 
 Netzwerk-Verkabelung im Browser planen und dokumentieren. Switches, Firewalls, Patchpanels, LWL-Panels, Server, USVs, Access Points und Hosts legst du in Schränken und Räumen an. Ihre Ports verbindest du per Drag & Drop.
 
+![Gesamtplan des Beispielprojekts: zwei Räume mit je einem Schrank, Switches, Patchpanel, Server, USV und Hosts](docs/screenshots/plan.png)
+
 - **Geräte im Stil gängiger Hersteller:** Lancom, UniFi, HP/HPE, FS, Dell, Supermicro, APC, Eaton, CyberPower, Aruba. Bei Firewalls zusätzlich Sophos, Fortinet, Palo Alto, WatchGuard und OPNsense.
 - **Ports und Kabel:** RJ45, SFP, SFP+, SFP28, QSFP+ und QSFP28 sowie Patchpanels mit Vorder- und Rückseite. Kabel nach Cat-Standard, Glasfaser (OM1–OM5, OS2), DAC oder AOC, dazu die Transceiver.
 - **Port-Nummerierung:** Bei zweireihigen Geräten wählbar: spaltenweise (1 oben, 2 unten oder 2 oben, 1 unten) oder nebeneinander (oben bzw. unten 1, 2, 3 …). Nummern und Beschriftungsfelder liegen immer über den Kabeln.
@@ -20,6 +22,29 @@ Netzwerk-Verkabelung im Browser planen und dokumentieren. Switches, Firewalls, P
 - **PDF und Etiketten:** komplette Dokumentation als PDF (Plan, Schränke, Topologie, alle Listen); Etiketten für Kabel, Ports und Geräte auf A4-Bögen, für Etikettendrucker oder als Kabelfahne, wahlweise mit QR-Code. In der Server-Version öffnet der QR-Code das Objekt direkt (`#dev-…`, `#cab-…`, `#port-…`).
 - **Patchlegung:** wird automatisch aus dem Plan erzeugt – nach Raum und Schrank gegliedert, je Switch eine Tabelle mit Port, Patch (Kürzel des Patchpanels + Port, z. B. 11.6), VLAN, Geräteklasse und Nutzer. Hat ein Patchpanel-Port eine eigene Beschriftung, steht genau diese in der Spalte Patch; sonst wird sie aus Kürzel und Port gebildet. Das Kürzel lässt sich am Patchpanel festlegen, sonst wird je Schrank von oben durchnummeriert.
 - **Export:** Patchliste und Patchlegung als CSV, der Plan als SVG oder PNG, das Projekt als JSON.
+
+## Screenshots
+
+Alle Bilder zeigen das Beispielprojekt, das beim ersten Start geladen wird.
+
+<table>
+<tr>
+<td width="50%"><img src="docs/screenshots/strecke.png" alt="Ausgewählter Switch-Port mit gelb markierter Strecke über das Patchpanel bis zum PC"><br><b>Strecke verfolgen:</b> Ein Klick auf einen Port markiert den Weg über das Patchpanel bis zum Gegenport, rechts stehen VLAN, PoE und Kabeldaten.</td>
+<td width="50%"><img src="docs/screenshots/server-raid.png" alt="Server im Schrank mit acht SSDs in zwei farbigen RAID-Verbünden"><br><b>Server und RAID:</b> Platten mit Größe und Typ, RAID-Verbünde farbig im Plan; Lebenszyklus mit Markierung für veraltet und EOL.</td>
+</tr>
+<tr>
+<td><img src="docs/screenshots/patchlegung.png" alt="Patchlegung, gegliedert nach Raum, Schrank und Switch"><br><b>Patchlegung:</b> je Raum, Schrank und Switch eine Tabelle mit Port, Patch, VLAN, Gerät und Nutzer.</td>
+<td><img src="docs/screenshots/topologie.png" alt="Automatisch erzeugte logische Topologie mit Firewall, Switches, Server und Hosts"><br><b>Logische Topologie:</b> automatisch aus dem Plan erzeugt, eingefärbt nach Tempo oder VLAN.</td>
+</tr>
+<tr>
+<td><img src="docs/screenshots/vlans-ips.png" alt="Liste der VLANs mit Subnetz und Belegung sowie aller IP-Adressen"><br><b>VLANs und IP-Adressen:</b> Subnetz, Gateway, Belegung und Prüfung jeder IP.</td>
+<td align="center"><img src="docs/screenshots/handy.png" alt="Ansicht auf dem Smartphone" width="260"><br><b>Auf dem Handy:</b> gleiche Funktionen, Eigenschaften als Leiste von unten.</td>
+</tr>
+</table>
+
+![Drei Seiten der PDF-Dokumentation: Deckblatt, Schrankansicht und Patchlegung](docs/screenshots/pdf.png)
+
+**PDF-Dokumentation:** Deckblatt mit Kennzahlen, Gesamtplan, jeder Schrank, Topologie und alle Listen in einem Dokument.
 
 ## Auf einem Server betreiben (Docker)
 
