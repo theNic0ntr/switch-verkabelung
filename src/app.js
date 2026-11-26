@@ -1063,7 +1063,8 @@ function inspPort(d,pid){
   const t=ptype(pid),cf=pconf(d,pid),pas=isPas(t),nm=pname(d,pid);
   let h=`<div class="ih"><span class="kind">${esc(nm)} · ${PT[t].n}</span><h2 id="ih-t">${esc(cf.label||nm)}</h2><p class="sub"><button type="button" class="link" data-act="seldev" data-id="${d.id}">${esc(d.name)}</button>${whereAll(d)?' · '+esc(whereAll(d)):''}</p></div>`;
   h+=farSummary(d,pid);
-  h+=fld('f-plabel','Beschriftung',inp('f-plabel','port.label',cf.label||'',`maxlength="60" placeholder="${pas?'z. B. Raum 1.12 · Dose 3':'z. B. Uplink Core'}"`));
+  h+=fld('f-plabel','Beschriftung',inp('f-plabel','port.label',cf.label||'',`maxlength="60" placeholder="${pas?'z. B. 11.6 oder Raum 1.12':'z. B. Uplink Core'}"`));
+  if(pas&&(d.kind==='patch'||d.kind==='fiber'))h+=`<p class="note">Steht so in der Patchlegung. Ohne Beschriftung: automatisch ${esc(autoDesig(d,pid))}</p>`;
   if(!pas){
     h+=fld('f-pspeed','Geschwindigkeit',selx('f-pspeed','port.speed',PT[t].sp.map(s=>[s,SP[s].n]),pspeed(d,pid)));
     if(vlanPort(d,pid))h+=vlanUI(d,pid,cf);
@@ -1600,7 +1601,9 @@ function cableRows(){
 /* ---------- Patchlegung: je Raum und Switch, Port → Patchpanel → Endgerät ---------- */
 function panelTag(d){if(d.ptag)return d.ptag;const L=state.devices.filter(x=>(x.kind==='patch'||x.kind==='fiber')&&(x.rack||'')===(d.rack||'')&&x.id!==d.id);
   const before=L.filter(x=>d.rack?(x.u<d.u):(x.y<d.y||(x.y===d.y&&x.x<d.x))).length;return String(before+1)}
-function patchDesig(d,pid){const p=lay(d).ports.find(q=>q.id===pid);return panelTag(d)+(state.view.psep||'.')+(p&&p.num?p.num:pname(d,pid))}
+/* eigene Portbeschriftung (weißes Feld) hat Vorrang, sonst Kürzel + Portnummer */
+function autoDesig(d,pid){const p=lay(d).ports.find(q=>q.id===pid);return panelTag(d)+(state.view.psep||'.')+(p&&p.num?p.num:pname(d,pid))}
+function patchDesig(d,pid){const cf=d.ports[pid];return cf&&cf.label?cf.label:autoDesig(d,pid)}
 const devClass=x=>x.kind==='host'||x.kind==='net'?subLbl(x):x.kind==='ap'?'Access Point':KIND[x.kind].n;
 const vlanName=id=>{const v=vlanOf(id);return v&&v.name?v.name:'VLAN '+id};
 function patchRows(){
@@ -1618,7 +1621,7 @@ function patchRows(){
           let patch='',cls='',user='';
           if(c){const ch=AN.get(c.id)&&AN.get(c.id).ch,St=ch?ch.steps:[];
             if(St.length){const fwd=St[0].from.d===sw.id&&St[0].from.p===p.id,hops=fwd?St.slice(0,-1).map(x=>x.to):St.slice(1).map(x=>x.from).reverse(),far=fwd?St[St.length-1].to:St[0].from;
-              patch=hops.filter(e=>{const x=dev(e.d);return x&&(x.kind==='patch'||x.kind==='fiber')}).map(e=>patchDesig(dev(e.d),e.p)).join(' › ');
+              patch=[...hops,far].filter(e=>{const x=dev(e.d);return x&&(x.kind==='patch'||x.kind==='fiber')}).map(e=>patchDesig(dev(e.d),e.p)).join(' › ');
               const x=dev(far.d);if(x&&x.id!==sw.id&&!isPas(ptype(far.p))){cls=devClass(x);user=x.user||(x.kind==='host'?'':x.name)}}nP++}
           const pv=pvlan(sw,p.id),vl=!pv?'':pv.m==='access'?vlanName(pv.v):'Trunk'+(pv.tag.length?' ('+pv.tag.join(', ')+')':''),port=p.num?String(p.num).padStart(2,'0'):pname(sw,p.id);
           S.rows.push({dv:sw.id,port:p.id,free:!c,vc:pv&&pv.m==='access'?vcol(pv.v):null,cells:[port,patch,vl,cls,user]});
@@ -1942,7 +1945,7 @@ function renderTable(){
   $('#t-h').textContent=TTL[tmode];
   $('#tcustom').hidden=!custom;$('#tscroll').hidden=pl_;
   $('#t-opts').hidden=!pl_;
-  if(pl_){$('#t-opts').innerHTML=`<label>Schreibweise Patch <select id="t-psep" aria-label="Trennzeichen zwischen Patchpanel und Port">${opts([['.','11.6'],['/','11/6'],['-','11-6']],state.view.psep||'.')}</select></label><label class="chk"><input type="checkbox" id="t-pfree"${state.view.pfree?' checked':''}> Freie Ports</label>`;
+  if(pl_){$('#t-opts').innerHTML=`<label title="Gilt für Patchpanel-Ports ohne eigene Beschriftung">Schreibweise Patch <select id="t-psep" aria-label="Trennzeichen zwischen Patchpanel und Port">${opts([['.','11.6'],['/','11/6'],['-','11-6']],state.view.psep||'.')}</select></label><label class="chk"><input type="checkbox" id="t-pfree"${state.view.pfree?' checked':''}> Freie Ports</label>`;
     const n=renderPatch(T,q);$('#t-sub').textContent=(T.sub||'')+(q?' · '+n+' Treffer':'');return}
   if(custom)renderNetze();
   const rows=T.rows.filter(r=>!q||r.cells.join(' ').toLowerCase().includes(q));

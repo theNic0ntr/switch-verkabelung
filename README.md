@@ -18,7 +18,7 @@ Netzwerk-Verkabelung im Browser planen und dokumentieren. Switches, Firewalls, P
 - **Vorlagen:** konfigurierte Geräte als eigene Vorlage speichern und wiederverwenden.
 - **Versionsverlauf:** benannte Stände, automatische Sicherungen, Vergleich mit dem aktuellen Stand, Wiederherstellen.
 - **PDF und Etiketten:** komplette Dokumentation als PDF (Plan, Schränke, Topologie, alle Listen); Etiketten für Kabel, Ports und Geräte auf A4-Bögen, für Etikettendrucker oder als Kabelfahne, wahlweise mit QR-Code. In der Server-Version öffnet der QR-Code das Objekt direkt (`#dev-…`, `#cab-…`, `#port-…`).
-- **Patchlegung:** wird automatisch aus dem Plan erzeugt – nach Raum und Schrank gegliedert, je Switch eine Tabelle mit Port, Patch (Kürzel des Patchpanels + Port, z. B. 11.6), VLAN, Geräteklasse und Nutzer. Das Kürzel lässt sich am Patchpanel festlegen, sonst wird je Schrank von oben durchnummeriert.
+- **Patchlegung:** wird automatisch aus dem Plan erzeugt – nach Raum und Schrank gegliedert, je Switch eine Tabelle mit Port, Patch (Kürzel des Patchpanels + Port, z. B. 11.6), VLAN, Geräteklasse und Nutzer. Hat ein Patchpanel-Port eine eigene Beschriftung, steht genau diese in der Spalte Patch; sonst wird sie aus Kürzel und Port gebildet. Das Kürzel lässt sich am Patchpanel festlegen, sonst wird je Schrank von oben durchnummeriert.
 - **Export:** Patchliste und Patchlegung als CSV, der Plan als SVG oder PNG, das Projekt als JSON.
 
 ## Auf einem Server betreiben (Docker)
