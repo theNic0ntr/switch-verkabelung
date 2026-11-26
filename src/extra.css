@@ -297,3 +297,57 @@ table.pl{width:auto;min-width:min(100%,640px)}
 @media(max-width:760px){.plbtn{max-width:44vw;padding:0 10px;font-size:14px}}
 @media(max-width:600px){.plbtn{max-width:52vw}.brand h1{display:none}}
 .ib.lang{font:700 13px/1 inherit;letter-spacing:.04em;color:#fff;min-width:40px}
+/* Wer hat angelegt / bearbeitet */
+.audit{margin:22px 0 4px;padding:12px 0 0;border-top:1px solid var(--line);display:grid;gap:8px;font-size:13px}
+.audit>div{display:grid;gap:1px}
+.audit dt{color:var(--mute);font-weight:600;font-size:12px}
+.audit dd{margin:0;overflow-wrap:anywhere}
+.audit .sep{color:var(--mute)}
+.audit time{color:var(--mute)}
+.mute{color:var(--mute)}
+/* Verbindungstest */
+.pingf{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:end;margin:0 0 10px}
+.pingf .fld{margin:0}
+.pingf .btn{min-height:40px}
+.pres{border-radius:10px;padding:10px 12px;margin:0 0 12px;display:grid;gap:2px;font-size:13px}
+.pres b{font-size:15px}
+.pres.ok{background:light-dark(#dcfce7,#12381f);color:light-dark(#14532d,#bbf7d0)}
+.pres.bad{background:light-dark(#fee2e2,#3f1414);color:light-dark(#7f1d1d,#fecaca)}
+.hops{list-style:none;margin:0 0 12px;padding:0;display:grid;gap:0}
+.hops li{position:relative;display:grid;grid-template-columns:28px minmax(0,1fr);gap:8px;font-size:14px;line-height:1.35}
+.hops li>div{display:grid;gap:1px;padding:2px 0 8px;min-width:0}
+.hops .hd>i{font-style:normal;width:24px;height:24px;border-radius:50%;display:grid;place-items:center;background:#2563eb;color:#fff;font-size:12px;font-weight:700;z-index:1}
+.hops .hd.gw>i{background:#7c3aed}.hops .hd.dst>i{background:#16a34a}.hops .hd.bad>i{background:#dc2626}
+.hops li::before{content:"";position:absolute;left:11px;top:0;bottom:0;width:2px;background:var(--line)}
+.hops li:first-child::before{top:12px}.hops li:last-child::before{bottom:calc(100% - 12px)}
+.hops .hc>div{grid-column:2;padding:0 0 8px}
+.hops small{color:var(--mute);font-size:12.5px}
+.hops small.ip{display:inline;font-variant-numeric:tabular-nums}
+.hops .ios{display:flex;flex-wrap:wrap;gap:0 10px}
+.hops .io>span:first-child{font-weight:600}
+.hops em{font-style:normal;color:var(--red);font-weight:600;font-size:13px}
+.hops .bad .link{color:var(--red)}
+.vt{display:inline-block;font-weight:600;border-left:3px solid var(--vc,#8a8f96);padding-left:5px;color:var(--ink)}
+.pnotes{margin:0 0 12px;padding:0 0 0 18px;font-size:13px;color:var(--mute)}
+.pcon{margin:0 0 12px;padding:10px 12px;border-radius:8px;background:#0c0c0b;color:#d9f99d;font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;white-space:pre-wrap;overflow-wrap:anywhere;max-height:240px;overflow:auto}
+.simflow{stroke-dasharray:3 15;animation:simdash .9s linear infinite}
+@keyframes simdash{to{stroke-dashoffset:-18}}
+.simpk .halo{fill:#2563eb;fill-opacity:.22}
+.simpk .env{fill:#2563eb;stroke:#fff;stroke-width:2.2}
+.simpk .flap{stroke:#fff;stroke-width:2}
+.simpk.rep .halo{fill:#16a34a}.simpk.rep .env{fill:#16a34a}
+.simbar{position:absolute;top:12px;left:50%;transform:translateX(-50%);width:max-content;z-index:5;display:flex;align-items:center;gap:10px;max-width:min(640px,calc(100% - 24px));background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:12px;padding:8px 8px 8px 12px;box-shadow:0 6px 24px rgba(0,0,0,.18)}
+.simbar[hidden]{display:none}
+.simbar .st{width:26px;height:26px;flex:none;border-radius:50%;display:grid;place-items:center;color:#fff;font-weight:700}
+.simbar.ok .st{background:#16a34a}.simbar.bad .st{background:#dc2626}
+.simbar .tx{display:grid;min-width:0;font-size:14px}
+.simbar .tx .ln{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.simbar small{color:var(--mute);font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.simbar .btn.sm,.simbar .ib.sm{flex:none}
+@media (max-width:760px){.simbar{top:8px;padding:6px 6px 6px 10px}.simbar small{white-space:normal}}
+@media (prefers-reduced-motion:reduce){.simflow{animation:none;stroke-dasharray:none}}
+.pres.run{background:light-dark(#dbeafe,#132a4d);color:light-dark(#1e3a8a,#bfdbfe)}
+.simbar.run .st{background:#2563eb;position:relative}
+.simbar.run .st::after{content:"";width:12px;height:12px;border-radius:50%;border:2px solid #fff;border-right-color:transparent;animation:simspin .8s linear infinite}
+@keyframes simspin{to{transform:rotate(360deg)}}
+.hops .link{justify-self:start;text-align:left}

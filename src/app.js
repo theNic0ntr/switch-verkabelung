@@ -768,7 +768,7 @@ function renderCanvas(){
   $('#l-pow').innerHTML=powSVG();
   drawCables();
   $('#empty').hidden=state.devices.length+state.racks.length+state.rooms.length>0;
-  lvSel();renderPeers();
+  lvSel();renderPeers();renderSim();
   $('#hint').textContent=PL.cur==='demo'?'Beispiel zum Ausprobieren – Änderungen werden nicht gespeichert. Oben links legst du einen eigenen Plan an.':'Port anklicken zeigt die ganze Strecke · Port auf Port ziehen steckt ein Kabel · Geräte in Schränke ziehen';
 }
 function powSVG(){if(!SDV)return '';const d=dev(SDV);if(!d||HID.has(d.id))return '';const pairs=[];
@@ -873,6 +873,7 @@ function renderInsp(){
   else if(sel&&sel.kind==='multi'&&MS.size>1)h=inspMulti();
   else{sel=null;h=inspNone()}
   $('#ic').innerHTML=h;
+  if(AU.ask.size)auFetch();
 }
 function msToggle(id){if(!MS.size&&sel&&sel.kind==='dev'&&sel.id!==id)MS.add(sel.id);MS.has(id)?MS.delete(id):MS.add(id);msApply()}
 function msApply(){if(!MS.size)select(null);else if(MS.size===1){const o=[...MS][0];select({kind:'dev',id:o})}else select({kind:'multi'})}
@@ -887,7 +888,7 @@ function inspMulti(){const L=[...MS].map(dev).filter(Boolean),free=L.filter(d=>!
 async function msDelete(){const ids=new Set(MS);if(!ids.size)return;if(!(await ask(pl(ids.size,'Gerät','Geräte')+' löschen?','Die Geräte und alle ihre Kabel werden entfernt. Strg+Z holt sie zurück.','Löschen',true)))return;
   ck();state.cables=state.cables.filter(c=>!ids.has(c.a.d)&&!ids.has(c.b.d));state.devices=state.devices.filter(d=>!ids.has(d.id));MS.clear();sel=null;touched();renderAll();toast(pl(ids.size,'Gerät','Geräte')+' gelöscht')}
 function msMove(dx,dy){const L=[...MS].map(dev).filter(d=>d&&!d.rack);if(!L.length)return;ck('msmove');for(const d of L){d.x+=dx;d.y+=dy}touched();renderAll()}
-const TPLX=['id','x','y','rack','u','name','ip','mac','user','location','notes','year','pa','pb','_u'];
+const TPLX=['id','x','y','rack','u','name','ip','mac','user','location','notes','year','pa','pb','_u','_cr','_ed'];
 function tplCfg(d){const c=JSON.parse(JSON.stringify(d));for(const k of TPLX)delete c[k];c.ports={};for(const [k,v] of Object.entries(d.ports||{})){const o={...v};delete o.label;delete o.notes;if(Object.keys(o).length)c.ports[k]=o}if(c.disks)for(const v of Object.values(c.disks))delete v.ok;return c}
 function saveTemplate(d){
   modal(`<form class="mbox" id="tplf" role="dialog" aria-modal="true" aria-labelledby="m-t"><div class="mh"><h2 id="m-t">Als Vorlage speichern</h2>${closeBtn}</div><p>Die Vorlage übernimmt Bauform, Ports, Port-Einstellungen, Optik und Festplatten – aber keine Namen, IPs oder Beschriftungen. Du findest sie unter „Hinzufügen“ bei ${esc(KIND[d.kind].n==='Host'?'Host':KIND[d.kind].n)}.</p>${fld('m-tn','Name der Vorlage',`<input id="m-tn" maxlength="40" value="${esc(d.model||d.name)}">`)}<div class="mf"><button type="button" class="btn" data-close>Abbrechen</button><button type="submit" class="btn pri">Speichern</button></div></form>`);
@@ -1006,9 +1007,11 @@ function inspDev(d){
   ${fld('f-notes','Notizen',`<textarea id="f-notes" data-f="dev.notes" rows="2" maxlength="500">${esc(d.notes)}</textarea>`)}
   <div class="row"><button type="button" class="btn" data-act="dup">Duplizieren</button><button type="button" class="btn" data-act="tplsave">Als Vorlage</button>${store.kind==='server'?`<button type="button" class="btn" data-act="qr" data-k="dev" data-id="${d.id}">QR-Code</button>`:''}${hideBtn(d.id)}<button type="button" class="btn danger" data-act="deldev">Löschen</button></div>
   ${netHTML(d,L)}
+  ${pingHTML(d)}
   ${powerHTML(d)}
   ${d.kind==='server'&&d.bays?diskHTML(d):''}
-  ${L.ports.length?`<h3>Ports</h3><div class="scroll"><table class="ptab"><thead><tr>${pas?'<th>Nr.</th><th>Beschriftung</th><th>Vorderseite</th><th>Rückseite</th>':'<th>Nr.</th><th>Typ</th><th>Tempo</th><th>Beschriftung</th><th>Verbunden mit</th>'}</tr></thead><tbody>${rows}</tbody></table></div>`:'<p class="note">Dieses Gerät hat keine Netzwerkports.</p>'}`;
+  ${L.ports.length?`<h3>Ports</h3><div class="scroll"><table class="ptab"><thead><tr>${pas?'<th>Nr.</th><th>Beschriftung</th><th>Vorderseite</th><th>Rückseite</th>':'<th>Nr.</th><th>Typ</th><th>Tempo</th><th>Beschriftung</th><th>Verbunden mit</th>'}</tr></thead><tbody>${rows}</tbody></table></div>`:'<p class="note">Dieses Gerät hat keine Netzwerkports.</p>'}
+  ${auditHTML(d)}`;
 }
 function inspRack(r){
   const G=rgeom(r),occ=new Map();for(const d of G.devs)occ.set(d.u,d);
@@ -1019,7 +1022,8 @@ function inspRack(r){
   ${fieldsHTML(r,'i',null,'rack')}
   ${fld('f-notes','Notizen',`<textarea id="f-notes" data-f="rack.notes" rows="2" maxlength="500">${esc(r.notes)}</textarea>`)}
   <div class="row"><button type="button" class="btn pri" data-act="addin" data-id="${r.id}">Gerät einbauen</button>${hideBtn(r.id)}<button type="button" class="btn danger" data-act="delrack">Löschen</button></div>
-  <h3>Belegung</h3><div class="scroll"><table class="ptab"><thead><tr><th>HE</th><th>Gerät</th><th>Typ</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  <h3>Belegung</h3><div class="scroll"><table class="ptab"><thead><tr><th>HE</th><th>Gerät</th><th>Typ</th></tr></thead><tbody>${rows}</tbody></table></div>
+  ${auditHTML(r)}`;
 }
 function roomItems(rm){const inn=(x,y)=>x>=rm.x&&x<=rm.x+rm.w&&y>=rm.y&&y<=rm.y+rm.h;const its=[];for(const r of state.racks){const G=rgeom(r);if(inn(r.x+G.W/2,r.y+Math.min(G.H/2,HEAD+U)))its.push({t:'rack',o:r})}for(const d of state.devices){if(d.rack)continue;const L=lay(d);if(inn(d.x+L.W/2,d.y+L.H/2))its.push({t:'dev',o:d})}return its}
 function inspRoom(rm){
@@ -1035,7 +1039,8 @@ function inspRoom(rm){
   <div class="row"><button type="button" class="btn" data-act="fitroom"${its.length?'':' disabled'}>An Inhalt anpassen</button>${hideBtn(rm.id)}<button type="button" class="btn danger" data-act="delroom">Löschen</button></div>
   ${C.racks.length?`<h3>Schränke im Raum</h3><ul class="rcont">${C.racks.map(r=>{const G=rgeom(r);return `<li><button type="button" class="link" data-act="selrack" data-id="${r.id}">${esc(r.name)}</button> <small>${r.rsize}″ · ${G.heUsed}/${G.n} HE</small>${G.devs.length?`<ul>${G.devs.map(d=>`<li>${lnk(d)} <small>${esc(heTxt(d))}</small></li>`).join('')}</ul>`:''}</li>`}).join('')}</ul>`:''}
   ${gk.length?`<h3>${C.racks.length?'Außerhalb der Schränke':'Im Raum'}</h3><ul class="rcont">${gk.map(k=>{const g=groups.get(k);return `<li><small>${esc(g.n)} · ${g.l.length}</small><ul>${g.l.map(d=>`<li>${lnk(d)}${d.user?` <small>${esc(d.user)}</small>`:''}${HID.has(d.id)?' <small>· ausgeblendet</small>':''}</li>`).join('')}</ul></li>`}).join('')}</ul>`:''}
-  ${!C.racks.length&&!loose.length?'<p class="note">Der Raum ist noch leer. Ziehe Schränke oder Geräte hinein – sie wandern dann beim Verschieben mit.</p>':''}`;
+  ${!C.racks.length&&!loose.length?'<p class="note">Der Raum ist noch leer. Ziehe Schränke oder Geräte hinein – sie wandern dann beim Verschieben mit.</p>':''}
+  ${auditHTML(rm)}`;
 }
 function connBlock(d,pid,side){
   const s=side||'f',c=cabOf(d.id,pid,s);
@@ -1107,7 +1112,7 @@ function inspCab(c){
   h+=fld('f-cnotes','Notiz',txa('f-cnotes','cab.notes',c.notes));
   if(inf.ch.steps.length>1)h+='<h3>Strecke von Ende zu Ende</h3>'+pathHTML(inf.ch);
   h+=`<h3>Prüfung</h3>${inf.iss.length?`<ul class="iss">${inf.iss.map(([s,m])=>`<li><i class="sev ${s}">${SEV[s].g}</i><span>${esc(m)}</span></li>`).join('')}</ul>`:'<p class="ok">Keine Auffälligkeiten.</p>'}`;
-  return h+`<button type="button" class="btn danger wide" data-act="delcab" data-id="${c.id}">Kabel entfernen</button>`;
+  return h+`<button type="button" class="btn danger wide" data-act="delcab" data-id="${c.id}">Kabel entfernen</button>`+auditHTML(c);
 }
 
 /* ================= edits ================= */
@@ -1131,7 +1136,7 @@ function mergeInto(B,M,T){const strip=o=>{const x={...o};for(const k of [...COLL
 function ck(key){const now=Date.now();if(key&&key===H.key&&now-H.t<1500){H.t=now;return}const j=JSON.stringify(state),top=H.u[H.u.length-1];if(top&&top.post==null)top.post=j;H.u.push({pre:j,post:null});if(H.u.length>150)H.u.shift();H.r=[];H.key=key||null;H.t=now}
 function hSeal(){const top=H.u[H.u.length-1];if(top&&top.post==null)top.post=JSON.stringify(state);H.key=null}
 function hApply(from,to){const R=sanitize(mergeInto(JSON.parse(from),JSON.parse(to),state));R.updated=state.updated;return R}
-function touched(){if(PL.cur==='demo'){state.updated=Date.now();setSave('demo');return}state.updated=Date.now();state.demo=false;store.dirty=true;clearTimeout(store.tl);store.tl=setTimeout(saveLocal,300);if(store.ref&&!SY.ro){clearTimeout(store.tc);setSave('saving');store.tc=setTimeout(saveCloud,250)}else if(!store.ref)setSave('local')}
+function touched(){auStamp();auRefresh();if(PL.cur==='demo'){state.updated=Date.now();setSave('demo');return}state.updated=Date.now();state.demo=false;store.dirty=true;clearTimeout(store.tl);store.tl=setTimeout(saveLocal,300);if(store.ref&&!SY.ro){clearTimeout(store.tc);setSave('saving');store.tc=setTimeout(saveCloud,250)}else if(!store.ref)setSave('local')}
 function fixSel(){for(const id of [...MS])if(!dev(id))MS.delete(id);if(sel&&sel.kind==='multi'&&MS.size<2){const o=[...MS][0];MS.clear();sel=o?{kind:'dev',id:o}:null}if(!sel)return;if(sel.kind==='dev'&&!dev(sel.id))sel=null;else if(sel.kind==='port'&&!(dev(sel.dev)&&pexists(dev(sel.dev),sel.port)))sel=null;else if(sel.kind==='cable'&&!state.cables.some(c=>c.id===sel.id))sel=null;else if(sel.kind==='rack'&&!rackOf(sel.id))sel=null;else if(sel.kind==='room'&&!roomOf(sel.id))sel=null}
 function undo(){const e=H.u.pop();if(!e)return;if(e.post==null)e.post=JSON.stringify(state);state=hApply(e.post,e.pre);H.r.push(e);H.key=null;LC.clear();fixSel();touched();renderAll()}
 function redo(){const e=H.r.pop();if(!e)return;state=hApply(e.pre,e.post);H.u.push(e);H.key=null;LC.clear();fixSel();touched();renderAll()}
@@ -1219,7 +1224,7 @@ function fitRoom(rm){
   let x1=1e9,y1=1e9,x2=-1e9,y2=-1e9;for(const i of its){let x,y,w,h;if(i.t==='rack'){const G=rgeom(i.o);x=i.o.x;y=i.o.y;w=G.W;h=G.H}else{const L=lay(i.o);x=i.o.x;y=i.o.y;w=L.W;h=L.H}x1=Math.min(x1,x);y1=Math.min(y1,y);x2=Math.max(x2,x+w);y2=Math.max(y2,y+h)}
   ck();rm.x=sn(x1-80);rm.y=sn(y1-140);rm.w=sn(x2-x1+160);rm.h=sn(y2-y1+220);touched();renderAll();
 }
-function dupDev(d){const n=JSON.parse(JSON.stringify(d));n.id='d'+rid();n.name=trunc(d.name+' '+W('(Kopie)'),40);ck();if(d.rack){n.rack=null;state.devices.push(n);rackInsert(n,rackOf(d.rack),null)}else{n.rack=null;place(n);state.devices.push(n)}touched();sel={kind:'dev',id:n.id};renderAll();centerOn(n)}
+function dupDev(d){const n=noAu(JSON.parse(JSON.stringify(d)));n.id='d'+rid();n.name=trunc(d.name+' '+W('(Kopie)'),40);ck();if(d.rack){n.rack=null;state.devices.push(n);rackInsert(n,rackOf(d.rack),null)}else{n.rack=null;place(n);state.devices.push(n)}touched();sel={kind:'dev',id:n.id};renderAll();centerOn(n)}
 function setCount(d,t,n){
   const old=d.pc[t]||0;if(n===old)return;
   const tryd={...d,pc:{...d.pc,[t]:n}};if(total(tryd)<minPorts(d)){toast('Dieses Gerät braucht mindestens einen Port');renderInsp();return}
@@ -1309,7 +1314,7 @@ function applyField(el,live){
 
 /* ================= view ================= */
 const stage=$('#stage'),cv=$('#cv'),world=$('#world');
-function applyView(){if(LV.peers.size){cancelAnimationFrame(LV.raf);LV.raf=requestAnimationFrame(renderPeers)}world.setAttribute('transform',`translate(${view.x.toFixed(1)} ${view.y.toFixed(1)}) scale(${view.z.toFixed(4)})`);stage.style.backgroundSize=`${20*view.z}px ${20*view.z}px`;stage.style.backgroundPosition=`${view.x}px ${view.y}px`;$('#z-lbl').textContent=Math.round(view.z*100)+' %'}
+function applyView(){if(SIM.res)simScale();if(LV.peers.size){cancelAnimationFrame(LV.raf);LV.raf=requestAnimationFrame(renderPeers)}world.setAttribute('transform',`translate(${view.x.toFixed(1)} ${view.y.toFixed(1)}) scale(${view.z.toFixed(4)})`);stage.style.backgroundSize=`${20*view.z}px ${20*view.z}px`;stage.style.backgroundPosition=`${view.x}px ${view.y}px`;$('#z-lbl').textContent=Math.round(view.z*100)+' %'}
 function bbox(){const B=contentBox(true)||{x1:0,y1:0,x2:400,y2:300};let {x1,y1,x2,y2}=B;
   for(const rt of routes().values()){const ps=rt.pts?rt.pts.map(([x,y])=>({x,y})):[];for(let t=0;t<=1.001;t+=.05)ps.push(rt.at(t));for(const p of ps){x1=Math.min(x1,p.x);y1=Math.min(y1,p.y);x2=Math.max(x2,p.x);y2=Math.max(y2,p.y)}}
   return {x1,y1,x2,y2}}
@@ -1471,11 +1476,12 @@ stage.addEventListener('wheel',e=>{if(mode!=='plan')return;e.preventDefault();co
 /* ================= UI events ================= */
 const ic=$('#ic');
 ic.addEventListener('input',e=>applyField(e.target,true));
-ic.addEventListener('change',e=>{const el=e.target;if(el.dataset.conn){if(!el.value)return;const [d,p]=el.value.split(':'),sd=el.dataset.side;connect(sd?{d:sel.dev,p:sel.port,s:sd}:{d:sel.dev,p:sel.port},{d,p});return}applyField(el,false)});
+ic.addEventListener('change',e=>{const el=e.target;if(el.id==='f-ping'){if(sel&&sel.kind==='dev'){SIM.pick[sel.id]=el.value;if(el.value)simStart(sel.id,el.value);else renderInsp()}return}if(el.dataset.conn){if(!el.value)return;const [d,p]=el.value.split(':'),sd=el.dataset.side;connect(sd?{d:sel.dev,p:sel.port,s:sd}:{d:sel.dev,p:sel.port},{d,p});return}applyField(el,false)});
 ic.addEventListener('click',e=>{
   const b=e.target.closest('[data-act]');
   if(b){const a=b.dataset.act;
     if(a==='dup')dupDev(dev(sel.id));else if(a==='deldev')delDev(dev(sel.id));
+    else if(a==='ping'){const t=SIM.pick[sel.id]||($('#f-ping')||{}).value;if(t)simStart(sel.id,t)}else if(a==='pingx')simClear();
     else if(a==='selcab')select({kind:'cable',id:b.dataset.id});else if(a==='delcab')delCable(b.dataset.id);
     else if(a==='seldev'){select({kind:'dev',id:b.dataset.id});centerOn(dev(b.dataset.id))}
     else if(a==='selrack'){select({kind:'rack',id:b.dataset.id})}
@@ -1504,7 +1510,7 @@ ic.addEventListener('click',e=>{
       touched();renderAll()}
     else if(a==='mset'){const k=b.dataset.k,L=[...MS].map(dev).filter(Boolean);if(k==='year'){const v=parseInt($('#f-my').value,10);if(!(v>=1980&&v<=2100)){toast('Bitte ein Jahr eingeben');return}ck();L.forEach(d=>d.year=v);toast('Kaufjahr '+v+' gesetzt')}
       else if(k==='pa'){const v=$('#f-mpa').value;ck();let n=0;for(const d of L)if(pwrDev(d)&&d.id!==v&&srcOpts(d).some(o=>o[0]===v)){d.pa=v;n++}toast(pl(n,'Gerät','Geräten')+' zugeordnet')}touched();renderAll()}
-    else if(a==='mdup'){const L=[...MS].map(dev).filter(Boolean);ck();const nw=[];for(const d of L){const n=JSON.parse(JSON.stringify(d));n.id='d'+rid();n.name=trunc(d.name+' '+W('(Kopie)'),40);if(n.rack){const r=rackOf(n.rack);n.rack=null;if(r){n.x=sn(r.x+rgeom(r).W+80);n.y=d.y}}else{n.x+=60;n.y+=60}state.devices.push(n);nw.push(n.id)}MS=new Set(nw);touched();select({kind:'multi'});toast(pl(nw.length,'Kopie','Kopien')+' angelegt')}
+    else if(a==='mdup'){const L=[...MS].map(dev).filter(Boolean);ck();const nw=[];for(const d of L){const n=noAu(JSON.parse(JSON.stringify(d)));n.id='d'+rid();n.name=trunc(d.name+' '+W('(Kopie)'),40);if(n.rack){const r=rackOf(n.rack);n.rack=null;if(r){n.x=sn(r.x+rgeom(r).W+80);n.y=d.y}}else{n.x+=60;n.y+=60}state.devices.push(n);nw.push(n.id)}MS=new Set(nw);touched();select({kind:'multi'});toast(pl(nw.length,'Kopie','Kopien')+' angelegt')}
     else if(a==='mhide'){const ids=[...MS];setHid(ids,true);MS.clear();sel=null;renderAll();toast('Ausgeblendet – über „Ansicht“ wieder einblenden')}
     else if(a==='mdel')msDelete();
     else if(a==='hide'){const id=b.dataset.id,h=HIDL.has(id);setHid([id],!h);if(!h){sel=null;toast('Ausgeblendet – über „Ansicht“ oben wieder einblenden')}renderAll()}
@@ -1555,7 +1561,7 @@ $('#b-rail').onclick=()=>$('#rail').classList.toggle('open');
 $('#itog').onclick=()=>{const m=$('#insp').classList.toggle('min');$('#itog').setAttribute('aria-expanded',String(!m))};
 $('#z-in').onclick=()=>zoomBy(1.25);$('#z-out').onclick=()=>zoomBy(.8);$('#z-fit').onclick=fit;$('#z-arr').onclick=arrange;
 $('#z-lbl').onclick=()=>{const r=stage.getBoundingClientRect();zoomAt(r.width/2,r.height/2,1/view.z)};
-function setMode(m){mode=m;if(LV.send)lvSet({m:m==='plan'?null:m});peersChanged();for(const [id,k] of [['#t-plan','plan'],['#t-topo','topo'],['#t-list','list']])$(id).setAttribute('aria-selected',String(m===k));$('#main').classList.toggle('tbl',m!=='plan');$('#tview').hidden=m!=='list';$('#topo').hidden=m!=='topo';if(m==='list')renderTable();else if(m==='topo')renderTopo(true);else requestAnimationFrame(applyView)}
+function setMode(m){mode=m;setTimeout(renderSim,0);if(LV.send)lvSet({m:m==='plan'?null:m});peersChanged();for(const [id,k] of [['#t-plan','plan'],['#t-topo','topo'],['#t-list','list']])$(id).setAttribute('aria-selected',String(m===k));$('#main').classList.toggle('tbl',m!=='plan');$('#tview').hidden=m!=='list';$('#topo').hidden=m!=='topo';if(m==='list')renderTable();else if(m==='topo')renderTopo(true);else requestAnimationFrame(applyView)}
 $('#t-plan').onclick=()=>setMode('plan');$('#t-list').onclick=()=>setMode('list');$('#t-topo').onclick=()=>setMode('topo');
 function setTab(t){tmode=t;document.querySelectorAll('.vt button').forEach(x=>x.setAttribute('aria-selected',String(x.dataset.tm===t)));renderTable()}
 $('.vt').addEventListener('click',e=>{const b=e.target.closest('[data-tm]');if(b)setTab(b.dataset.tm)});
@@ -1776,6 +1782,8 @@ function sanitize(o){
     const len=c.len===''||c.len==null||!Number.isFinite(+c.len)?'':clamp(+c.len,0,100000);
     out.cables.push({id,a,b,label:S(c.label,40),med:med||'cu',cat,shield:pick(c.shield,SHIELD,'U/UTP'),fg,ca:pick(c.ca,CONS,'LC'),cb:pick(c.cb,CONS,'LC'),pol:pick(c.pol,['UPC','APC'],'UPC'),dac:pick(c.dac,['passiv','aktiv'],'passiv'),ta:TR[c.ta]?c.ta:'',tb:TR[c.tb]?c.tb:'',ia:S(c.ia,60),ib:S(c.ib,60),color:COL[c.color]?c.color:'auto',len,notes:S(c.notes,300)});
   }
+  {const keep=(src,dst)=>{const m=new Map((Array.isArray(src)?src:[]).filter(x=>x&&typeof x==='object').map(x=>[x.id,x]));for(const x of dst){const o=m.get(x.id);if(!o)continue;for(const k of ['_cr','_ed']){const v=o[k];if(Array.isArray(v)&&typeof v[0]==='string'&&Number.isFinite(+v[1])&&+v[1]>0)x[k]=[v[0].slice(0,60),Math.round(+v[1])]}}};
+   if(!o._tpl){keep(o.devices,out.devices);keep(o.racks,out.racks);keep(o.rooms,out.rooms);keep(o.cables,out.cables)}}
   const prev=state;state=out;for(const r of out.racks)packRack(r,null);state=prev;
   return out;
 }
@@ -2135,7 +2143,7 @@ const VER={
   add:async name=>{if(store.kind==='server'){if(store.dirty)await saveCloud();const r=await fetch(vUrl(),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name})});return r.ok}return lvAdd(name||'Gespeicherter Stand')},
   del:async id=>{if(store.kind==='server')return (await fetch(vUrl(id),{method:'DELETE'})).ok;const a=lvRead().filter(v=>v.id!==id);return lvWrite(a)}};
 function diffPlans(A,B){const out=[],m=(a,b,key,name,lbl)=>{const am=new Map(a.map(x=>[x[key],x])),bm=new Map(b.map(x=>[x[key],x]));const add=b.filter(x=>!am.has(x[key])),del=a.filter(x=>!bm.has(x[key]));let ch=[],mv=0;
-    for(const x of b){const o=am.get(x[key]);if(!o)continue;const s1=JSON.stringify({...o,x:0,y:0}),s2=JSON.stringify({...x,x:0,y:0});if(s1!==s2)ch.push(x);else if(o.x!==x.x||o.y!==x.y)mv++}
+    for(const x of b){const o=am.get(x[key]);if(!o)continue;const s1=JSON.stringify({...o,x:0,y:0,_cr:0,_ed:0}),s2=JSON.stringify({...x,x:0,y:0,_cr:0,_ed:0});if(s1!==s2)ch.push(x);else if(o.x!==x.x||o.y!==x.y)mv++}
     const nm=l=>l.slice(0,6).map(x=>name(x)).join(', ')+(l.length>6?' …':'');
     const P=n=>n+' '+(n===1?lbl[0]:lbl[1]);if(add.length)out.push(`<li class="da">+ ${P(add.length)} neu: ${esc(nm(add))}</li>`);if(del.length)out.push(`<li class="dd">− ${P(del.length)} entfernt: ${esc(nm(del))}</li>`);if(ch.length)out.push(`<li>~ ${P(ch.length)} geändert: ${esc(nm(ch))}</li>`);if(mv)out.push(`<li>${P(mv)} verschoben</li>`)};
   m(A.devices,B.devices,'id',x=>x.name,['Gerät','Geräte']);m(A.cables,B.cables,'id',x=>x.label||'Kabel',['Kabel','Kabel']);m(A.racks,B.racks,'id',x=>x.name,['Schrank','Schränke']);m(A.rooms,B.rooms,'id',x=>x.name,['Raum','Räume']);m(A.vlans||[],B.vlans||[],'id',x=>'VLAN '+x.id,['VLAN','VLANs']);
@@ -2205,7 +2213,7 @@ function onRemote(doc){
   if(base&&cur!==base&&!state.demo){try{next=sanitize(mergeInto(JSON.parse(base),state,remote));next.view=state.view;next.updated=remote.updated}catch(_){next=remote}}
   hSeal();
   const prevSel=sel&&JSON.stringify(sel);
-  state=next;SY.rev=doc.rev??SY.rev;SY.synced=rj;histAdd(doc.rev,rj);LC.clear();fixSel();
+  state=next;auReset();SY.rev=doc.rev??SY.rev;SY.synced=rj;histAdd(doc.rev,rj);LC.clear();fixSel();
   const ae=document.activeElement,editing=!!(ae&&$('#insp').contains(ae)&&/^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName)),keep=editing&&prevSel===(sel&&JSON.stringify(sel));
   renderAll(keep);if(keep)SY.inspStale=true;
   saveLocal();sbSave();
@@ -2220,7 +2228,7 @@ function firstRemote(doc){
   if(!state.demo&&lb&&lb.json&&cur!==lb.json){SY.synced=lb.json;SY.rev=lb.rev;onRemote({...doc,parent:undefined});return}
   if(!state.demo&&!lb&&(state.updated||0)>remote.updated){remote.view=state.view;SY.rev=doc.rev;SY.synced=JSON.stringify(remote);histAdd(doc.rev,SY.synced);setSave('saving');saveCloud();return}
   if(!state.demo)remote.view=state.view;
-  state=remote;sel=null;MS.clear();H.u=[];H.r=[];LC.clear();SY.rev=doc.rev;SY.synced=JSON.stringify(state);histAdd(doc.rev,SY.synced);
+  state=remote;auReset();sel=null;MS.clear();H.u=[];H.r=[];LC.clear();SY.rev=doc.rev;SY.synced=JSON.stringify(state);histAdd(doc.rev,SY.synced);
   saveLocal();sbSave();renderAll();if(PL.fit){PL.fit=false;fit()}setSave(SY.ro?'ro':'cloud');
 }
 /* eigener Server (Docker): Speicherung über /api/plan */
@@ -2255,11 +2263,11 @@ async function openPlan(id,force){
   const g=++PL.gen;if(PL.unsub){try{PL.unsub()}catch(_){}PL.unsub=null}
   SY.rev=null;SY.synced=null;SY.pend=null;SY.hist.clear();store.dirty=false;store.pending=false;clearTimeout(store.tc);
   PL.cur=id;try{localStorage.setItem(LSC,id)}catch(_){}setPlanUrl(id);
-  H.u=[];H.r=[];H.key=null;sel=null;MS.clear();LC.clear();raidEdit=null;
+  H.u=[];H.r=[];H.key=null;sel=null;MS.clear();LC.clear();raidEdit=null;cancelAnimationFrame(SIM.raf);SIM.anim=null;SIM.src=SIM.dst=SIM.res=null;
   if(LV.send)lvSet({pl:id,s:null,d:null});
-  if(id==='demo'){state=sanitize(demo());state.demo=true;renderAll();fit();renderPlans();peersChanged();setSave('demo');return}
+  if(id==='demo'){state=sanitize(demo());state.demo=true;auReset();renderAll();fit();renderPlans();peersChanged();setSave('demo');return}
   const m=PL.list.find(x=>x.id===id),cached=loadLocal(id);
-  state=cached||{...emptyState(),name:(m&&m.name)||'Plan'};state.demo=false;
+  state=cached||{...emptyState(),name:(m&&m.name)||'Plan'};state.demo=false;auReset();
   renderAll();fit();renderPlans();peersChanged();
   if(PL.be==='local'||!store.ref&&PL.be!=='shared'){setSave('local');return}
   setSave('boot');PL.fit=!cached;
@@ -2367,7 +2375,7 @@ async function initCloud(tries){
   if(!db||!user){local();return}
   let uid=null;try{uid=await user.id()}catch(_){}
   if(!uid){local();return}
-  store.kind='shared';store.max=240000;PL.be='shared';PL.db=db;PL.user=user;
+  store.kind='shared';store.max=240000;PL.be='shared';PL.db=db;PL.user=user;AU.uid=uid;
   try{SY.ro=(await user.can('data.write'))===false}catch(_){}
   initRoom(room,user);
   let first=true;const to=setTimeout(()=>{if(first){first=false;local()}},10000);
@@ -2415,7 +2423,7 @@ $('#people').addEventListener('click',e=>{if(!e.target.closest('#pme')||LV.auth|
   $('#m-nm').select();$('#nmf').onsubmit=ev=>{ev.preventDefault();const n=$('#m-nm').value.trim().slice(0,30);if(!n)return;try{localStorage.setItem(LSN,n)}catch(_){}LV.me.name=n;LV.me.color=colorFor(n);lvSet({n,c:LV.me.color});closeModal();renderPeople()}});
 function liveServer(me){
   LV.auth=!!me.auth;let n='';try{n=localStorage.getItem(LSN)||''}catch(_){}
-  const name=me.user||n||W('Gast')+' '+SY.cid.slice(0,3).toUpperCase();LV.me={name,color:colorFor(name),self:true};
+  const name=me.user||n||W('Gast')+' '+guestTag();LV.me={name,color:colorFor(name),self:true};
   if(!LV.auth)Object.assign(LV.mine,{n:name,c:LV.me.color});
   LV.send=p=>fetch('api/presence',{method:'POST',cache:'no-store',headers:{'Content-Type':'application/json'},body:JSON.stringify({cid:SY.cid,p})}).then(r=>{if(r.status===404)LV.ready=false}).catch(()=>{});
   const from=x=>{const p=x.p&&typeof x.p==='object'?x.p:{},nm=(x.user||(typeof p.n==='string'?p.n:'')||'Gast').slice(0,40);return {name:nm,color:x.user?colorFor(x.user):(/^#[0-9a-f]{6}$/i.test(p.c)?p.c:colorFor(nm)),p}};
@@ -2469,7 +2477,7 @@ function renderPeers(){const g=$('#l-peer');if(!g)return;if(mode!=='plan'||!LV.p
 /* ================= example ================= */
 /* englisches Beispiel: gleiche Daten, englische Namen */
 const DEMO_EN={'Beispiel Bürogebäude':'Example office building','EG · Technik & Empfang':'Ground floor · Tech & reception','Serverraum UG':'Server room (basement)','Verteiler EG':'Distribution GF','Access-SW EG':'Access-SW GF','AP Flur EG':'AP hallway GF','LWL-Panel Serverraum':'Fibre panel server room','Patchpanel EG':'Patch panel GF','PC Buchhaltung':'PC accounting','PC Empfang':'PC reception','Telefon Empfang':'Phone reception','USV Serverraum':'UPS server room','Telefonie':'Voice','VM-Daten':'VM data','Backbone EG':'Backbone GF','Backbone OG':'Backbone 1F','Glasfaser-ONT':'Fibre ONT','LTE-Backup':'LTE backup','Mgmt-Netz':'Mgmt network','USV-NMC':'UPS NMC','Technikraum EG':'Tech room GF','Online, 2 HE':'Online, 2 U','1 HE · 2 × QSFP28':'1 U · 2 × QSFP28','Backbone Serverraum → Verteiler EG':'Backbone server room → distribution GF','Buchhaltung (Raum 12), Dose 1 · PC Erika Musterfrau':'Accounting (room 12), outlet 1 · PC Jane Doe','Empfang (Raum 11), Dose 1 · PC Max Mustermann':'Reception (room 11), outlet 1 · PC John Smith','Empfang (Raum 11), Dose 2 · Telefon Max Mustermann':'Reception (room 11), outlet 2 · Phone John Smith','Flur EG (Raum 10) · Deckendose für AP':'Hallway GF (room 10) · ceiling outlet for AP','Max Mustermann':'John Smith','Erika Musterfrau':'Jane Doe','AP Flur':'AP hallway'};
-function demo(){const o=demo_();if(!EN)return o;const map=v=>{if(Array.isArray(v))return v.map(map);if(v&&typeof v==='object'){const r={};for(const [k,x] of Object.entries(v))r[k]=typeof x==='string'&&/^(name|user|label|notes|role|location|model)$/.test(k)&&DEMO_EN[x]?DEMO_EN[x]:map(x);return r}return v};return map(o)}
+function demo(){const o=demo_();for(const k of ['devices','cables','racks','rooms'])for(const x of o[k])x._cr=['~',1768478400];if(!EN)return o;const map=v=>{if(Array.isArray(v))return v.map(map);if(v&&typeof v==='object'){const r={};for(const [k,x] of Object.entries(v))r[k]=typeof x==='string'&&/^(name|user|label|notes|role|location|model)$/.test(k)&&DEMO_EN[x]?DEMO_EN[x]:map(x);return r}return v};return map(o)}
 function demo_(){
   const D=(k,o)=>mkDev(k,o);
   const devs=[
@@ -2509,6 +2517,248 @@ function demo_(){
   ],vlans:[{id:10,name:'Clients',color:'#2563eb',subnet:'10.0.10.0/24',gw:'10.0.10.1'},{id:20,name:'WLAN',color:'#16a34a',subnet:'10.0.20.0/24',gw:'10.0.20.1'},{id:30,name:'Telefonie',color:'#9333ea',subnet:'10.0.30.0/24',gw:'10.0.30.1'},{id:99,name:'Management',color:'#475569',subnet:'10.0.0.0/24',gw:'10.0.0.254'}],view:{labelMode:'num',colorBy:'speed',hide:{cats:[],ids:[]}},life:{old:5,eol:10},updated:0,demo:true};
 }
 
+/* ================= Wer hat angelegt, wer zuletzt bearbeitet =================
+   Geräte, Kabel, Schränke und Räume tragen _cr (angelegt) und _ed (zuletzt bearbeitet) als [wer, Unix-Sekunden].
+   touched() vergleicht den Plan mit dem zuletzt gesehenen Stand und stempelt nur, was die eigene Änderung verändert hat.
+   Stände von anderen (onRemote, Plan öffnen) setzen nur die Vergleichsbasis neu – ihre Stempel kommen von ihnen selbst.
+   Wer: Server → Kontoname, Gastname oder selbst gewählter Name; Artifact → „@“ + Benutzer-ID (Name wird beim Anzeigen
+   nachgeschlagen); nur im Browser → der selbst gewählte Name, sonst leer (dann steht nur die Zeit da). */
+const AUK=['_cr','_ed'];
+const AU={base:null,uid:null,names:new Map(),ask:new Set()};
+const LSG='switch-verkabelung-guest';
+function guestTag(){let g='';try{g=localStorage.getItem(LSG)||''}catch(_){}if(!/^[A-Z0-9]{3}$/.test(g)){g=(rid()+rid()).replace(/[^a-z0-9]/gi,'').slice(0,3).toUpperCase();try{localStorage.setItem(LSG,g)}catch(_){}}return g}
+function auWho(){if(store.kind==='shared')return AU.uid?'@'+AU.uid:'';if(store.kind==='server'&&LV.me&&LV.me.name)return LV.me.name.slice(0,40);let n='';try{n=localStorage.getItem(LSN)||''}catch(_){}return n.slice(0,40)}
+function auSnap(){const m=new Map(),att=new Map(),sig=o=>{const x={...o};for(const k of AUK)delete x[k];delete x.x;delete x.y;return JSON.stringify(x)};
+  for(const c of state.cables){for(const e of [c.a,c.b]){if(!att.has(e.d))att.set(e.d,[]);att.get(e.d).push(c.id+'@'+e.p+(e.s||''))}m.set('c:'+c.id,{s:sig(c)})}
+  for(const d of state.devices)m.set('d:'+d.id,{s:sig(d)+'|'+(att.get(d.id)||[]).sort().join(','),x:d.rack?null:d.x,y:d.rack?null:d.y});
+  for(const r of state.racks)m.set('k:'+r.id,{s:sig(r),x:r.x,y:r.y});
+  for(const r of state.rooms)m.set('m:'+r.id,{s:sig(r),x:r.x,y:r.y});
+  return m}
+function auRefresh(){const el=$('#ic .audit');if(!el||!sel)return;const o=sel.kind==='dev'?dev(sel.id):sel.kind==='cable'?state.cables.find(c=>c.id===sel.id):sel.kind==='rack'?rackOf(sel.id):sel.kind==='room'?roomOf(sel.id):null;if(o)el.outerHTML=auditHTML(o)}
+function auReset(){try{AU.base=auSnap()}catch(_){AU.base=null}}
+function auStamp(){if(!state)return;const B=AU.base,cur=auSnap();AU.base=cur;if(!B)return;
+  const who=auWho(),now=Math.round(Date.now()/1000),mv=new Set();
+  /* wird ein Raum verschoben, wandert sein Inhalt mit – das zählt nur als Änderung am Raum */
+  for(const r of state.rooms){const b=B.get('m:'+r.id);if(b&&(b.x!==r.x||b.y!==r.y))mv.add((r.x-b.x)+','+(r.y-b.y))}
+  const one=(o,k)=>{const n=cur.get(k),b=B.get(k);
+    if(!b){if(Array.isArray(o._cr))o._ed=[who,now];else o._cr=[who,now];return}
+    let ch=n.s!==b.s;if(!ch&&n.x!=null&&b.x!=null&&(n.x!==b.x||n.y!==b.y))ch=!mv.has((n.x-b.x)+','+(n.y-b.y));
+    if(ch)o._ed=[who,now]};
+  for(const d of state.devices)one(d,'d:'+d.id);for(const c of state.cables)one(c,'c:'+c.id);for(const r of state.racks)one(r,'k:'+r.id);for(const r of state.rooms)one(r,'m:'+r.id)}
+const noAu=o=>{for(const k of AUK)delete o[k];return o};
+function auName(w){if(!w)return '';if(w==='~')return W('Beispielplan');if(store.kind==='shared'&&w[0]==='@'){const id=w.slice(1);if(id===AU.uid)return (LV.me&&LV.me.name)||W('Du');if(!AU.names.has(id))AU.ask.add(id);return AU.names.get(id)||'…'}return w}
+const auMine=w=>!!w&&w!=='~'&&w===auWho();
+const auWhen=t=>(Date.now()-t)/1000<86400?ago(t):new Date(t).toLocaleString(LOC,{dateStyle:'medium',timeStyle:'short'});
+function auditHTML(o){
+  const row=(lbl,a,emp)=>{if(!Array.isArray(a))return `<div><dt>${lbl}</dt><dd><span class="mute">${emp}</span></dd></div>`;
+    const t=a[1]*1000,nm=auName(a[0]),uid=store.kind==='shared'&&a[0][0]==='@'?a[0].slice(1):'';
+    return `<div><dt>${lbl}</dt><dd>${nm?`<b${uid?` data-au="${esc(uid)}"`:''}${a[0]==='~'?'':' translate="no"'}>${esc(nm)}</b>${auMine(a[0])?' <span class="mute">(du)</span>':''}<span class="sep"> · </span>`:''}<time datetime="${new Date(t).toISOString()}" title="${esc(new Date(t).toLocaleString(LOC,{dateStyle:'full',timeStyle:'short'}))}">${esc(auWhen(t))}</time></dd></div>`};
+  return `<dl class="audit">${row('Angelegt von',o._cr,'nicht erfasst')}${row('Zuletzt bearbeitet von',o._ed,Array.isArray(o._cr)?'seitdem nicht geändert':'nicht erfasst')}</dl>`}
+/* Namen der Artifact-Benutzer nachladen und eintragen */
+function auFetch(){const ids=[...AU.ask].filter(id=>!AU.names.has(id));AU.ask.clear();if(!ids.length||!PL.user||typeof PL.user.profiles!=='function')return;for(const id of ids)AU.names.set(id,null);
+  const put=()=>{for(const el of document.querySelectorAll('[data-au]')){const n=AU.names.get(el.dataset.au);if(n)el.textContent=n}};
+  Promise.resolve().then(()=>PL.user.profiles(ids)).then(ps=>{for(const id of ids){const p=ps&&ps[id];AU.names.set(id,(p&&p.name)||W('Unbekannt'))}put()}).catch(()=>{for(const id of ids)AU.names.set(id,W('Unbekannt'));put()})}
+
+/* ================= Verbindungstest (Ping) =================
+   Simuliert ein ICMP-Echo anhand der Doku – ähnlich dem Simulationsmodus im Packet Tracer:
+   Kabelwege (auch über Patch- und LWL-Panels), Link und Port-Status, VLANs (Access, Trunk, Native) und Gateways.
+   Switches leiten innerhalb eines VLANs weiter, Router und Firewalls routen zwischen VLANs. Ports ohne VLAN-Angabe
+   gelten als transparent. Firewall-Regeln, Routing-Tabellen, ARP und STP werden nicht nachgebildet. */
+const isL3=d=>d.kind==='fw'||(d.kind==='net'&&(d.sub==='router'||d.sub==='gateway'));
+const isL2=d=>d.kind==='switch'||(d.kind==='net'&&d.sub==='mc');
+const canPing=d=>!!d&&!!FORM[d.kind]&&FORM[d.kind].flat().includes('ip');
+const SIM={src:null,dst:null,res:null,pick:{},anim:null,raf:0};
+const vnm=v=>{if(!v)return 'Ungetaggter Verkehr';const V=vlanOf(v);return V&&V.name?`VLAN ${v} (${V.name})`:`VLAN ${v}`};
+/* Kabelweg ab einem aktiven Port: Gegenstelle und die Kabel in Laufrichtung */
+function pLink(d,pid){const c=cabOf(d.id,pid,'f');if(!c)return null;const inf=AN.get(c.id);if(!inf)return null;const ch=inf.ch,me=e=>!!e&&e.d===d.id&&e.p===pid;
+  const fwd=me(ch.A)||!me(ch.B),far=fwd?ch.B:ch.A,st=fwd?ch.steps:ch.steps.slice().reverse().map(s=>({c:s.c,from:s.to,to:s.from}));
+  return {ch,c,far:far&&!(far.d===d.id&&far.p===pid)?far:null,st}}
+function linkDown(d,pid,L){if(pconf(d,pid).off)return `${pname(d,pid)} an „${d.name}“ ist deaktiviert`;
+  const fd=L.far&&dev(L.far.d);if(fd&&!isPas(ptype(L.far.p))&&pconf(fd,L.far.p).off)return `${pname(fd,L.far.p)} an „${fd.name}“ ist deaktiviert`;
+  if(!L.ch.nl)return null;const iss=(AN.get(L.c.id)||{}).iss||[],i=iss.find(x=>x[0]==='err')||L.ch.iss.find(x=>x[0]==='err')||iss[0];return i?'Kein Link: '+i[1].replace(/^Kein Link:\s*/,''):'Kein Link'}
+/* wie verlässt ein Paket aus VLAN v den Port: 'u' ungetaggt, 't' getaggt, null gar nicht */
+function egress(d,pid,v,t){const pv=pvlan(d,pid);if(!pv)return v?t:'u';
+  if(pv.m==='access')return !v||pv.v===v?'u':null;
+  if(pv.nat&&(!v||pv.nat===v))return 'u';return v&&pv.tag.includes(v)?'t':null}
+/* wie wird es am Port der Gegenseite angenommen */
+function ingress(d,pid,v,t){const pv=pvlan(d,pid);if(!pv)return {v,t};
+  if(pv.m==='access')return t==='u'?{v:pv.v,t:'u'}:{drop:'tagged',pv};
+  if(t==='u')return pv.nat?{v:pv.nat,t:'u'}:{drop:'nonative',pv};
+  return pv.tag.includes(v)?{v,t:'t'}:{drop:'notag',pv}}
+function egMsg(d,pid,v){const pv=pvlan(d,pid),pn=`${pname(d,pid)} von „${d.name}“`;if(pv&&pv.m==='access')return `${vnm(v)} kommt an ${pn} nicht raus – der Port ist Access-Port in ${vnm(pv.v)}`;if(!v)return `Trunk an ${pn} hat kein Native VLAN – ungetaggte Pakete werden verworfen`;return `${vnm(v)} ist auf dem Trunk an ${pn} nicht erlaubt`}
+function dropMsg(r,Y,pid,v){const pn=`${pname(Y,pid)} von „${Y.name}“`;
+  if(r.drop==='tagged')return `${pn} ist Access-Port in ${vnm(r.pv.v)} und verwirft getaggte Pakete aus ${vnm(v)}`;
+  if(r.drop==='nonative')return `Trunk an ${pn} hat kein Native VLAN – ungetaggte Pakete werden verworfen`;
+  return `${vnm(v)} ist auf dem Trunk an ${pn} nicht erlaubt`}
+const pingNet=d=>{const n=ip2n(d.ip),vi=n!=null?ipVlan(n):null,vp=HVL.get(d.id)||null;return {n,vi,vp,v:vi?vi.id:vp||0}};
+/* Nimmt das Ziel das Paket an? */
+function pAccept(d,inP,v,t,vT){if(t==='t'&&!vlanPort(d,inP))return `„${d.name}“ bekommt ${vnm(v)} getaggt – der Switch-Port davor muss ein Access-Port sein`;
+  if(vT&&v&&v!==vT)return `„${d.name}“ ist in ${vnm(vT)} adressiert, das Paket kommt aber in ${vnm(v)} an`;return null}
+function pChain(Q,i){const L=[];for(;i>=0;i=Q[i].par)L.unshift(Q[i]);return L}
+/* Weg innerhalb eines VLANs: Breitensuche über (Gerät, VLAN, getaggt) */
+function l2Search(S,v0,isT){const Q=[{d:S,v:v0,t:'u',inP:null,par:-1,via:null}],seen=new Set([S.id+'|'+v0+'|u']);
+  for(let i=0;i<Q.length&&Q.length<20000;i++){const n=Q[i];
+    if(i>0&&isT(n))return pChain(Q,i);
+    if(i>0&&!isL2(n.d))continue;
+    for(const p of lay(n.d).ports){if(p.id===n.inP||isPas(p.type)||(isL3(n.d)&&isWan(n.d,p.id)))continue;const t2=egress(n.d,p.id,n.v,n.t);if(!t2)continue;
+      const L=pLink(n.d,p.id);if(!L||!L.far)continue;const Y=dev(L.far.d);if(!Y||isPas(ptype(L.far.p))||linkDown(n.d,p.id,L))continue;
+      const r=ingress(Y,L.far.p,n.v,t2);if(r.drop||(n.v&&r.v&&r.v!==n.v))continue;
+      const nv=n.v||r.v||0,k=Y.id+'|'+nv+'|'+r.t;if(seen.has(k))continue;seen.add(k);
+      Q.push({d:Y,v:nv,t:r.t,inP:L.far.p,par:i,via:{L,outP:p.id,t:t2}})}}
+  return null}
+/* nur Kabel und Switches, ohne VLAN und Link – dient dazu, die Stelle zu finden, an der es hakt */
+function physSearch(S,T){const Q=[{d:S,inP:null,par:-1,via:null}],seen=new Set([S.id]);
+  for(let i=0;i<Q.length;i++){const n=Q[i];if(i>0&&n.d.id===T.id)return pChain(Q,i);if(i>0&&!isL2(n.d))continue;
+    for(const p of lay(n.d).ports){if(p.id===n.inP||isPas(p.type)||(isL3(n.d)&&isWan(n.d,p.id)))continue;const L=pLink(n.d,p.id);if(!L||!L.far)continue;const Y=dev(L.far.d);
+      if(!Y||isPas(ptype(L.far.p))||seen.has(Y.id))continue;seen.add(Y.id);Q.push({d:Y,inP:L.far.p,par:i,via:{L,outP:p.id}})}}
+  return null}
+function toSeq(P){const seq=[];P.forEach((n,i)=>{const nx=P[i+1];if(n.via)seq.push({k:'link',L:n.via.L,outP:n.via.outP,inP:n.inP,t:n.via.t,v:n.v});seq.push({k:'dev',d:n.d,inP:n.inP,outP:nx?nx.via.outP:null,v:n.v})});return seq}
+/* eine Strecke S → T innerhalb eines VLANs; klappt es nicht, wird der Kabelweg nachgespielt, um die Ursache zu finden */
+function l2Leg(S,T,v0,vT){
+  const P=l2Search(S,v0,n=>n.d.id===T.id&&!pAccept(n.d,n.inP,n.v,n.t,vT));
+  if(P)return {seq:toSeq(P)};
+  const pp=physSearch(S,T);
+  if(!pp){const own=lay(S).ports.filter(p=>!isPas(p.type)&&cabOf(S.id,p.id,'f'));
+    if(!own.length)return {seq:[{k:'dev',d:S,inP:null,outP:null,v:v0}],fail:{i:0,pos:'in',msg:`„${S.name}“ ist nicht verkabelt`}};
+    const open=own.map(p=>pLink(S,p.id)).find(L=>L&&(!L.far||isPas(ptype(L.far.p))));
+    if(open&&own.length===1){const e=open.far||open.st[open.st.length-1].to;return {seq:[{k:'dev',d:S,inP:null,outP:own[0].id,v:v0},{k:'link',L:open,outP:own[0].id,inP:null,t:'u',v:v0,open:1}],fail:{i:1,pos:'end',msg:`Die Strecke endet an ${pfull(e)} – dort ist nichts weiter gesteckt`}}}
+    return {seq:[{k:'dev',d:S,inP:null,outP:null,v:v0}],fail:{i:0,pos:'in',msg:`Kein Kabelweg von „${S.name}“ zu „${T.name}“ – auch nicht über Switches`}}}
+  let v=v0,t='u';const seq=[];
+  for(let i=0;i<pp.length;i++){const n=pp[i],nx=pp[i+1];seq.push({k:'dev',d:n.d,inP:n.inP,outP:nx?nx.via.outP:null,v});const di=seq.length-1;
+    if(!nx)return {seq,fail:{i:di,pos:'in',msg:pAccept(n.d,n.inP,v,t,vT)||`„${n.d.name}“ antwortet nicht`}};
+    const o=nx.via.outP,t2=egress(n.d,o,v,t);
+    if(!t2)return {seq,fail:{i:di,pos:'out',msg:egMsg(n.d,o,v)}};
+    const L=nx.via.L,dn=linkDown(n.d,o,L);seq.push({k:'link',L,outP:o,inP:nx.inP,t:t2,v});
+    if(dn)return {seq,fail:{i:seq.length-1,pos:'start',msg:dn}};
+    const r=ingress(nx.d,nx.inP,v,t2);
+    if(r.drop)return {seq,fail:{i:seq.length-1,pos:'end',msg:dropMsg(r,nx.d,nx.inP,v)}};
+    if(v&&r.v&&r.v!==v)return {seq,fail:{i:seq.length-1,pos:'end',msg:`VLAN passt nicht: Das Paket aus ${vnm(v)} landet an ${pname(nx.d,nx.inP)} von „${nx.d.name}“ in ${vnm(r.v)}`}};
+    v=v||r.v||0;t=r.t}
+  return {seq,fail:{i:seq.length-1,pos:'in',msg:`„${T.name}“ ist nicht erreichbar`}}}
+/* hat der Router ein Bein im Ziel-VLAN? */
+function gwHas(G,v){const V=vlanOf(v),S=vnet(V),n=ip2n(G.ip);if(S&&inNet(n,S))return true;let cfg=false;
+  for(const p of lay(G).ports){if(isPas(p.type))continue;const pv=pvlan(G,p.id);if(!pv)continue;cfg=true;if(pv.m==='access'?pv.v===v:(pv.nat===v||pv.tag.includes(v)))return true}
+  return !cfg}
+function runPing(S,D){
+  const R={S,D,ok:false,seq:[],notes:[],fail:null,ttl:64,G:null,kind:'timeout'};
+  const stop=(msg,kind)=>{R.fail={i:-1,msg};R.kind=kind||'error';return R};
+  if(S.id===D.id)return stop('Quelle und Ziel sind dasselbe Gerät');
+  const a=pingNet(S),b=pingNet(D);
+  if(a.n==null)return stop(S.ip?`„${S.name}“: „${S.ip}“ ist keine gültige IPv4-Adresse`:`„${S.name}“ hat keine IP-Adresse – trag oben eine ein`,'noip');
+  if(b.n==null)return stop(D.ip?`„${D.name}“: „${D.ip}“ ist keine gültige IPv4-Adresse`:`„${D.name}“ hat keine IP-Adresse`,'noip');
+  if(a.n===b.n)return stop(`„${S.name}“ und „${D.name}“ haben dieselbe IP-Adresse ${S.ip}`);
+  const ib=IPI&&IPI.get(D.id),ia=IPI&&IPI.get(S.id);
+  if(ib&&ib.dup)R.notes.push(`${D.ip} ist mehrfach vergeben – die Antwort kann von einem anderen Gerät kommen`);
+  if(ia&&ia.wrong&&a.vp&&!a.vi)R.notes.push(`Die IP von „${S.name}“ passt nicht zum Subnetz von ${vnm(a.vp)}`);
+  const join=(A,B,extra)=>{const s=A.seq.slice(0,-1),g={...A.seq[A.seq.length-1],...extra,outP:B.seq[0].outP};return [...s,g,...B.seq.slice(1)]};
+  const routed=a.vi&&b.vi?a.vi.id!==b.vi.id:!!(a.v&&b.v&&a.v!==b.v);
+  if(!routed){const L=l2Leg(S,D,a.v,b.v);R.seq=L.seq;if(L.fail){R.fail=L.fail;return R}R.ok=true;return R}
+  /* anderes Netz: erst zum Gateway, dort ins Ziel-VLAN routen */
+  const VS=a.vi||vlanOf(a.v),VD=b.vi||vlanOf(b.v),gw=VS&&VS.gw,gn=ip2n(gw);
+  let G=null;
+  if(isL3(S)&&gwHas(S,b.v))G=S;
+  else{
+    if(!gw||gn==null)return stop(`${vnm(a.v)} hat kein Gateway eingetragen – ohne Gateway kommt „${S.name}“ nicht in ${vnm(b.v)}`,'nogw');
+    G=state.devices.find(x=>x.id!==S.id&&ip2n(x.ip)===gn)||null;
+    if(!G){const f=l2Search(S,a.v,n=>isL3(n.d)&&!pAccept(n.d,n.inP,n.v,n.t,0));
+      if(f){G=f[f.length-1].d;R.notes.push(`Gateway ${gw} ist keinem Gerät im Plan zugeordnet – angenommen: „${G.name}“ (in ${vnm(a.v)} erreichbar)`)}
+      else return stop(`Gateway ${gw} von ${vnm(a.v)} gehört zu keinem Gerät im Plan, und kein Router oder keine Firewall ist dort erreichbar`,'nogw')}}
+  R.G=G;R.ttl=63;
+  const L1=G===S?{seq:[{k:'dev',d:S,inP:null,outP:null,v:a.v}]}:l2Leg(S,G,a.v,a.v);if(G===S)R.ttl=64;
+  if(L1.fail){R.seq=L1.seq;R.fail={...L1.fail,msg:L1.fail.msg+(L1.fail.i===L1.seq.length-1&&L1.seq[L1.fail.i].d===G?'':` (auf dem Weg zum Gateway „${G.name}“)`)};return R}
+  if(G===D){R.seq=L1.seq;R.seq[R.seq.length-1]={...R.seq[R.seq.length-1],role:'gw'};R.ok=true;R.ttl=64;return R}
+  if(!gwHas(G,b.v)){R.seq=L1.seq;const i=R.seq.length-1;R.seq[i]={...R.seq[i],role:'gw',v2:b.v};R.fail={i,pos:'in',msg:`„${G.name}“ hat keinen Port in ${vnm(b.v)} – Zielnetz nicht erreichbar`};R.kind='unreach';return R}
+  const L2=l2Leg(G,D,b.v,b.v);
+  R.seq=join(L1,L2,G===S?{v2:b.v}:{role:'gw',v2:b.v});
+  if(L2.fail){R.fail={...L2.fail,i:L2.fail.i+L1.seq.length-1};return R}
+  if(VD&&VD.gw&&ip2n(VD.gw)!=null){const G2=state.devices.find(x=>ip2n(x.ip)===ip2n(VD.gw));if(G2&&G2.id!==G.id)R.notes.push(`Die Antwort ginge eigentlich über „${G2.name}“ (Gateway von ${vnm(b.v)}) – hier wird derselbe Weg zurück angenommen`)}
+  R.ok=true;return R}
+/* ---------- Anzeige im Inspektor ---------- */
+function pingTargets(d){const L=state.devices.filter(x=>x.id!==d.id&&canPing(x));const g=new Map();for(const x of L){if(!g.has(x.kind))g.set(x.kind,[]);g.get(x.kind).push(x)}
+  const ord=['host','server','ap','switch','fw','net','ups','pdu'];return ord.filter(k=>g.has(k)).map(k=>[k,g.get(k).sort((a,b)=>a.name.localeCompare(b.name,LOC))])}
+function seqHTML(R){
+  const vb=v=>v?`<b class="vt" style="--vc:${vcol(v)}" translate="no">${esc(vnm(v))}</b>`:'';
+  const pio=(d,p,lbl)=>{if(!p)return '';const pv=pvlan(d,p);return `<span class="io"><span>${lbl}</span> <span>${esc(pname(d,p))}</span>${pv?` <span class="mute">${esc(pv.m==='access'?'Access '+vshort(pv.v):vlanTxt(pv))}</span>`:''}</span>`};
+  let h='',n=0;
+  R.seq.forEach((it,i)=>{const bad=R.fail&&R.fail.i===i;
+    if(it.k==='dev'){n++;const d=it.d,role=it.role==='gw'?'gw':i===0?'src':i===R.seq.length-1&&R.ok?'dst':'';
+      const what=role==='src'?`<small><span>sendet ICMP Echo Request</span> ${vb(it.v)}</small>`:role==='gw'?`<small><span>routet als Gateway</span> ${vb(it.v)} → ${vb(it.v2||it.v)}</small>`:role==='dst'?`<small>antwortet mit ICMP Echo Reply</small>`:isL2(d)?`<small><span>leitet weiter</span> ${vb(it.v)}</small>`:'';
+      const io=pio(d,it.inP,'Eingang')+pio(d,it.outP,'Ausgang');
+      h+=`<li class="hd${bad?' bad':''}${role?' '+role:''}"><i>${bad?'!':n}</i><div><button type="button" class="link" data-act="seldev" data-id="${d.id}">${esc(d.name)}</button>${d.ip?` <small class="ip" translate="no">${esc(d.ip)}</small>`:''}${what}${io?`<small class="ios">${io}</small>`:''}${bad?`<em>${esc(R.fail.msg)}</em>`:''}</div></li>`}
+    else{const cs=it.L.st.map(s=>`<button type="button" class="link" data-act="selcab" data-id="${s.c.id}">${esc(s.c.label||'(Kabel)')}</button>`),via=it.L.st.slice(0,-1).map(s=>{const pd=dev(s.to.d);return `<span translate="no">${esc(pd.name)} ${esc(pconf(pd,s.to.p).label||pname(pd,s.to.p))}</span>`});
+      h+=`<li class="hc${bad?' bad':''}"><div><small>${cs.join(' → ')}${via.length?` <span>über</span> ${via.join(', ')}`:''}${it.t==='t'?' <span class="mute">getaggt</span>':''}</small>${bad?`<em>${esc(R.fail.msg)}</em>`:''}</div></li>`}});
+  return `<ol class="hops">${h}</ol>`}
+function pingCon(R){const ip=R.D.ip,E=EN,L=[];if(R.kind==='noip'&&!R.S.ip)return '';
+  L.push(`C:\\> ping ${ip}`,'',E?`Pinging ${ip} with 32 bytes of data:`:`Ping wird ausgeführt für ${ip} mit 32 Bytes Daten:`);
+  const gwIp=R.G&&R.G.ip||'';let rec=0;
+  for(let i=0;i<4;i++){if(R.ok){L.push(E?`Reply from ${ip}: bytes=32 time<1ms TTL=${R.ttl}`:`Antwort von ${ip}: Bytes=32 Zeit<1ms TTL=${R.ttl}`);rec++}
+    else if(R.kind==='unreach'){L.push(E?`Reply from ${gwIp||R.G.name}: Destination net unreachable.`:`Antwort von ${gwIp||R.G.name}: Zielnetz nicht erreichbar.`);rec++}
+    else if(R.kind==='nogw'||R.kind==='error'){L.push(E?'General failure.':'Allgemeiner Fehler.')}
+    else L.push(E?'Request timed out.':'Zeitüberschreitung der Anforderung.')}
+  const lost=4-rec;L.push('',E?`Ping statistics for ${ip}:`:`Ping-Statistik für ${ip}:`,E?`    Packets: Sent = 4, Received = ${rec}, Lost = ${lost} (${lost*25}% loss),`:`    Pakete: Gesendet = 4, Empfangen = ${rec}, Verloren = ${lost} (${lost*25}% Verlust),`);
+  return `<pre class="pcon" translate="no">${esc(L.join('\n'))}</pre>`}
+function pingHTML(d){if(!canPing(d))return '';
+  const T=pingTargets(d),cur=SIM.pick[d.id]||(SIM.src===d.id?SIM.dst:'')||'';
+  let h=`<h3>Verbindungstest</h3><div class="pingf">${fld('f-ping','Ping an',`<select id="f-ping"><option value="">Ziel wählen …</option>${T.map(([k,L])=>`<optgroup label="${esc(KINDP[k]||KIND[k].n)}">${L.map(x=>`<option value="${x.id}"${x.id===cur?' selected':''}${x.ip?'':' disabled'}>${esc(x.name)} – ${x.ip?esc(x.ip):'keine IP'}</option>`).join('')}</optgroup>`).join('')}</select>`)}<button type="button" class="btn pri" data-act="ping"${cur?'':' disabled'}>Ping senden</button></div>`;
+  const R=SIM.src===d.id&&SIM.res;
+  if(R&&SIM.anim)return h+`<div class="pres run"><b>Paket unterwegs …</b><span><span translate="no">${esc(R.S.name)} → ${esc(R.D.name)}</span></span></div>`;
+  if(!R)return h+`<p class="note">Schickt ein simuliertes Ping-Paket los und zeigt im Plan, über welche Kabel, Patchpanels, Switches und Gateways es läuft – und wo es hängen bleibt.${d.ip?'':' Dafür braucht das Gerät eine IP-Adresse.'}</p>`;
+  const mid=new Set(R.seq.filter(x=>x.k==='dev'&&x.d!==R.S&&x.d!==R.D).map(x=>x.d.id)).size;
+  h+=`<div class="pres ${R.ok?'ok':'bad'}"><b>${R.ok?'Ping erfolgreich':R.kind==='unreach'?'Zielnetz nicht erreichbar':'Ping fehlgeschlagen'}</b>${R.ok?`<span><span translate="no">${esc(R.S.name)} → ${esc(R.D.name)}</span></span><span>${mid>0?'über '+pl(mid,'Gerät','Geräte'):'direkt verbunden'}</span>${R.G&&R.G!==R.S?`<span>geroutet über „${esc(R.G.name)}“</span>`:''}`:`<span>${esc(R.fail.msg)}</span>`}</div>`;
+  if(R.seq.length)h+=seqHTML(R);
+  if(R.notes.length)h+=`<ul class="pnotes">${R.notes.map(t=>`<li>${esc(t)}</li>`).join('')}</ul>`;
+  h+=pingCon(R);
+  h+=`<div class="row"><button type="button" class="btn" data-act="ping">Erneut senden</button><button type="button" class="btn" data-act="pingx">Pfad ausblenden</button></div><p class="note">Simuliert anhand der Doku: Kabel, Link, Port-Status, VLANs und Gateways. Firewall-Regeln und Routing-Tabellen werden nicht geprüft.</p>`;
+  return h}
+/* ---------- Anzeige im Plan ---------- */
+function simStart(src,dst){const S=dev(src),D=dev(dst);if(!S||!D)return;SIM.src=src;SIM.dst=dst;SIM.pick[src]=dst;SIM.res=runPing(S,D);
+  if(mode!=='plan')setMode('plan');
+  const reduce=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches,go=!reduce&&SIM.res.seq.length>1;cancelAnimationFrame(SIM.raf);SIM.anim=go?{}:null;
+  renderInsp();renderSim();simShow();if(go)simAnim();else simDone()}
+function simClear(){cancelAnimationFrame(SIM.raf);SIM.anim=null;SIM.src=SIM.dst=SIM.res=null;renderSim();if(sel&&sel.kind==='dev')renderInsp()}
+/* Punkte, an denen das Paket entlangläuft; t = Zeit in ms */
+function simPts(R){const pts=[],P=(d,p)=>{const e=endPos({d:d.id,p});return {x:e.x,y:e.y}},add=(q,dw)=>{pts.push({x:q.x,y:q.y,dw:dw||0})};
+  const F=R.fail,last=F&&F.i>=0?F.i:R.seq.length-1;
+  for(let i=0;i<=last&&i<R.seq.length;i++){const it=R.seq[i];
+    if(it.k==='dev'){if(it.inP)add(P(it.d,it.inP),i===last?0:220);if(it.outP&&!(F&&F.i===i&&F.pos==='in'))add(P(it.d,it.outP),it.inP?0:160)}
+    else{if(F&&F.i===i&&F.pos==='start')break;
+      it.L.st.forEach((s,j)=>{const rt=RTC&&RTC.get(s.c.id);if(!rt)return;const fw=s.c.a.d===s.from.d&&s.c.a.p===s.from.p&&(s.c.a.s||'f')===(s.from.s||'f');
+        for(let k=0;k<=20;k++){const q=rt.at(fw?k/20:1-k/20);add(q)}if(j<it.L.st.length-1)pts[pts.length-1].dw=120})}}
+  let T=0;for(let i=0;i<pts.length;i++){if(i)T+=Math.hypot(pts[i].x-pts[i-1].x,pts[i].y-pts[i-1].y)/0.9;pts[i].t=T;T+=pts[i].dw}
+  return {pts,T}}
+function simAt(S,t){const p=S.pts;if(!p.length)return null;if(t<=0)return p[0];for(let i=1;i<p.length;i++){const a=p[i-1],b=p[i],ta=a.t+a.dw;if(t<a.t+a.dw)return a;if(t<=b.t){const f=b.t>ta?(t-ta)/(b.t-ta):1;return {x:a.x+(b.x-a.x)*f,y:a.y+(b.y-a.y)*f}}}return p[p.length-1]}
+function simAnim(){cancelAnimationFrame(SIM.raf);const R=SIM.res,S=simPts(R);if(S.pts.length<2){simDone();return}
+  const k=S.T>2800?2800/S.T:S.T<1100?1100/S.T:1,dur=S.T*k,back=R.ok,t0=performance.now();SIM.anim={S,k,dur,back,t0};
+  const step=now=>{if(!SIM.anim||SIM.res!==R)return;const el=(now-t0),g=$('#simpk');let p=null,rep=false;
+    if(el<=dur)p=simAt(S,el/k);else if(back&&el<=dur*2+250){rep=true;p=simAt(S,Math.max(0,S.T-(el-dur-250)/k))}else{simDone();return}
+    if(g&&p){const z=clamp(1/view.z,.8,3.5);g.setAttribute('transform',`translate(${p.x.toFixed(1)} ${p.y.toFixed(1)}) scale(${z.toFixed(3)})`);g.setAttribute('class','simpk'+(rep?' rep':''));g.style.display=''}
+    SIM.raf=requestAnimationFrame(step)};
+  SIM.raf=requestAnimationFrame(step)}
+function simDone(){cancelAnimationFrame(SIM.raf);const was=!!SIM.anim;SIM.anim=null;const g=$('#simpk');if(g)g.style.display='none';renderSim();if(was&&sel&&sel.kind==='dev'&&sel.id===SIM.src){const a=document.activeElement,f=a&&a.id;renderInsp();if(f==='f-ping'){const e=$('#f-ping');e&&e.focus()}}}
+function simShow(){/* den Weg ins Bild holen, falls er nicht zu sehen ist */const R=SIM.res;if(!R||!R.seq.length)return;const r=stage.getBoundingClientRect();if(!r.width)return;
+  let x1=1e9,y1=1e9,x2=-1e9,y2=-1e9;const inc=(x,y)=>{x1=Math.min(x1,x);y1=Math.min(y1,y);x2=Math.max(x2,x);y2=Math.max(y2,y)};
+  for(const it of R.seq){if(it.k==='dev'){const L=lay(it.d);inc(it.d.x,it.d.y);inc(it.d.x+L.W,it.d.y+L.H)}else for(const s of it.L.st){const rt=RTC&&RTC.get(s.c.id);if(rt)for(let t=0;t<=1;t+=.25){const q=rt.at(t);inc(q.x,q.y)}}}
+  const sx=v=>v*view.z+view.x,sy=v=>v*view.z+view.y;if(sx(x1)>=0&&sy(y1)>=0&&sx(x2)<=r.width&&sy(y2)<=r.height-40)return;
+  const pad=60,bw=x2-x1,bh=y2-y1,z=clamp(Math.min((r.width-pad*2)/bw,(r.height-pad*2-50)/bh),.08,1.1);view.z=z;view.x=(r.width-bw*z)/2-x1*z;view.y=(r.height-50-bh*z)/2-y1*z;applyView()}
+function simScale(){const z=clamp(1/view.z,.8,3.5).toFixed(3);for(const e of document.querySelectorAll('#l-sim .sk'))e.setAttribute('transform',`translate(${e.dataset.x} ${e.dataset.y}) scale(${z})`)}
+function renderSim(){const g=$('#l-sim'),bar=$('#simbar');if(!g)return;
+  if(SIM.src&&(!dev(SIM.src)||!dev(SIM.dst))){SIM.src=SIM.dst=SIM.res=null}
+  if(SIM.src&&!SIM.anim)SIM.res=runPing(dev(SIM.src),dev(SIM.dst));
+  const R=SIM.res;if(!R||mode!=='plan'){g.innerHTML='';if(bar){bar.hidden=true;bar.innerHTML=''}return}
+  const F=R.fail,last=F&&F.i>=0?F.i:R.seq.length-1,col=R.ok&&!SIM.anim?'#16a34a':'#2563eb',bd=new Map();let s='',n=0;
+  R.seq.forEach((it,i)=>{const bad=F&&F.i===i,c=bad?'#dc2626':i>last?'#94a3b8':col;
+    if(it.k==='link'){for(const st of it.L.st){if(HID.has(st.c.a.d)||HID.has(st.c.b.d))continue;const rt=RTC&&RTC.get(st.c.id);if(!rt)continue;s+=`<path d="${rt.d}" fill="none" stroke="${c}" stroke-opacity=".28" stroke-width="18" stroke-linecap="round"/><path class="simflow" d="${rt.d}" fill="none" stroke="${c}" stroke-width="3.2" stroke-linecap="round"/>`}}
+    else{n++;const d=it.d;if(HID.has(d.id))return;const L=lay(d);if(!bd.has(d.id)){bd.set(d.id,{d,l:[],c});s+=`<rect x="${d.x-6}" y="${d.y-6}" width="${L.W+12}" height="${L.H+12}" rx="10" fill="none" stroke="${c}" stroke-width="4"${bad?'':' stroke-dasharray="12 7"'}/>`}const B=bd.get(d.id);B.l.push(bad?'!':n);if(bad)B.c=c}});
+  let badges='';for(const {d,l,c} of bd.values()){const t=l.join(' · '),w=Math.max(30,t.length*8.6+14);badges+=`<g class="sk" data-x="${d.x-6}" data-y="${d.y-6}"><rect x="${-w/2}" y="-15" width="${w}" height="30" rx="15" fill="${c}" stroke="#fff" stroke-width="3"/><text y="5.5" text-anchor="middle" font-size="15" font-weight="700" fill="#fff">${t}</text></g>`}
+  if(F&&F.i>=0&&!SIM.anim){const S=simPts(R),p=S.pts[S.pts.length-1]||(()=>{const it=R.seq[F.i];if(it.k==='dev'){const L=lay(it.d);return {x:it.d.x+L.W/2,y:it.d.y+L.H/2}}return null})();
+    if(p){s+=`<g class="sk" data-x="${p.x.toFixed(1)}" data-y="${p.y.toFixed(1)}"><circle r="17" fill="#dc2626" stroke="#fff" stroke-width="3"/><path d="M-7 -7L7 7M7 -7L-7 7" stroke="#fff" stroke-width="4" stroke-linecap="round"/></g>`}}
+  s+=badges+`<g id="simpk" class="simpk" style="display:${SIM.anim?'':'none'}"><circle r="20" class="halo"/><rect x="-14" y="-10" width="28" height="20" rx="3" class="env"/><path d="M-14 -9L0 2L14 -9" fill="none" class="flap"/></g>`;
+  g.innerHTML=s;simScale();
+  if(bar){const S=R.S,D=R.D,run=!!SIM.anim;bar.hidden=false;bar.className='simbar '+(run?'run':R.ok?'ok':'bad');
+    bar.innerHTML=`<span class="st">${run?'':R.ok?'✓':'✕'}</span><span class="tx"><span class="ln"><b>Ping</b> <button type="button" class="link" data-sim="src" translate="no">${esc(S.name)}</button> → <button type="button" class="link" data-sim="dst" translate="no">${esc(D.name)}</button></span><small${!run&&!R.ok?` title="${esc(R.fail.msg)}"`:''}>${run?'Paket unterwegs …':R.ok?(R.G&&R.G!==S?`geroutet über „${esc(R.G.name)}“`:'erfolgreich'):esc(R.fail.msg)}</small></span><button type="button" class="btn sm" data-sim="again">Erneut</button><button type="button" class="ib sm" data-sim="close" aria-label="Verbindungstest schließen" title="Schließen">×</button>`}}
+
+$('#simbar').addEventListener('click',e=>{const b=e.target.closest('[data-sim]');if(!b||!SIM.res)return;const k=b.dataset.sim;if(k==='close')simClear();else if(k==='again')simStart(SIM.src,SIM.dst);else{const id=k==='src'?SIM.src:SIM.dst;select({kind:'dev',id});centerOn(dev(id))}});
+
 /* ================= start ================= */
 function start(hot){
   let s=null;
@@ -2517,7 +2767,7 @@ function start(hot){
   let last=null;try{last=localStorage.getItem(LSC)}catch(_){}
   if(!s&&last&&last!=='demo'){s=loadLocal(last);if(s)PL.cur=last}
   if(!s){s=sanitize(demo());s.demo=true;PL.cur='demo'}
-  state=s;
+  state=s;auReset();
   $('#defs').innerHTML=defsSVG();renderLegend();buildMenu();setSave('boot');
   if(innerWidth<=760){$('#insp').classList.add('min');$('#itog').setAttribute('aria-expanded','false')}
   renderAll();

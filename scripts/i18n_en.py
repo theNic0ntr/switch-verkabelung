@@ -382,6 +382,40 @@ EN.update({"{x}-Stil": "{x} style", "{n}″": "{n}″", "{n}/{n} × {n}″": "{n
 "{n} HE · {n} × {n}″ · {n} × SFP+": "{n} U · {n} × {n}″ · {n} × SFP+", "{n} HE · {n} × {n}″ · {n} × QSFP{n}": "{n} U · {n} × {n}″ · {n} × QSFP{n}", "{n} Gbit/s": "{n} Gbit/s", "{n} TB SSD": "{n} TB SSD", "{n} GB SSD": "{n} GB SSD"})
 EN.update({"{n} A": "{n} A", "SSD {n}″": "SSD {n}″", "HDD {n}″": "HDD {n}″", "· {n} TB": "· {n} TB", "· {n} GB": "· {n} GB", "{n} × {n}G": "{n} × {n}G", "{n} m": "{n} m", "{n},{n} m": "{n}.{n} m"})
 EN.update({"Eigenschaften": "Properties"})
+EN.update({
+"Angelegt von": "Created by", "Zuletzt bearbeitet von": "Last edited by", "seitdem nicht geändert": "not changed since", "Beispielplan": "Example plan", "Unbekannt": "Unknown", "Du": "You",
+"Verbindungstest": "Connection test", "Ping an": "Ping to", "Ziel wählen …": "Choose target …", "keine IP": "no IP", "Ping senden": "Send ping",
+"Schickt ein simuliertes Ping-Paket los und zeigt im Plan, über welche Kabel, Patchpanels, Switches und Gateways es läuft – und wo es hängen bleibt.": "Sends a simulated ping packet and shows on the plan which cables, patch panels, switches and gateways it passes – and where it gets stuck.",
+"Schickt ein simuliertes Ping-Paket los und zeigt im Plan, über welche Kabel, Patchpanels, Switches und Gateways es läuft – und wo es hängen bleibt. Dafür braucht das Gerät eine IP-Adresse.": "Sends a simulated ping packet and shows on the plan which cables, patch panels, switches and gateways it passes – and where it gets stuck. The device needs an IP address for this.",
+"Paket unterwegs …": "Packet on its way …", "Ping erfolgreich": "Ping successful", "Zielnetz nicht erreichbar": "Destination network unreachable", "Ping fehlgeschlagen": "Ping failed",
+"direkt verbunden": "directly connected", "geroutet über „{q}“": "routed via “{q}”", "Erneut senden": "Send again", "Pfad ausblenden": "Hide path", "Erneut": "Again", "erfolgreich": "successful",
+"Verbindungstest schließen": "Close connection test",
+"Simuliert anhand der Doku: Kabel, Link, Port-Status, VLANs und Gateways. Firewall-Regeln und Routing-Tabellen werden nicht geprüft.": "Simulated from the documentation: cables, link, port status, VLANs and gateways. Firewall rules and routing tables are not checked.",
+"sendet ICMP Echo Request": "sends ICMP echo request", "routet als Gateway": "routes as gateway", "antwortet mit ICMP Echo Reply": "replies with ICMP echo reply", "leitet weiter": "forwards",
+"Eingang": "In", "Ausgang": "Out", "über": "via", "Access {n}": "Access {n}", "getaggt": "tagged", "(Kabel)": "(cable)", "Ungetaggter Verkehr": "Untagged traffic",
+"{x} an „{q}“ ist deaktiviert": "{x} on “{q}” is disabled", "Kein Link: {x}": "No link: {x}",
+"{x} von „{q}“ ist Access-Port in {x} und verwirft getaggte Pakete aus {x}": "{x} on “{q}” is an access port in {x} and drops tagged packets from {x}",
+"Trunk an {x} von „{q}“ hat kein Native VLAN – ungetaggte Pakete werden verworfen": "The trunk on {x} of “{q}” has no native VLAN – untagged packets are dropped",
+"{x} ist auf dem Trunk an {x} von „{q}“ nicht erlaubt": "{x} is not allowed on the trunk on {x} of “{q}”",
+"{x} kommt an {x} von „{q}“ nicht raus – der Port ist Access-Port in {x}": "{x} can't leave through {x} of “{q}” – the port is an access port in {x}",
+"„{q}“ bekommt {x} getaggt – der Switch-Port davor muss ein Access-Port sein": "“{q}” receives {x} tagged – the switch port in front of it must be an access port",
+"„{q}“ ist in {x} adressiert, das Paket kommt aber in {x} an": "“{q}” is addressed in {x}, but the packet arrives in {x}",
+"„{q}“ ist nicht verkabelt": "“{q}” is not cabled", "Die Strecke endet an {x} – dort ist nichts weiter gesteckt": "The run ends at {x} – nothing else is plugged in there",
+"Kein Kabelweg von „{q}“ zu „{q}“ – auch nicht über Switches": "No cable path from “{q}” to “{q}” – not even via switches", "„{q}“ antwortet nicht": "“{q}” does not respond",
+"VLAN passt nicht: Das Paket aus {x} landet an {x} von „{q}“ in {x}": "VLAN mismatch: the packet from {x} arrives at {x} of “{q}” in {x}",
+"„{q}“ ist nicht erreichbar": "“{q}” is not reachable", "Quelle und Ziel sind dasselbe Gerät": "Source and target are the same device",
+"„{q}“: „{q}“ ist keine gültige IPv4-Adresse": "“{q}”: “{q}” is not a valid IPv4 address",
+"„{q}“ hat keine IP-Adresse – trag oben eine ein": "“{q}” has no IP address – enter one above", "„{q}“ hat keine IP-Adresse": "“{q}” has no IP address",
+"„{q}“ und „{q}“ haben dieselbe IP-Adresse {n}": "“{q}” and “{q}” have the same IP address {n}",
+"{n} ist mehrfach vergeben – die Antwort kann von einem anderen Gerät kommen": "{n} is assigned more than once – the reply may come from another device",
+"Die IP von „{q}“ passt nicht zum Subnetz von {x}": "The IP of “{q}” doesn't match the subnet of {x}",
+"{x} hat kein Gateway eingetragen – ohne Gateway kommt „{q}“ nicht in {x}": "{x} has no gateway – without a gateway “{q}” can't reach {x}",
+"Gateway {x} ist keinem Gerät im Plan zugeordnet – angenommen: „{q}“ (in {x} erreichbar)": "Gateway {x} isn't assigned to any device in the plan – assuming “{q}” (reachable in {x})",
+"Gateway {x} von {x} gehört zu keinem Gerät im Plan, und kein Router oder keine Firewall ist dort erreichbar": "Gateway {x} of {x} doesn't belong to any device in the plan, and no router or firewall is reachable there",
+"{x} (auf dem Weg zum Gateway „{q}“)": "{x} (on the way to gateway “{q}”)",
+"„{q}“ hat keinen Port in {x} – Zielnetz nicht erreichbar": "“{q}” has no port in {x} – destination network unreachable",
+"Die Antwort ginge eigentlich über „{q}“ (Gateway von {x}) – hier wird derselbe Weg zurück angenommen": "The reply would actually go via “{q}” (gateway of {x}) – the same way back is assumed here"
+})
 import json, os
 root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 out = '/* Englische Übersetzung – erzeugt aus scripts/i18n_en.py, nicht von Hand ändern. */\nwindow.I18N_EN=' + json.dumps(EN, ensure_ascii=False, separators=(',', ':')) + ';\n'

@@ -25,10 +25,14 @@ Netzwerk-Verkabelung im Browser planen und dokumentieren. Switches, Firewalls, P
 - **Deutsch und Englisch:** Der Knopf **DE/EN** oben rechts schaltet die Sprache um. Übersetzt werden Oberfläche, Hinweise, Listen, CSV, PDF-Dokumentation und Etiketten; eigene Namen von Geräten, Räumen oder Plänen bleiben, wie sie sind. Beim ersten Aufruf richtet sich die Sprache nach dem Browser. Die Übersetzungen stehen in `scripts/i18n_en.py`, daraus erzeugt `python3 scripts/i18n_en.py` die Datei `src/i18n-en.js`.
 - **Mehrere Pläne:** Oben links wählst du den Plan, legst neue an, benennst um, duplizierst oder löschst. Das mitgelieferte Beispiel bleibt immer als Tutorial erhalten: Darin kannst du alles ausprobieren, gespeichert wird nichts. Mit „Beispiel als eigenen Plan speichern“ wird daraus ein echter Plan. Im Menü siehst du, wer gerade in welchem Plan arbeitet. Ein Link mit `?plan=<id>` öffnet direkt einen bestimmten Plan, die QR-Codes auf Etiketten enthalten ihn automatisch.
 - **Live zusammenarbeiten:** Jede Änderung wird sofort gespeichert und erscheint bei allen, die den Plan offen haben. Arbeiten zwei Leute gleichzeitig, werden ihre Änderungen je Gerät, Kabel und Feld zusammengeführt. Gleichzeitige Änderungen an verschiedenen Dingen gehen also nicht verloren; am selben Feld gilt die zuletzt gespeicherte. Oben rechts siehst du, wer gerade im Plan ist. Im Plan erscheinen ihre Mauszeiger mit Namen und Farbe, außerdem das Gerät, das jemand gerade verschiebt, als Umriss an der neuen Stelle, das Kabel, das jemand zieht, und was gerade ausgewählt ist. Rückgängig (Strg+Z) nimmt nur deine eigenen Schritte zurück.
+- **Verbindungstest (Ping):** Bei jedem Gerät mit IP-Adresse wählst du rechts unter „Verbindungstest“ ein Ziel. Ein simuliertes Ping-Paket läuft dann – ähnlich wie im Simulationsmodus von Cisco Packet Tracer – im Plan über Kabel, Patchpanels, Switches und das Gateway zum Ziel und als Antwort zurück. Die Liste daneben zeigt jede Station mit Ein- und Ausgangsport, VLAN (getaggt oder nicht) und Kabelnummern, dazu eine Ping-Ausgabe wie in der Eingabeaufforderung. Kommt das Paket nicht an, steht dort, wo und warum: Port deaktiviert, kein Link, VLAN auf dem Trunk nicht erlaubt, falsches Access-VLAN, kein Gateway eingetragen, Router ohne Port im Zielnetz oder eine offene Strecke am Patchpanel. Das Ergebnis aktualisiert sich, sobald du etwas korrigierst. Geprüft wird nur, was dokumentiert ist; Firewall-Regeln und Routing-Tabellen werden nicht nachgebildet, Ports ohne VLAN-Angabe gelten als transparent.
+- **Wer hat was angelegt und geändert:** Ganz unten in den Eigenschaften eines Geräts, Kabels, Schranks oder Raums steht, wer es angelegt und wer es zuletzt bearbeitet hat, mit Zeitpunkt. Auf dem Server ist das der Kontoname, ohne Anmeldung der Gastname (z. B. „Gast F03“) oder der Name, den man sich über das eigene Kürzel oben rechts gegeben hat. Verschieben zählt als Bearbeitung, das Mitwandern beim Verschieben eines Raums nicht; ein gestecktes oder gezogenes Kabel zählt bei beiden Geräten.
 
 ## Screenshots
 
 Alle Bilder zeigen das Beispielprojekt, das beim ersten Start geladen wird.
+
+![Verbindungstest: Ping vom PC Empfang zum Telefon. Der Weg über Patchpanel, Access-Switch, Core-Switch und Firewall ist grün markiert und nummeriert, rechts stehen alle Stationen mit Ports und VLANs](docs/screenshots/ping.png)
 
 <table>
 <tr>
@@ -41,7 +45,7 @@ Alle Bilder zeigen das Beispielprojekt, das beim ersten Start geladen wird.
 </tr>
 <tr>
 <td><img src="docs/screenshots/plaene.png" alt="Menü oben links mit mehreren Plänen, dem Beispiel als Tutorial und Aktionen wie Neuer Plan"><br><b>Mehrere Pläne:</b> oben links wechseln, anlegen, umbenennen, duplizieren oder löschen; das Beispiel bleibt als Tutorial.</td>
-<td></td>
+<td><img src="docs/screenshots/angelegt-bearbeitet.png" alt="Fußzeile in den Eigenschaften: angelegt von Beispielplan, zuletzt bearbeitet von Nico"><br><b>Angelegt und bearbeitet:</b> ganz unten in den Eigenschaften, mit Name und Zeitpunkt.</td>
 </tr>
 <tr>
 <td><img src="docs/screenshots/vlans-ips.png" alt="Liste der VLANs mit Subnetz und Belegung sowie aller IP-Adressen"><br><b>VLANs und IP-Adressen:</b> Subnetz, Gateway, Belegung und Prüfung jeder IP.</td>
