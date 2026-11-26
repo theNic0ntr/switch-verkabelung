@@ -416,6 +416,41 @@ EN.update({
 "„{q}“ hat keinen Port in {x} – Zielnetz nicht erreichbar": "“{q}” has no port in {x} – destination network unreachable",
 "Die Antwort ginge eigentlich über „{q}“ (Gateway von {x}) – hier wird derselbe Weg zurück angenommen": "The reply would actually go via “{q}” (gateway of {x}) – the same way back is assumed here"
 })
+EN.update({
+"Spanning Tree": "Spanning tree", "Spanning Tree (RSTP)": "Spanning tree (RSTP)", "RSTP": "RSTP", "Bridge-Priorität": "Bridge priority", "32768 (Standard)": "32768 (default)",
+"{n} (immer Root)": "{n} (always root)", "{n} (Core)": "{n} (core)", "{n} (zweiter Core)": "{n} (second core)",
+"Root-Port": "Root port", "Designated": "Designated", "Alternate": "Alternate", "Backup": "Backup", "Edge-Port": "Edge port", "Root-Bridge": "Root bridge", "Root": "Root", "Richtung": "towards",
+"Spanning Tree ist aus: Der Switch reicht BPDUs nur durch und fängt keine Schleife ab.": "Spanning tree is off: the switch only passes BPDUs through and doesn't catch any loop.",
+"Keine Verbindung zu einem anderen Switch mit RSTP – hier gibt es keinen Baum zu berechnen.": "No connection to another switch with RSTP – there is no tree to calculate here.",
+"Priorität {n}": "Priority {n}", "{n} Switch im Baum": "{n} switch in the tree", "{n} Switches im Baum": "{n} switches in the tree", "Root-Port: {x}": "Root port: {x}",
+"Pfadkosten {n}": "Path cost {n}", "{n} von {n} Hops": "{n} of {n} hops", "Rolle": "Role", "Zustand": "State", "Kosten": "Cost", "Gegenüber": "Peer", "Weiterleiten": "Forwarding", "Blockiert": "Discarding",
+"Kosten nach IEEE 802.1t (lang), * = am Port festgelegt. Max Age, Timer und Methode stellst du im Projekt ein (nichts auswählen).": "Cost per IEEE 802.1t (long), * = set on the port. Max Age, timers and method are set in the project (select nothing).",
+"Kosten nach IEEE 802.1D (kurz), * = am Port festgelegt. Max Age, Timer und Methode stellst du im Projekt ein (nichts auswählen).": "Cost per IEEE 802.1D (short), * = set on the port. Max Age, timers and method are set in the project (select nothing).",
+"Spanning Tree ist an diesem Switch aus.": "Spanning tree is off on this switch.", "Port ohne Link": "Port without link", "Kosten {n}": "Cost {n}", "Blockiert – leitet keine Daten weiter": "Discarding – does not forward data",
+"Port-Kosten": "Port cost", "automatisch: {n}": "automatic: {n}", "Rollen und Root im Plan zeigen": "Show roles and root in the plan", "Pfadkosten": "Path cost",
+"IEEE 802.1t (lang, Standard bei RSTP)": "IEEE 802.1t (long, default for RSTP)", "IEEE 802.1D (kurz, älter)": "IEEE 802.1D (short, older)", "Max Age (Hops)": "Max Age (hops)",
+"Noch keine Switches mit RSTP untereinander verbunden.": "No switches with RSTP connected to each other yet.",
+"weitester Switch {n} von {n} Hops": "farthest switch {n} of {n} hops", "Durchmesser {n}": "diameter {n}", "{n} Port blockiert:": "{n} port blocked:", "{n} Ports blockiert:": "{n} ports blocked:",
+"kein Port blockiert – keine Schleife": "no port blocked – no loop", "Schleife ohne Spanning Tree": "Loop without spanning tree",
+"Max Age ist bei RSTP das Hop-Budget: so viele Switches darf ein Switch höchstens von der Root entfernt sein. Die Timer müssen 2 × (Forward Delay − 1) ≥ Max Age ≥ 2 × (Hello + 1) erfüllen.": "With RSTP, Max Age is the hop budget: a switch may be at most this many switches away from the root. The timers must satisfy 2 × (Forward Delay − 1) ≥ Max Age ≥ 2 × (Hello + 1).",
+"{n} Hop": "{n} hop", "{n} Hops": "{n} hops",
+"„{q}“ ist {n} Hops von der Root-Bridge „{q}“ entfernt – mehr als Max Age ({n}) erlaubt, die BPDUs verfallen": "“{q}” is {n} hops away from the root bridge “{q}” – more than Max Age ({n}) allows, the BPDUs expire",
+"„{q}“ ist {n} von höchstens {n} Hops von der Root-Bridge entfernt – Hop-Budget fast ausgeschöpft": "“{q}” is {n} of at most {n} hops away from the root bridge – hop budget almost used up",
+"Spanning-Tree-Durchmesser {n} Switches (Root „{q}“) – mit klassischem STP im Netz sind höchstens {n} empfohlen": "Spanning tree diameter {n} switches (root “{q}”) – with classic STP in the network at most {n} are recommended",
+"Root-Bridge „{q}“ ergibt sich nur aus der Standard-Priorität und der MAC. Für den Core-Switch eine niedrigere Priorität setzen, z. B. {n}": "Root bridge “{q}” results only from the default priority and the MAC. Set a lower priority for the core switch, e.g. {n}",
+"Root-Bridge „{q}“ ergibt sich nur aus der Standard-Priorität – ohne MAC-Adressen hier nach Namen geschätzt. Für den Core-Switch eine niedrigere Priorität setzen, z. B. {n}": "Root bridge “{q}” results only from the default priority – without MAC addresses estimated here by name. Set a lower priority for the core switch, e.g. {n}",
+"RSTP blockiert {x} an „{q}“ ({x}) – der Ring ist damit abgesichert": "RSTP blocks {x} on “{q}” ({x}) – the ring is protected",
+"STP-Timer passen nicht: {n} × (Forward Delay − {n}) = {n} ist kleiner als Max Age {n}": "STP timers don't fit: {n} × (Forward Delay − {n}) = {n} is less than Max Age {n}",
+"STP-Timer passen nicht: Max Age {n} ist kleiner als {n} × (Hello + {n}) = {n}": "STP timers don't fit: Max Age {n} is less than {n} × (Hello + {n}) = {n}",
+"Schleife ohne Spanning Tree über „{q}“ und „{q}“ – Broadcast-Sturm. RSTP einschalten oder ein Kabel ziehen": "Loop without spanning tree via “{q}” and “{q}” – broadcast storm. Enable RSTP or unplug a cable",
+"{x} an „{q}“ ist durch RSTP blockiert ({x})": "{x} on “{q}” is blocked by RSTP ({x})", "blockiert (RSTP)": "blocked (RSTP)", "{n} blockiert": "{n} blocked",
+"Start": "Start", "Ziel erreicht": "Target reached", "Router / Firewall": "Router / firewall", "Route verfolgen": "Trace route", "Senden": "Send", "Erneut verfolgen": "Trace again",
+"Route gefunden": "Route found", "Kabelweg gefunden": "Cable path found", "Keine Route": "No route", "Für Datenverkehr passt es nicht: {x}": "Not usable for traffic: {x}", "Route": "Route",
+"Ohne IP-Adressen an „{q}“ und „{q}“: nur Routenverfolgung über Kabel, Switches und VLANs": "No IP addresses on “{q}” and “{q}”: route tracing only, via cables, switches and VLANs",
+"Ohne gültige IP-Adresse an „{q}“: nur Routenverfolgung über Kabel, Switches und VLANs": "No valid IP address on “{q}”: route tracing only, via cables, switches and VLANs",
+"Schickt ein simuliertes Ping-Paket los und zeigt im Plan, über welche Kabel, Patchpanels, Switches und Gateways es läuft – und wo es hängen bleibt. Ohne IP-Adressen wird nur die Route verfolgt.": "Sends a simulated ping packet and shows on the plan which cables, patch panels, switches and gateways it passes – and where it gets stuck. Without IP addresses, only the route is traced.",
+"Simuliert anhand der Doku: Kabel, Link, Port-Status, Spanning Tree, VLANs und Gateways. Firewall-Regeln und Routing-Tabellen werden nicht geprüft.": "Simulated from the documentation: cables, link, port status, spanning tree, VLANs and gateways. Firewall rules and routing tables are not checked."
+})
 import json, os
 root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 out = '/* Englische Übersetzung – erzeugt aus scripts/i18n_en.py, nicht von Hand ändern. */\nwindow.I18N_EN=' + json.dumps(EN, ensure_ascii=False, separators=(',', ':')) + ';\n'

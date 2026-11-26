@@ -131,6 +131,8 @@ const F={
  ptag:{l:'Kürzel (Patchlegung)',t:'text',max:12,ph:d=>'automatisch: '+panelTag({...d,ptag:''})},
  ip:{l:'IP-Adresse',t:'text',max:40,ph:'10.0.0.2'},
  mac:{l:'MAC-Adresse',t:'text',max:20,ph:'aa:bb:cc:dd:ee:ff'},
+ stp:{l:'Spanning Tree',t:'seg',o:[['','RSTP'],['off','Aus']]},
+ bprio:{l:'Bridge-Priorität',t:'sel',o:()=>[['','32768 (Standard)'],...BPRIO.filter(v=>v!==32768).map(v=>[String(v),String(v)+(v===0?' (immer Root)':v===4096?' (Core)':v===8192?' (zweiter Core)':'')])]},
  notes:{l:'Notizen',t:'text',max:500},
  watt:{l:'Leistungsaufnahme (W)',t:'num',min:0,max:20000,opt:1,ph:d=>'geschätzt ca. '+estW(d)+' W'},
  psu:{l:'Netzteile',t:'seg',o:[['1','1 Netzteil'],['2','2 (redundant)']]},
@@ -153,7 +155,7 @@ const F={
  place:{l:'Position',t:'seg',o:[['right','Rechts neben den Plan'],['around','Um den ganzen Plan']],show:d=>d.id==='preview'}
 };
 const FORM={
- switch:['name','model','style','size','rack',['he','rows'],'pnum','u','pc',['rj45Speed'],'poe',['location','ip']],
+ switch:['name','model','style','size','rack',['he','rows'],'pnum','u','pc',['rj45Speed'],'poe',['ip','mac'],'location'],
  fw:['name','model','style','size','rack',['he','rows'],'pnum','u','pc',['rj45Speed','wan'],['location','ip']],
  net:['name','sub','model','style','size','rack',['he','rows'],'pnum','u','pc',['rj45Speed','wan'],['location','ip']],
  patch:['name','model','style','size','rack',['he','rows'],'pnum','u','pc',['cat'],'shield',['ptag','location']],
@@ -724,10 +726,10 @@ function analyze(){
   const par={},find=x=>{while(par[x]&&par[x]!==x)x=par[x];return x};
   for(const [k,arr] of pairs){
     const [a,b]=k.split('|').map(dev),sw=a.kind==='switch'&&b.kind==='switch';
-    if(arr.length>1)for(const ch of arr)ch.iss.push(['info',sw?`${arr.length} Verbindungen zwischen „${a.name}“ und „${b.name}“ – als LAG (LACP) bündeln, sonst blockiert STP`:`${arr.length} Verbindungen zwischen „${a.name}“ und „${b.name}“ – als Bond/Team (LACP) einrichten`]);
-    if(sw){const ra=find(a.id),rb=find(b.id);if(ra===rb)arr[0].iss.push(['info','Diese Verbindung schließt einen Ring – STP/RSTP muss aktiv sein']);else par[ra]=rb}
+    if(arr.length>1&&!(sw&&(a.stp==='off'||b.stp==='off')))for(const ch of arr)ch.iss.push(['info',sw?`${arr.length} Verbindungen zwischen „${a.name}“ und „${b.name}“ – als LAG (LACP) bündeln, sonst blockiert STP`:`${arr.length} Verbindungen zwischen „${a.name}“ und „${b.name}“ – als Bond/Team (LACP) einrichten`]);
   }
   for(const ch of chans)for(const s of ch.steps){const mi=MI.get(s.c.id),iss=[...mi.iss];for(const i of ch.iss)if(!iss.some(j=>j[1]===i[1]))iss.push(i);res.set(s.c.id,{speed:ch.nl?null:ch.speed,nolink:ch.nl,iss,ch})}
+  {const SI=stpCalc(chans);for(const x of SI.cabIss)for(const st of x.ch.steps){const r=res.get(st.c.id);if(r&&!r.iss.some(i=>i[1]===x.m))r.iss.push([x.s,x.m])}for(const i of SI.devIss)list.push(i)}
   for(const c of state.cables)for(const [s,m] of res.get(c.id).iss)list.push({s,m,c:c.id});
   const uniq=[],keys=new Set();
   for(const i of list.sort((a,b)=>SEV[a.s].r-SEV[b.s].r)){const k=i.s+i.m;if(!keys.has(k)){keys.add(k);uniq.push(i)}}
@@ -768,7 +770,7 @@ function renderCanvas(){
   $('#l-pow').innerHTML=powSVG();
   drawCables();
   $('#empty').hidden=state.devices.length+state.racks.length+state.rooms.length>0;
-  lvSel();renderPeers();renderSim();
+  lvSel();renderPeers();renderStp();renderSim();
   $('#hint').textContent=PL.cur==='demo'?'Beispiel zum Ausprobieren – Änderungen werden nicht gespeichert. Oben links legst du einen eigenen Plan an.':'Port anklicken zeigt die ganze Strecke · Port auf Port ziehen steckt ein Kabel · Geräte in Schränke ziehen';
 }
 function powSVG(){if(!SDV)return '';const d=dev(SDV);if(!d||HID.has(d.id))return '';const pairs=[];
@@ -905,6 +907,7 @@ function inspNone(){
   <h3>Lebenszyklus</h3>
   <div class="grid2">${fld('f-lo','Veraltet nach (Jahren)',`<input id="f-lo" data-f="life.old" type="number" min="1" max="50" inputmode="numeric" value="${state.life.old}">`)}${fld('f-le','EOL nach (Jahren)',`<input id="f-le" data-f="life.eol" type="number" min="1" max="60" inputmode="numeric" value="${state.life.eol}">`)}</div>
   ${(()=>{let o=0,e=0,n=0;for(const d of state.devices){const z=lcs(d);if(!z)continue;n++;if(z.s==='eol')e++;else if(z.s==='old')o++}return `<p class="note">Gilt für alle Geräte mit Kaufjahr – einzelne Geräte können eigene Werte haben. ${n?`${e?`<button type="button" class="link" data-act="q" data-q="EOL">${pl(e,'Gerät','Geräte')} EOL</button>`:'Kein Gerät EOL'} · ${o?`<button type="button" class="link" data-act="q" data-q="veraltet">${o} veraltet</button>`:'keins veraltet'} · ${n} mit Kaufjahr`:'Noch kein Gerät hat ein Kaufjahr.'}</p>`})()}
+  ${stpProjHTML()}
   <h3>So geht’s</h3>
   <ol class="help"><li>„Hinzufügen“ oben legt Geräte, Schränke und Räume an.</li><li>Ein Klick auf einen Port markiert die ganze Strecke gelb – Kabel, Patchpanel und Gegenport.</li><li>Von einem Port auf einen freien Port ziehen steckt ein Kabel.</li><li>Rack-Geräte in einen Schrank ziehen: Sie rasten in der HE ein, der Schrank wächst mit. Freie HE anklicken baut dort ein neues Gerät ein.</li><li>Räume an der Titelleiste verschieben – ihr Inhalt wandert mit. Die Größe stellst du an der Ecke unten rechts ein.</li><li>Patchpanel-Ports haben Vorder- und Rückseite: Hosts und Access Points landen hinten (Verlegekabel, gepunktet).</li><li>Die Suche links findet Geräte, Personen, IPs und Port-Beschriftungen – z. B. „PC Max Mustermann“. Ein Klick auf ein Gerät markiert alle seine Verbindungen.</li><li>„Ansicht“ oben blendet ganze Kategorien oder einzelne Räume, Schränke, Geräte und Hosts aus – Hosts verschwinden samt Kabel, belegte Ports zeigen dann einen Punkt.</li><li>Mit Kaufjahr markiert der Plan veraltete Geräte orange und Geräte am Lebensende (EOL) rot.</li><li>Umschalt + Klick, Umschalt + Ziehen oder der Auswahlknopf unten rechts wählt mehrere Geräte gleichzeitig.</li><li>„Topologie“ zeigt das logische Netz automatisch, „Listen“ enthält Kabel, Strecken, Geräte, VLANs & IPs, Strom und Material – jeweils als CSV.</li><li>Unter „Datei“: PDF-Dokumentation, Etiketten mit QR-Code und der Versionsverlauf.</li><li>Entf löscht die Auswahl, Strg+Z macht rückgängig.</li></ol>`;
 }
@@ -1007,6 +1010,7 @@ function inspDev(d){
   ${fld('f-notes','Notizen',`<textarea id="f-notes" data-f="dev.notes" rows="2" maxlength="500">${esc(d.notes)}</textarea>`)}
   <div class="row"><button type="button" class="btn" data-act="dup">Duplizieren</button><button type="button" class="btn" data-act="tplsave">Als Vorlage</button>${store.kind==='server'?`<button type="button" class="btn" data-act="qr" data-k="dev" data-id="${d.id}">QR-Code</button>`:''}${hideBtn(d.id)}<button type="button" class="btn danger" data-act="deldev">Löschen</button></div>
   ${netHTML(d,L)}
+  ${stpHTML(d)}
   ${pingHTML(d)}
   ${powerHTML(d)}
   ${d.kind==='server'&&d.bays?diskHTML(d):''}
@@ -1079,6 +1083,7 @@ function inspPort(d,pid){
     if(vlanPort(d,pid))h+=vlanUI(d,pid,cf);
     if(d.kind==='switch'&&t==='rj45')h+=`<label class="chk"><input type="checkbox" id="f-ppoe" data-f="port.poe"${ppoe(d,pid)?' checked':''}> PoE aktiv</label>`;
     h+=`<label class="chk"><input type="checkbox" id="f-poff" data-f="port.off"${cf.off?' checked':''}> Port deaktiviert</label>`;
+    h+=stpPortHTML(d,pid);
   }
   h+=fld('f-pnotes','Notiz',txa('f-pnotes','port.notes',cf.notes||''));
   if(pas)h+='<h3>Vorderseite · Patchkabel</h3>'+connBlock(d,pid,'f')+'<h3>Rückseite · Verlegekabel</h3>'+connBlock(d,pid,'r');
@@ -1286,6 +1291,10 @@ function applyField(el,live){
     else return;
     if(rm[k]===v)return;ck('room'+k+rm.id);rm[k]=v;
   }
+  else if(sc==='stp'){const lim={maxAge:[6,40],hello:[1,10],fwd:[4,30]};const cur={...STPD,...(state.stp||{})};let v;
+    if(k==='method'){if(!['long','short'].includes(val))return;v=val}else if(lim[k]){v=clamp(parseInt(val,10)||cur[k],lim[k][0],lim[k][1]);el.value=v}else return;
+    if(cur[k]===v)return;ck('stp'+k);state.stp={...cur,[k]:v};keep=false}
+  else if(sc==='port'&&k==='pcost'){const d=dev(sel.dev);if(!d)return;const v=String(val).trim()===''?'':clamp(parseInt(val,10)||1,1,200000000);if(v!=='')el.value=v;const o=d.ports[sel.port]||{};if((o.pcost||'')===v)return;ck('pcost'+sel.dev+sel.port);if(v==='')pset(d,sel.port,'pcost','');else{d.ports[sel.port]={...o,pcost:v}}keep=false}
   else if(sc==='port'&&(k==='vm'||k==='vlan')){const d=dev(sel.dev);if(!d)return;const o=d.ports[sel.port]||{};
     if(k==='vm'){const tr=val==='trunk';if((o.vm==='trunk')===tr)return;ck();pset(d,sel.port,'vm',tr?'trunk':'');if(!tr)pset(d,sel.port,'tv','');else if(!o.tv)pset(d,sel.port,'tv',[])}
     else{const v=val===''?null:+val;if((o.vlan||null)===v)return;ck();pset(d,sel.port,'vlan',v)}
@@ -1314,7 +1323,7 @@ function applyField(el,live){
 
 /* ================= view ================= */
 const stage=$('#stage'),cv=$('#cv'),world=$('#world');
-function applyView(){if(SIM.res)simScale();if(LV.peers.size){cancelAnimationFrame(LV.raf);LV.raf=requestAnimationFrame(renderPeers)}world.setAttribute('transform',`translate(${view.x.toFixed(1)} ${view.y.toFixed(1)}) scale(${view.z.toFixed(4)})`);stage.style.backgroundSize=`${20*view.z}px ${20*view.z}px`;stage.style.backgroundPosition=`${view.x}px ${view.y}px`;$('#z-lbl').textContent=Math.round(view.z*100)+' %'}
+function applyView(){if(SIM.res||STP.pr.size)simScale();if(LV.peers.size){cancelAnimationFrame(LV.raf);LV.raf=requestAnimationFrame(renderPeers)}world.setAttribute('transform',`translate(${view.x.toFixed(1)} ${view.y.toFixed(1)}) scale(${view.z.toFixed(4)})`);stage.style.backgroundSize=`${20*view.z}px ${20*view.z}px`;stage.style.backgroundPosition=`${view.x}px ${view.y}px`;$('#z-lbl').textContent=Math.round(view.z*100)+' %'}
 function bbox(){const B=contentBox(true)||{x1:0,y1:0,x2:400,y2:300};let {x1,y1,x2,y2}=B;
   for(const rt of routes().values()){const ps=rt.pts?rt.pts.map(([x,y])=>({x,y})):[];for(let t=0;t<=1.001;t+=.05)ps.push(rt.at(t));for(const p of ps){x1=Math.min(x1,p.x);y1=Math.min(y1,p.y);x2=Math.max(x2,p.x);y2=Math.max(y2,p.y)}}
   return {x1,y1,x2,y2}}
@@ -1728,7 +1737,7 @@ function sanitize(o){
   const okId=v=>typeof v==='string'&&/^[A-Za-z0-9_-]{1,40}$/.test(v);
   const pick=(v,list,df)=>list.includes(v)?v:df;
   const ov_=o.view||{};
-  const out={v:3,name:S(o.name,80)||'Netzwerk',devices:[],cables:[],racks:[],rooms:[],view:{labelMode:pick(ov_.labelMode,['num','spec','off'],ov_.labels===false?'off':'num'),colorBy:ov_.colorBy==='cable'?'cable':'speed',psep:pick(ov_.psep,['.','/','-'],'.'),pfree:!!ov_.pfree,hide:{cats:[],ids:[]},topoHosts:pick(ov_.topoHosts,['single','group','off'],''),topoColor:pick(ov_.topoColor,['speed','vlan'],'speed')},life:{old:N(o.life&&o.life.old,1,50,5),eol:N(o.life&&o.life.eol,1,60,10)},updated:Number(o.updated)||0,demo:!!o.demo};
+  const out={v:3,name:S(o.name,80)||'Netzwerk',devices:[],cables:[],racks:[],rooms:[],view:{labelMode:pick(ov_.labelMode,['num','spec','off'],ov_.labels===false?'off':'num'),colorBy:ov_.colorBy==='cable'?'cable':'speed',psep:pick(ov_.psep,['.','/','-'],'.'),pfree:!!ov_.pfree,hide:{cats:[],ids:[]},topoHosts:pick(ov_.topoHosts,['single','group','off'],''),topoColor:pick(ov_.topoColor,['speed','vlan'],'speed'),stp:!!ov_.stp},life:{old:N(o.life&&o.life.old,1,50,5),eol:N(o.life&&o.life.eol,1,60,10)},updated:Number(o.updated)||0,demo:!!o.demo};
   const oids=new Set();
   for(const r of (Array.isArray(o.racks)?o.racks:[]).slice(0,60)){if(!r||typeof r!=='object')continue;const id=okId(r.id)&&!oids.has(r.id)?r.id:'k'+rid();oids.add(id);out.racks.push({id,name:S(r.name,60)||'Schrank',rsize:pick(r.rsize,['19','10'],'19'),minHe:N(r.minHe,0,60,0),rcolor:pick(r.rcolor,['schwarz','grau'],'schwarz'),location:S(r.location,60),notes:S(r.notes,500),x:N(r.x,-50000,50000,40),y:N(r.y,-50000,50000,40)})}
   for(const m of (Array.isArray(o.rooms)?o.rooms:[]).slice(0,60)){if(!m||typeof m!=='object')continue;const id=okId(m.id)&&!oids.has(m.id)?m.id:'m'+rid();oids.add(id);out.rooms.push({id,name:S(m.name,60)||'Raum',roomc:pick(m.roomc,Object.keys(RCOL),'blau'),x:N(m.x,-50000,50000,0),y:N(m.y,-50000,50000,0),w:N(m.w,300,30000,1600),h:N(m.h,200,30000,1100),notes:S(m.notes,500)})}
@@ -1751,13 +1760,13 @@ function sanitize(o){
         x.raids.push({id:okId(r.id)&&!x.raids.some(q=>q.id===r.id)?r.id:'r'+rid(),name:S(r.name,30)||'Verbund',lvl:RAIDL[r.lvl]?r.lvl:'5',col:N(r.col,0,RAIDC.length-1,x.raids.length%RAIDC.length),disks:ds})}}
     x.rj45Speed=pick(d.rj45Speed,PT.rj45.sp,'1G');x.poe=!!d.poe;x.cat=CAT[d.cat]?d.cat:'cat6a';x.shield=d.shield!==false;x.fg=FG[d.fg]?d.fg:'os2';x.pol=pick(d.pol,['UPC','APC'],'UPC');
     x.wifi=pick(d.wifi,F.wifi.o.map(v=>v[0]),'Wi-Fi 6');x.poeStd=pick(d.poeStd,['af','at','bt'],'at');x.sub=pick(d.sub,(kind==='net'?NETS:HOSTS).map(h=>h[0]),x.sub);x.pd=!!d.pd;
-    x.wan=N(d.wan,0,4,kind==='fw'&&!fwOld?1:0);const NE=(v,a,b)=>v===''||v==null||!Number.isFinite(Number(v))?'':clamp(Math.round(Number(v)),a,b);x.year=NE(d.year,1980,2100);x.watt=NE(d.watt,0,20000);x.psu=d.psu==='2'||d.psu===2?'2':'1';x.pa=okId(d.pa)?d.pa:'';x.pb=okId(d.pb)?d.pb:'';x.o13=N(d.o13,0,48,x.o13);x.o19=N(d.o19,0,24,x.o19);x.amp=AMPW[d.amp]?String(d.amp):'16';x.uw=NE(d.uw,100,200000);x.bat=NE(d.bat,10,500000);x.lifeOld=NE(d.lifeOld,1,50);x.lifeEol=NE(d.lifeEol,1,60);x.va=pick(String(d.va),VAS,x.va);x.topo=TOPO[d.topo]?d.topo:x.topo;
+    x.wan=N(d.wan,0,4,kind==='fw'&&!fwOld?1:0);const NE=(v,a,b)=>v===''||v==null||!Number.isFinite(Number(v))?'':clamp(Math.round(Number(v)),a,b);x.year=NE(d.year,1980,2100);x.watt=NE(d.watt,0,20000);x.psu=d.psu==='2'||d.psu===2?'2':'1';x.pa=okId(d.pa)?d.pa:'';x.pb=okId(d.pb)?d.pb:'';if(kind==='switch'){x.stp=d.stp==='off'?'off':'';x.bprio=d.bprio!==''&&d.bprio!=null&&BPRIO.includes(+d.bprio)&&+d.bprio!==32768?String(+d.bprio):''}x.o13=N(d.o13,0,48,x.o13);x.o19=N(d.o19,0,24,x.o19);x.amp=AMPW[d.amp]?String(d.amp):'16';x.uw=NE(d.uw,100,200000);x.bat=NE(d.bat,10,500000);x.lifeOld=NE(d.lifeOld,1,50);x.lifeEol=NE(d.lifeEol,1,60);x.va=pick(String(d.va),VAS,x.va);x.topo=TOPO[d.topo]?d.topo:x.topo;
     const src=d.pc&&typeof d.pc==='object'?d.pc:{rj45:d.rj45,sfp:d.sfp,sfpp:d.sfpp};
     x.pc={};for(const t of K.types){const n=N(src[t],0,maxc(x,t),0);if(n)x.pc[t]=n}
     if(total(x)<minPorts(x))x.pc[K.types.includes('rj45')?'rj45':K.types[0]]=K.types.includes('rj45')?8:24;
     if(d.ports&&typeof d.ports==='object')for(const [k,v] of Object.entries(d.ports)){if(!pexists(x,k)||!v||typeof v!=='object')continue;const t=ptype(k),pc={};if(v.label)pc.label=S(v.label,60);if(!isPas(t)&&PT[t].sp.includes(v.speed))pc.speed=v.speed;if(!isPas(t)&&['switch','fw','net','server'].includes(kind)){const ok=n=>Number.isInteger(n)&&n>=1&&n<=4094;
       if(v.vm==='trunk'||Array.isArray(v.tv)){const nv=Number(v.vlan);if(ok(nv))pc.vlan=nv;if(v.vm==='trunk'){pc.vm='trunk';pc.tv=[...new Set((Array.isArray(v.tv)?v.tv:[]).map(Number).filter(ok))].sort((a,b)=>a-b)}}
-      else if(v.vlan!=null&&v.vlan!==''){const ns=[...new Set(String(v.vlan).split(/[^0-9]+/).map(Number).filter(ok))];if(ns.length===1)pc.vlan=ns[0];else if(ns.length>1){pc.vm='trunk';pc.tv=ns.sort((a,b)=>a-b)}}}if(typeof v.poe==='boolean'&&t==='rj45')pc.poe=v.poe;if(v.off&&!isPas(t))pc.off=true;if(v.notes)pc.notes=S(v.notes,300);if(Object.keys(pc).length)x.ports[k]=pc}
+      else if(v.vlan!=null&&v.vlan!==''){const ns=[...new Set(String(v.vlan).split(/[^0-9]+/).map(Number).filter(ok))];if(ns.length===1)pc.vlan=ns[0];else if(ns.length>1){pc.vm='trunk';pc.tv=ns.sort((a,b)=>a-b)}}}if(typeof v.poe==='boolean'&&t==='rj45')pc.poe=v.poe;if(v.off&&!isPas(t))pc.off=true;if(+v.pcost>0&&!isPas(t))pc.pcost=clamp(Math.round(+v.pcost),1,200000000);if(v.notes)pc.notes=S(v.notes,300);if(Object.keys(pc).length)x.ports[k]=pc}
     if(d.rack&&rIds.has(d.rack)&&rackable(x)){const r=out.racks.find(q=>q.id===d.rack);if(!(x.size==='19'&&r.rsize==='10')){x.rack=d.rack;x.u=N(d.u,1,200,1)}}
     out.devices.push(x);
   }
@@ -1769,6 +1778,7 @@ function sanitize(o){
   {out.vlans=[];const seen=new Set();for(const v of (Array.isArray(o.vlans)?o.vlans:[]).slice(0,400)){const id=Number(v&&v.id);if(!Number.isInteger(id)||id<1||id>4094||seen.has(id))continue;seen.add(id);out.vlans.push({id,name:S(v.name,40),color:/^#[0-9a-f]{6}$/i.test(v.color)?v.color:VLC[out.vlans.length%VLC.length],subnet:S(v.subnet,43),gw:S(v.gw,40)})}
    for(const d of out.devices)for(const pc of Object.values(d.ports))for(const id of [pc.vlan,...(pc.tv||[])])if(id&&!seen.has(id)){seen.add(id);out.vlans.push({id,name:'',color:VLC[out.vlans.length%VLC.length],subnet:'',gw:''})}
    out.vlans.sort((a,b)=>a.id-b.id)}
+  if(o.stp&&typeof o.stp==='object'){const t=o.stp;out.stp={maxAge:N(t.maxAge,6,40,20),hello:N(t.hello,1,10,2),fwd:N(t.fwd,4,30,15),method:t.method==='short'?'short':'long'}}
   const used=new Set(),cids=new Set(),byId=Object.fromEntries(out.devices.map(d=>[d.id,d]));
   for(const c of (Array.isArray(o.cables)?o.cables:[]).slice(0,5000)){
     if(!c||!c.a||!c.b)continue;
@@ -1910,11 +1920,12 @@ function topoSVG(forExport){
   for(const e of M.E.values()){const A=P(e.a),B=P(e.b);if(!A||!B||A===B)continue;const key=[A.n.id,B.n.id].sort().join('|');if(seen.has(key)&&(A.n.grp||B.n.grp))continue;seen.add(key);
     const [U,D]=A.y<=B.y?[A,B]:[B,A],ux=U.x+NW/2,uy=U.y+NH,dx=D.x+NW/2,dy=D.y,ch=e.chs[0],sp=ch.speed,nl=e.chs.every(c=>c.nl);
     let col=sp&&!nl?SP[sp].c:'#8a8f96';if(cv==='vlan'){const pa=pvlan(dev(ch.A.d),ch.A.p),pb=pvlan(dev(ch.B.d),ch.B.p),pv=pa||pb;col=pv?(pv.m==='trunk'?'#111':vcol(pv.v)):'#b5b5b0'}
+    const blk=e.chs.filter(c=>stpBlocked(dev(c.A.d),c.A.p)||stpBlocked(dev(c.B.d),c.B.p)).length,allB=blk&&blk===e.chs.length;if(allB)col='#f59e0b';
     const w=!sp?2:SP[sp].v>=25e3?5:SP[sp].v>=1e4?4:SP[sp].v>=2500?3:2.2,sameRow=Math.abs(uy-NH-dy)<1;
     const d=sameRow?`M${U.x+NW/2} ${U.y}C${U.x+NW/2} ${U.y-50} ${dx} ${dy-50} ${dx} ${dy}`:`M${ux} ${uy}C${ux} ${uy+48} ${dx} ${dy-48} ${dx} ${dy}`;
-    ed+=`<path d="${d}" fill="none" stroke="${col}" stroke-width="${w}"${nl?' stroke-dasharray="6 5"':cv==='vlan'&&col==='#111'?' stroke-dasharray="10 4"':''} stroke-linecap="round"/>`;
+    ed+=`<path d="${d}" fill="none" stroke="${col}" stroke-width="${w}"${nl?' stroke-dasharray="6 5"':allB?' stroke-dasharray="3 7"':cv==='vlan'&&col==='#111'?' stroke-dasharray="10 4"':''} stroke-linecap="round"/>`;
     const infra=n=>n.d&&['fw','net','switch'].includes(n.d.kind);
-    if(infra(U.n)&&infra(D.n)||e.n>1){const mx=(ux+dx)/2,my=sameRow?U.y-38:(uy+dy)/2,t=(e.n>1?e.n+'× ':'')+(sp&&!nl?SP[sp].n.replace(' Gbit/s','G').replace(' Mbit/s','M').replace(',','.'):'kein Link');lab+=`<g><rect x="${mx-t.length*3.3-7}" y="${my-9}" width="${t.length*6.6+14}" height="18" rx="9" fill="#fff" stroke="${col}" stroke-width="1.4"/><text x="${mx}" y="${my+4}" text-anchor="middle" font-size="11" font-weight="700" fill="#111">${esc(t)}</text></g>`}}
+    if(infra(U.n)&&infra(D.n)||e.n>1){const mx=(ux+dx)/2,my=sameRow?U.y-38:(uy+dy)/2,t=allB?'blockiert (RSTP)':(e.n>1?e.n+'× ':'')+(sp&&!nl?SP[sp].n.replace(' Gbit/s','G').replace(' Mbit/s','M').replace(',','.'):'kein Link')+(blk?' · '+blk+' blockiert':'');lab+=`<g><rect x="${mx-t.length*3.3-7}" y="${my-9}" width="${t.length*6.6+14}" height="18" rx="9" fill="#fff" stroke="${col}" stroke-width="1.4"/><text x="${mx}" y="${my+4}" text-anchor="middle" font-size="11" font-weight="700" fill="#111">${esc(t)}</text></g>`}}
   let nd='';
   for(const p of pos.values()){const n=p.n,x=p.x,y=p.y;
     if(n.grp){const by=new Map();for(const h of n.grp){const v=HVL.get(h.d.id)||0;by.set(v,(by.get(v)||0)+1)}
@@ -1922,7 +1933,7 @@ function topoSVG(forExport){
     const d=n.d,st=STY[d.style]||STY[KIND[d.kind].styles[0]],dark=KIND[d.kind].rack&&st.g&&!['unifi','smc','aruba','host'].includes(st.key),bg=d.kind==='host'||d.kind==='ap'?'#fbfbf9':st.g[0],fg=dark?'#fff':'#16191d',sub=d.ip||d.model||(d.kind==='host'?subLbl(d):KIND[d.kind].n),hv=HVL.get(d.id),z=lcs(d);
     nd+=`<g class="tn" data-tdev="${d.id}"><rect x="${x}" y="${y}" width="${NW}" height="${NH}" rx="10" fill="${bg}" stroke="${hv?vcol(hv):dark?'#000':'#a3a8ae'}" stroke-width="${hv?2.4:1.2}"/>${hv?`<rect x="${x}" y="${y}" width="8" height="${NH}" rx="4" fill="${vcol(hv)}"/>`:''}${p.loose?`<rect x="${x}" y="${y}" width="${NW}" height="${NH}" rx="10" fill="none" stroke="#d0342c" stroke-dasharray="4 3"/>`:''}
       <g transform="translate(${x+14} ${y+11}) scale(1.15)" fill="none" stroke="${fg}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${KICON[d.kind]}</g>
-      <text x="${x+44}" y="${y+25}" font-size="13.5" font-weight="700" fill="${fg}">${esc(trunc(d.name,17))}</text><text x="${x+44}" y="${y+42}" font-size="11" fill="${dark?'#c3c9d0':'#5b626b'}">${esc(trunc(sub,22))}</text>
+      <text x="${x+44}" y="${y+25}" font-size="13.5" font-weight="700" fill="${fg}">${esc(trunc(d.name,17))}</text><text x="${x+44}" y="${y+42}" font-size="11" fill="${dark?'#c3c9d0':'#5b626b'}">${esc(trunc(sub,22))}</text>${stpRootTag(d,x,y,NW)}
       ${z&&z.s!=='ok'?`<rect x="${x+NW-40}" y="${y-9}" width="36" height="16" rx="8" fill="${LCC[z.s].c}"/><text x="${x+NW-22}" y="${y+3}" text-anchor="middle" font-size="9.5" font-weight="700" fill="${LCC[z.s].t}">${z.s==='eol'?'EOL':'alt'}</text>`:''}</g>`}
   const pad=40;TB={x:x1-pad,y:y1-pad-50,w:x2-x1+pad*2,h:y2-y1+pad*2+50};
   return {svg:`${ed}${nd}${lab}`,box:TB,M}}
@@ -2482,7 +2493,7 @@ function demo_(){
   const D=(k,o)=>mkDev(k,o);
   const devs=[
     D('fiber',{id:'lwl1',name:'LWL-Panel Serverraum',style:'fs',pc:{lc:24},fg:'os2',pol:'UPC',rack:'rA',u:1,ports:{l1:{label:'Backbone EG'},l2:{label:'Backbone OG'}}}),
-    D('switch',{id:'core',name:'Core-SW',year:2022,psu:'2',pa:'pdu1',pb:'usv1',model:'8G + 16 SFP28 + 2 QSFP28',style:'fs',pc:{rj45:8,sfp28:16,qsfp28:2},rack:'rA',u:2,ip:'10.0.0.1',ports:{r1:{label:'Firewall LAN',vm:'trunk',vlan:99,tv:[10,20,30]},r7:{label:'USV-NMC',vlan:99},r8:{label:'Mgmt-Netz',vlan:99},t1:{speed:'10G',label:'Backbone EG',vm:'trunk',vlan:99,tv:[10,20,30]}}}),
+    D('switch',{id:'core',name:'Core-SW',year:2022,bprio:'4096',psu:'2',pa:'pdu1',pb:'usv1',model:'8G + 16 SFP28 + 2 QSFP28',style:'fs',pc:{rj45:8,sfp28:16,qsfp28:2},rack:'rA',u:2,ip:'10.0.0.1',ports:{r1:{label:'Firewall LAN',vm:'trunk',vlan:99,tv:[10,20,30]},r7:{label:'USV-NMC',vlan:99},r8:{label:'Mgmt-Netz',vlan:99},t1:{speed:'10G',label:'Backbone EG',vm:'trunk',vlan:99,tv:[10,20,30]}}}),
     D('fw',{id:'fw1',name:'Firewall',pa:'pdu1',model:'XGS · 2 WAN · 6 LAN',style:'sophos',year:2019,pc:{rj45:8,sfpp:2},wan:2,rack:'rA',u:3,ip:'10.0.0.254',ports:{r1:{label:'Glasfaser-ONT'},r2:{label:'LTE-Backup'},r3:{label:'LAN Core',vm:'trunk',vlan:99,tv:[10,20,30]}}}),
     D('server',{id:'srv1',name:'ESX-01',year:2015,psu:'2',pa:'pdu1',pb:'usv1',role:'Hypervisor',model:'1 HE · 2 × QSFP28',style:'hpe',he:1,pc:{mgmt:1,rj45:2,qsfp28:2},rack:'rA',u:4,ip:'10.0.10.11',disks:{0:{c:1.92,u:'TB',t:'SSD'},1:{c:1.92,u:'TB',t:'SSD'},2:{c:1.92,u:'TB',t:'SSD'},3:{c:1.92,u:'TB',t:'SSD'},4:{c:1.92,u:'TB',t:'SSD'},5:{c:1.92,u:'TB',t:'SSD'},6:{c:480,u:'GB',t:'SSD'},7:{c:480,u:'GB',t:'SSD'}},raids:[{id:'rd1',name:'VM-Daten',lvl:'10',col:0,disks:[0,1,2,3,4,5]},{id:'rd2',name:'System',lvl:'1',col:1,disks:[6,7]}]}),
     D('pdu',{id:'pdu1',name:'PDU A',model:'Metered',style:'apc',o13:8,o19:0,amp:'16',pc:{mgmt:1},pa:'usv1',rack:'rA',u:7}),
@@ -2516,6 +2527,128 @@ function demo_(){
     C('c15',{d:'pp1',p:'k4',s:'r'},{d:'pc2',p:'r1'},{label:'K-015',cat:'cat7',shield:'S/FTP',len:24,color:'weiss'})
   ],vlans:[{id:10,name:'Clients',color:'#2563eb',subnet:'10.0.10.0/24',gw:'10.0.10.1'},{id:20,name:'WLAN',color:'#16a34a',subnet:'10.0.20.0/24',gw:'10.0.20.1'},{id:30,name:'Telefonie',color:'#9333ea',subnet:'10.0.30.0/24',gw:'10.0.30.1'},{id:99,name:'Management',color:'#475569',subnet:'10.0.0.0/24',gw:'10.0.0.254'}],view:{labelMode:'num',colorBy:'speed',hide:{cats:[],ids:[]}},life:{old:5,eol:10},updated:0,demo:true};
 }
+
+/* ================= Spanning Tree (RSTP) =================
+   Berechnet den Baum so, wie RSTP ihn im eingeschwungenen Zustand bildet:
+   Root-Bridge = kleinste Bridge-ID (Priorität, dann MAC), Pfadkosten je Port nach Tempo (IEEE 802.1t „lang“ oder
+   802.1D „kurz“, je Port überschreibbar), Root-Port = günstigster Weg zur Root, je Segment ein Designated Port,
+   alle übrigen Alternate/Backup (blockiert). Switches mit „Spanning Tree aus“ und Medienkonverter verhalten sich wie
+   Hubs: sie reichen BPDUs durch, fangen aber selbst keine Schleife ab.
+   Budgets: Hop-Budget = Max Age (so viele Switches darf ein Switch von der Root entfernt sein), dazu die
+   Timer-Regeln aus 802.1D und die Pfadkosten zur Root. */
+const STPD={maxAge:20,hello:2,fwd:15,method:'long'};
+const BPRIO=Array.from({length:16},(_,i)=>i*4096);
+let STP={br:new Map(),pr:new Map(),comps:[],hubLoops:[]};
+const stpCfg=()=>({...STPD,...(state.stp||{})});
+const isBr=d=>!!d&&d.kind==='switch'&&d.stp!=='off';
+const isHub=d=>!!d&&((d.kind==='switch'&&d.stp==='off')||(d.kind==='net'&&d.sub==='mc'));
+const bprio=d=>d.bprio!==''&&d.bprio!=null&&Number.isFinite(+d.bprio)?+d.bprio:32768;
+const macKey=d=>{const h=String(d.mac||'').toLowerCase().replace(/[^0-9a-f]/g,'');return h.length===12?h:null};
+const macTxt=d=>{const k=macKey(d);return k?k.match(/../g).join(':'):''};
+function autoCost(sp){const v=SP[sp]?SP[sp].v:1e3;if(stpCfg().method==='short')return v>=25e3?1:v>=1e4?2:v>=2500?3:v>=1e3?4:v>=100?19:100;return Math.max(1,Math.round(2e7/v))}
+function bidCmp(a,b){const pa=bprio(a),pb=bprio(b);if(pa!==pb)return pa-pb;const ma=macKey(a),mb=macKey(b);if(ma&&mb&&ma!==mb)return ma<mb?-1:1;if(!!ma!==!!mb)return ma?-1:1;const n=a.name.localeCompare(b.name,'de');return n||(a.id<b.id?-1:a.id>b.id?1:0)}
+const STPR={root:'Root-Port',designated:'Designated',alternate:'Alternate',backup:'Backup',edge:'Edge-Port',disabled:'Kein Link'};
+const stpFwd=r=>r==='root'||r==='designated'||r==='edge';
+function stpCalc(chans){
+  const C=stpCfg(),br=new Map(),pr=new Map(),cabIss=[],devIss=[];
+  const par=new Map(),find=x=>{if(!par.has(x))par.set(x,x);while(par.get(x)!==x){par.set(x,par.get(par.get(x)));x=par.get(x)}return x},join=(a,b)=>{const A=find(a),B=find(b);if(A!==B)par.set(A,B);return A!==B};
+  const hp=new Map(),hl=new Map(),hubLoops=[];/* Hubs untereinander: Schleifen ohne STP */
+  const node=(d,p)=>isBr(d)?'p:'+d.id+':'+p:isHub(d)?'h:'+d.id:null;
+  const ports=new Map();/* Bridge-Port → {d,p,ch,far,up} */
+  for(const ch of chans){if(!ch.A||!ch.B)continue;const X=dev(ch.A.d),Y=dev(ch.B.d);if(!X||!Y||isPas(ptype(ch.A.p))||isPas(ptype(ch.B.p)))continue;
+    const up=!ch.nl&&!pconf(X,ch.A.p).off&&!pconf(Y,ch.B.p).off,sp=ch.speed;
+    for(const [D,e,f] of [[X,ch.A,ch.B],[Y,ch.B,ch.A]])if(isBr(D))ports.set(D.id+':'+e.p,{d:D,p:e.p,ch,far:f,up,sp,peer:dev(f.d)});
+    if(!up)continue;const nx=node(X,ch.A.p),ny=node(Y,ch.B.p);if(!nx||!ny)continue;join(nx,ny);
+    if(isHub(X)&&isHub(Y)){const k=find('hh:'+X.id),j=find('hh:'+Y.id);if(k===j)hubLoops.push([X,Y,ch]);else par.set(k,j)}}
+  /* Segmente: alle Bridge-Ports, die (direkt oder über Hubs) aneinanderhängen */
+  const seg=new Map();
+  for(const [k,P] of ports){if(!P.up){pr.set(k,{role:'disabled',P});continue}
+    if(!isBr(P.peer)&&!isHub(P.peer)){pr.set(k,{role:'edge',P,cost:+pconf(P.d,P.p).pcost>0?+pconf(P.d,P.p).pcost:autoCost(P.sp||pspeed(P.d,P.p))});continue}
+    const s=find('p:'+k);if(!seg.has(s))seg.set(s,[]);const pi=lay(P.d).ports.findIndex(q=>q.id===P.p)+1,pc=pconf(P.d,P.p),cost=+pc.pcost>0?+pc.pcost:autoCost(P.sp||pspeed(P.d,P.p));
+    const m={k,d:P.d,p:P.p,pid:128*4096+pi,cost,auto:!(+pc.pcost>0),P,s};seg.get(s).push(m);pr.set(k,{role:'?',...m})}
+  /* Bridges und ihre Zusammenhangskomponenten */
+  const bp=new Map();for(const L of seg.values())for(const m of L){if(!bp.has(m.d.id))bp.set(m.d.id,[]);bp.get(m.d.id).push(m)}
+  const cpar=new Map(),cf=x=>{if(!cpar.has(x))cpar.set(x,x);while(cpar.get(x)!==x)x=cpar.get(x);return x};
+  for(const L of seg.values())for(let i=1;i<L.length;i++){const a=cf(L[0].d.id),b=cf(L[i].d.id);if(a!==b)cpar.set(a,b)}
+  const comps=new Map();for(const d of state.devices){if(!isBr(d))continue;const r=cf(d.id);if(!comps.has(r))comps.set(r,[]);comps.get(r).push(d)}
+  const out=[];
+  for(const L of comps.values()){
+    const root=L.slice().sort(bidCmp)[0],dist=new Map([[root.id,0]]),done=new Set();
+    for(;;){let u=null;for(const d of L)if(dist.has(d.id)&&!done.has(d.id)&&(!u||dist.get(d.id)<dist.get(u.id)))u=d;if(!u)break;done.add(u.id);
+      for(const mu of bp.get(u.id)||[])for(const mv of seg.get(mu.s))if(mv.d.id!==u.id){const nd=dist.get(u.id)+mv.cost;if(!dist.has(mv.d.id)||nd<dist.get(mv.d.id))dist.set(mv.d.id,nd)}}
+    const vec=(m)=>[dist.get(m.d.id)??Infinity,m.d,m.pid];
+    const vcmp=(a,b)=>a[0]!==b[0]?a[0]-b[0]:bidCmp(a[1],b[1])||a[2]-b[2];
+    const desig=new Map();for(const m of [].concat(...L.map(d=>bp.get(d.id)||[]))){const D=desig.get(m.s);if(!D||vcmp(vec(m),vec(D))<0)desig.set(m.s,m)}
+    const rp=new Map();
+    for(const d of L){if(d.id===root.id)continue;let best=null,bv=null;
+      for(const m of bp.get(d.id)||[]){const D=desig.get(m.s);if(!D||D.d.id===d.id)continue;const v=[dist.get(D.d.id)+m.cost,D.d,D.pid,m.pid];
+        if(!bv||(v[0]!==bv[0]?v[0]<bv[0]:(bidCmp(v[1],bv[1])||v[2]-bv[2]||v[3]-bv[3])<0)){best=m;bv=v}}
+      if(best)rp.set(d.id,{m:best,D:desig.get(best.s)})}
+    for(const d of L)for(const m of bp.get(d.id)||[]){const D=desig.get(m.s),R=rp.get(d.id),x=pr.get(m.k);
+      x.role=D===m?'designated':R&&R.m===m?'root':D&&D.d.id===d.id?'backup':'alternate';x.D=D}
+    /* Hops über die Root-Ports */
+    const hops=new Map([[root.id,0]]),ord=L.slice().sort((a,b)=>(dist.get(a.id)??1e15)-(dist.get(b.id)??1e15));
+    for(let pass=0;pass<3;pass++)for(const d of ord){const R=rp.get(d.id);if(R&&hops.has(R.D.d.id))hops.set(d.id,hops.get(R.D.d.id)+1)}
+    let maxH=0;for(const d of L){const h=hops.get(d.id)??0;maxH=Math.max(maxH,h);const R=rp.get(d.id);br.set(d.id,{root,dist:dist.get(d.id)??0,hops:h,rp:R?R.m.p:null,up:R?R.D.d:null,n:L.length})}
+    /* Durchmesser: längster Weg im Baum (Anzahl Switches) */
+    let dia=1;if(L.length>1){const adj=new Map(L.map(d=>[d.id,[]]));for(const [id,R] of rp){adj.get(id).push(R.D.d.id);if(adj.has(R.D.d.id))adj.get(R.D.d.id).push(id)}
+      const far=s=>{const q=[s],dd=new Map([[s,1]]);let last=s;while(q.length){const x=q.shift();last=x;for(const y of adj.get(x)||[])if(!dd.has(y)){dd.set(y,dd.get(x)+1);q.push(y)}}return [last,dd.get(last)]};dia=far(far(root.id)[0])[1]}
+    out.push({root,L,maxH,dia});
+    if(L.length<2)continue;
+    for(const d of L){const h=hops.get(d.id)||0;if(h>C.maxAge)devIss.push({s:'err',m:`„${d.name}“ ist ${h} Hops von der Root-Bridge „${root.name}“ entfernt – mehr als Max Age (${C.maxAge}) erlaubt, die BPDUs verfallen`,dv:d.id});
+      else if(h>=C.maxAge-2&&h>0)devIss.push({s:'warn',m:`„${d.name}“ ist ${h} von höchstens ${C.maxAge} Hops von der Root-Bridge entfernt – Hop-Budget fast ausgeschöpft`,dv:d.id})}
+    if(dia>7)devIss.push({s:'info',m:`Spanning-Tree-Durchmesser ${dia} Switches (Root „${root.name}“) – mit klassischem STP im Netz sind höchstens 7 empfohlen`,dv:root.id});
+    if(bprio(root)===32768&&L.length>1)devIss.push({s:'info',m:`Root-Bridge „${root.name}“ ergibt sich nur aus der Standard-Priorität${macKey(root)?' und der MAC':' – ohne MAC-Adressen hier nach Namen geschätzt'}. Für den Core-Switch eine niedrigere Priorität setzen, z. B. 4096`,dv:root.id});
+    for(const d of L)for(const m of bp.get(d.id)||[]){const x=pr.get(m.k);if(x.role==='alternate'||x.role==='backup')cabIss.push({ch:m.P.ch,s:'info',m:`RSTP blockiert ${pname(d,m.p)} an „${d.name}“ (${STPR[x.role]}) – der Ring ist damit abgesichert`})}
+  }
+  if(comps.size&&[...comps.values()].some(L=>L.length>1)){
+    if(2*(C.fwd-1)<C.maxAge)devIss.push({s:'warn',m:`STP-Timer passen nicht: 2 × (Forward Delay − 1) = ${2*(C.fwd-1)} ist kleiner als Max Age ${C.maxAge}`});
+    if(C.maxAge<2*(C.hello+1))devIss.push({s:'warn',m:`STP-Timer passen nicht: Max Age ${C.maxAge} ist kleiner als 2 × (Hello + 1) = ${2*(C.hello+1)}`})}
+  for(const [X,Y,ch] of hubLoops)cabIss.push({ch,s:'err',m:`Schleife ohne Spanning Tree über „${X.name}“ und „${Y.name}“ – Broadcast-Sturm. RSTP einschalten oder ein Kabel ziehen`});
+  STP={br,pr,comps:out,hubLoops};
+  return {cabIss,devIss}}
+const stpRootTag=(d,x,y,w)=>{const B=STP.br.get(d.id);return B&&B.n>1&&B.root.id===d.id?`<g><rect x="${x+w-56}" y="${y-9}" width="50" height="18" rx="9" fill="#2563eb" stroke="#fff" stroke-width="1.5"/><text x="${x+w-31}" y="${y+4}" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">Root</text></g>`:''};
+const stpRole=(d,pid)=>{const x=STP.pr.get(d.id+':'+pid);return x?x.role:null};
+const stpBlocked=(d,pid)=>{const r=stpRole(d,pid);return r==='alternate'||r==='backup'};
+/* ---------- Anzeige ---------- */
+const fmtCost=n=>Number(n).toLocaleString(LOC);
+function stpHTML(d){if(d.kind!=='switch')return '';
+  const dd={...d,stp:d.stp||'',bprio:d.bprio||''};let h='<h3>Spanning Tree (RSTP)</h3>'+fieldsHTML(dd,'i',null,'dev',['stp','bprio']);
+  if(d.stp==='off')return h+'<p class="note">Spanning Tree ist aus: Der Switch reicht BPDUs nur durch und fängt keine Schleife ab.</p>';
+  const B=STP.br.get(d.id),C=stpCfg();
+  if(!B||B.n<2)return h+'<p class="note">Keine Verbindung zu einem anderen Switch mit RSTP – hier gibt es keinen Baum zu berechnen.</p>';
+  const lnk=x=>`<button type="button" class="link" data-act="seldev" data-id="${x.id}">${esc(x.name)}</button>`;
+  if(B.root.id===d.id)h+=`<div class="stpbox root"><b>Root-Bridge</b><span>Priorität ${bprio(d)}${macKey(d)?' · MAC '+macTxt(d):''}</span><span>${pl(B.n,'Switch','Switches')} im Baum</span></div>`;
+  else h+=`<div class="stpbox${B.hops>C.maxAge?' bad':''}"><b>Root-Port: ${esc(pname(d,B.rp))}</b><span><span>Richtung</span> ${lnk(B.up)} · <span>Root</span> ${lnk(B.root)}</span><span>Pfadkosten ${fmtCost(B.dist)} · ${B.hops} von ${C.maxAge} Hops</span></div>`;
+  const rows=lay(d).ports.map(p=>{const x=STP.pr.get(d.id+':'+p.id);if(!x||x.role==='edge'||x.role==='disabled')return '';const fd=x.P.peer;
+    return `<tr tabindex="0" data-sp="${p.id}"><td class="num">${p.lbl?esc(p.lbl):p.num}</td><td><i class="sr ${x.role}"></i>${STPR[x.role]}</td><td>${stpFwd(x.role)?'Weiterleiten':'Blockiert'}</td><td class="nw">${fmtCost(x.cost)}${x.auto?'':' *'}</td><td>${fd?esc(trunc(fd.name,18)):'–'}</td></tr>`}).join('');
+  if(rows)h+=`<div class="scroll"><table class="ptab"><thead><tr><th>Port</th><th>Rolle</th><th>Zustand</th><th>Kosten</th><th>Gegenüber</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  return h+`<p class="note">Kosten nach ${C.method==='short'?'IEEE 802.1D (kurz)':'IEEE 802.1t (lang)'}, * = am Port festgelegt. Max Age, Timer und Methode stellst du im Projekt ein (nichts auswählen).</p>`}
+function stpPortHTML(d,pid){if(d.kind!=='switch'||isPas(ptype(pid)))return '';const x=STP.pr.get(d.id+':'+pid),cf=pconf(d,pid),auto=autoCost(pspeed(d,pid));
+  let h='<h3>Spanning Tree</h3>';
+  if(d.stp==='off')h+='<p class="note">Spanning Tree ist an diesem Switch aus.</p>';
+  else if(x)h+=`<div class="stpbox ${x.role==='alternate'||x.role==='backup'?'bad':x.role==='root'?'rp':''}"><b>${STPR[x.role]}</b><span>${x.role==='disabled'?'Port ohne Link':stpFwd(x.role)?'Weiterleiten':'Blockiert – leitet keine Daten weiter'}${x.cost?' · Kosten '+fmtCost(x.cost):''}</span></div>`;
+  h+=fld('f-pcost','Port-Kosten',`<input id="f-pcost" data-f="port.pcost" type="number" min="1" max="200000000" inputmode="numeric" value="${+cf.pcost>0?+cf.pcost:''}" placeholder="automatisch: ${auto}">`);
+  return h}
+function stpProjHTML(){const C=stpCfg(),sw=state.devices.filter(d=>d.kind==='switch');if(!sw.length)return '';
+  let h=`<h3>Spanning Tree (RSTP)</h3><label class="chk"><input type="checkbox" id="f-vstp" data-f="view.stp"${state.view.stp?' checked':''}> Rollen und Root im Plan zeigen</label>`;
+  h+=fld('f-stpm','Pfadkosten',selx('f-stpm','stp.method',[['long','IEEE 802.1t (lang, Standard bei RSTP)'],['short','IEEE 802.1D (kurz, älter)']],C.method));
+  h+=`<div class="grid3">${fld('f-stpa','Max Age (Hops)',`<input id="f-stpa" data-f="stp.maxAge" type="number" min="6" max="40" inputmode="numeric" value="${C.maxAge}">`)}${fld('f-stph','Hello (s)',`<input id="f-stph" data-f="stp.hello" type="number" min="1" max="10" inputmode="numeric" value="${C.hello}">`)}${fld('f-stpf','Forward Delay (s)',`<input id="f-stpf" data-f="stp.fwd" type="number" min="4" max="30" inputmode="numeric" value="${C.fwd}">`)}</div>`;
+  const big=STP.comps.filter(c=>c.L.length>1),lnk=x=>`<button type="button" class="link" data-act="seldev" data-id="${x.id}">${esc(x.name)}</button>`;
+  if(!big.length)return h+'<p class="note">Noch keine Switches mit RSTP untereinander verbunden.</p>';
+  for(const c of big){const bl=[];for(const d of c.L)for(const p of lay(d).ports){const x=STP.pr.get(d.id+':'+p.id);if(x&&(x.role==='alternate'||x.role==='backup'))bl.push([d,p.id])}
+    h+=`<div class="stpbox root"><b><span>Root-Bridge</span> ${lnk(c.root)}</b><span>${pl(c.L.length,'Switch','Switches')} · Priorität ${bprio(c.root)}</span><span>weitester Switch ${c.maxH} von ${C.maxAge} Hops · Durchmesser ${c.dia}</span><span>${bl.length?`${pl(bl.length,'Port','Ports')} blockiert: ${bl.map(([d,p])=>`<button type="button" class="link" data-act="goport" data-d="${d.id}" data-p="${p}">${esc(d.name)} ${esc(pname(d,p))}</button>`).join(', ')}`:'kein Port blockiert – keine Schleife'}</span></div>`}
+  if(STP.hubLoops.length)h+=`<p class="note"><span class="wtag">Schleife ohne Spanning Tree</span> über ${STP.hubLoops.map(([X,Y])=>esc(X.name)+' / '+esc(Y.name)).join(', ')}</p>`;
+  return h+'<p class="note">Max Age ist bei RSTP das Hop-Budget: so viele Switches darf ein Switch höchstens von der Root entfernt sein. Die Timer müssen 2 × (Forward Delay − 1) ≥ Max Age ≥ 2 × (Hello + 1) erfüllen.</p>'}
+function renderStp(){const g=$('#l-stp');if(!g)return;if(mode!=='plan'){g.innerHTML='';return}const on=!!state.view.stp;let s='',top='';
+  const mark=(d,p,role)=>{if(HID.has(d.id))return '';const e=endPos({d:d.id,p}),c={root:'#2563eb',designated:'#16a34a',alternate:'#f59e0b',backup:'#f59e0b'}[role],t={root:'R',designated:'D',alternate:'A',backup:'B'}[role];
+    return `<g class="sk" data-x="${e.x.toFixed(1)}" data-y="${e.y.toFixed(1)}"><circle r="9.5" fill="${c}" stroke="#111" stroke-width="1.6"/><text y="4" text-anchor="middle" font-size="11" font-weight="800" fill="${role==='alternate'||role==='backup'?'#111':'#fff'}">${t}</text></g>`};
+  for(const [k,x] of STP.pr){if(!x.P||x.role==='edge'||x.role==='disabled')continue;const bl=x.role==='alternate'||x.role==='backup';if(!bl&&!on)continue;
+    const d=x.P.d;if(bl)for(const st of x.P.ch.steps){if(HID.has(st.c.a.d)||HID.has(st.c.b.d))continue;const rt=RTC&&RTC.get(st.c.id);if(rt)s+=`<path d="${rt.d}" fill="none" stroke="#f59e0b" stroke-width="4" stroke-dasharray="3 9" stroke-linecap="round"/>`}
+    top+=mark(d,x.P.p,x.role)}
+  if(on)for(const c of STP.comps){if(c.L.length<2)continue;for(const d of c.L){if(HID.has(d.id))continue;const B=STP.br.get(d.id),L=lay(d),isR=c.root.id===d.id,txt=isR?`Root · ${bprio(d)}`:`${fmtCost(B.dist)} · ${B.hops} Hop${B.hops===1?'':'s'}`,w=txt.length*7+18;
+    top+=`<g class="sk" data-x="${d.x+L.W-8}" data-y="${d.y-2}"><rect x="${-w}" y="-11" width="${w}" height="22" rx="11" fill="${isR?'#2563eb':'#fff'}" stroke="${isR?'#fff':'#2563eb'}" stroke-width="2"/><text x="${-w/2}" y="4" text-anchor="middle" font-size="12" font-weight="700" fill="${isR?'#fff':'#1e3a8a'}">${esc(txt)}</text></g>`}}
+  g.innerHTML=s+top;simScale()}
 
 /* ================= Wer hat angelegt, wer zuletzt bearbeitet =================
    Geräte, Kabel, Schränke und Räume tragen _cr (angelegt) und _ed (zuletzt bearbeitet) als [wer, Unix-Sekunden].
@@ -2575,6 +2708,8 @@ function pLink(d,pid){const c=cabOf(d.id,pid,'f');if(!c)return null;const inf=AN
   return {ch,c,far:far&&!(far.d===d.id&&far.p===pid)?far:null,st}}
 function linkDown(d,pid,L){if(pconf(d,pid).off)return `${pname(d,pid)} an „${d.name}“ ist deaktiviert`;
   const fd=L.far&&dev(L.far.d);if(fd&&!isPas(ptype(L.far.p))&&pconf(fd,L.far.p).off)return `${pname(fd,L.far.p)} an „${fd.name}“ ist deaktiviert`;
+  if(stpBlocked(d,pid))return `${pname(d,pid)} an „${d.name}“ ist durch RSTP blockiert (${STPR[stpRole(d,pid)]})`;
+  if(fd&&stpBlocked(fd,L.far.p))return `${pname(fd,L.far.p)} an „${fd.name}“ ist durch RSTP blockiert (${STPR[stpRole(fd,L.far.p)]})`;
   if(!L.ch.nl)return null;const iss=(AN.get(L.c.id)||{}).iss||[],i=iss.find(x=>x[0]==='err')||L.ch.iss.find(x=>x[0]==='err')||iss[0];return i?'Kein Link: '+i[1].replace(/^Kein Link:\s*/,''):'Kein Link'}
 /* wie verlässt ein Paket aus VLAN v den Port: 'u' ungetaggt, 't' getaggt, null gar nicht */
 function egress(d,pid,v,t){const pv=pvlan(d,pid);if(!pv)return v?t:'u';
@@ -2607,17 +2742,23 @@ function l2Search(S,v0,isT){const Q=[{d:S,v:v0,t:'u',inP:null,par:-1,via:null}],
       Q.push({d:Y,v:nv,t:r.t,inP:L.far.p,par:i,via:{L,outP:p.id,t:t2}})}}
   return null}
 /* nur Kabel und Switches, ohne VLAN und Link – dient dazu, die Stelle zu finden, an der es hakt */
-function physSearch(S,T){const Q=[{d:S,inP:null,par:-1,via:null}],seen=new Set([S.id]);
+function physSearch(S,T,noStp){const Q=[{d:S,inP:null,par:-1,via:null}],seen=new Set([S.id]);
   for(let i=0;i<Q.length;i++){const n=Q[i];if(i>0&&n.d.id===T.id)return pChain(Q,i);if(i>0&&!isL2(n.d))continue;
     for(const p of lay(n.d).ports){if(p.id===n.inP||isPas(p.type)||(isL3(n.d)&&isWan(n.d,p.id)))continue;const L=pLink(n.d,p.id);if(!L||!L.far)continue;const Y=dev(L.far.d);
-      if(!Y||isPas(ptype(L.far.p))||seen.has(Y.id))continue;seen.add(Y.id);Q.push({d:Y,inP:L.far.p,par:i,via:{L,outP:p.id}})}}
+      if(!Y||isPas(ptype(L.far.p))||seen.has(Y.id))continue;if(noStp&&(stpBlocked(n.d,p.id)||stpBlocked(Y,L.far.p)))continue;seen.add(Y.id);Q.push({d:Y,inP:L.far.p,par:i,via:{L,outP:p.id}})}}
+  return noStp?physSearch(S,T,false):null}
+/* reine Routenverfolgung: Kabel, Link und RSTP zählen, VLANs nicht; auch über Router und Firewalls */
+function wireSearch(S,T){const Q=[{d:S,inP:null,par:-1,via:null}],seen=new Set([S.id]);
+  for(let i=0;i<Q.length;i++){const n=Q[i];if(i>0&&n.d.id===T.id)return pChain(Q,i);if(i>0&&!isL2(n.d)&&!isL3(n.d))continue;
+    for(const p of lay(n.d).ports){if(p.id===n.inP||isPas(p.type))continue;const L=pLink(n.d,p.id);if(!L||!L.far)continue;const Y=dev(L.far.d);
+      if(!Y||isPas(ptype(L.far.p))||seen.has(Y.id)||linkDown(n.d,p.id,L))continue;seen.add(Y.id);Q.push({d:Y,inP:L.far.p,par:i,via:{L,outP:p.id}})}}
   return null}
 function toSeq(P){const seq=[];P.forEach((n,i)=>{const nx=P[i+1];if(n.via)seq.push({k:'link',L:n.via.L,outP:n.via.outP,inP:n.inP,t:n.via.t,v:n.v});seq.push({k:'dev',d:n.d,inP:n.inP,outP:nx?nx.via.outP:null,v:n.v})});return seq}
 /* eine Strecke S → T innerhalb eines VLANs; klappt es nicht, wird der Kabelweg nachgespielt, um die Ursache zu finden */
 function l2Leg(S,T,v0,vT){
   const P=l2Search(S,v0,n=>n.d.id===T.id&&!pAccept(n.d,n.inP,n.v,n.t,vT));
   if(P)return {seq:toSeq(P)};
-  const pp=physSearch(S,T);
+  const pp=physSearch(S,T,true);
   if(!pp){const own=lay(S).ports.filter(p=>!isPas(p.type)&&cabOf(S.id,p.id,'f'));
     if(!own.length)return {seq:[{k:'dev',d:S,inP:null,outP:null,v:v0}],fail:{i:0,pos:'in',msg:`„${S.name}“ ist nicht verkabelt`}};
     const open=own.map(p=>pLink(S,p.id)).find(L=>L&&(!L.far||isPas(ptype(L.far.p))));
@@ -2639,17 +2780,20 @@ function l2Leg(S,T,v0,vT){
 function gwHas(G,v){const V=vlanOf(v),S=vnet(V),n=ip2n(G.ip);if(S&&inNet(n,S))return true;let cfg=false;
   for(const p of lay(G).ports){if(isPas(p.type))continue;const pv=pvlan(G,p.id);if(!pv)continue;cfg=true;if(pv.m==='access'?pv.v===v:(pv.nat===v||pv.tag.includes(v)))return true}
   return !cfg}
-function runPing(S,D){
+function runPing(S,D){const R=pingCore(S,D);
+  if(R.trace&&R.fail&&S.id!==D.id){const P=wireSearch(S,D);if(P){R.warn=R.fail.msg;R.fail=null;R.ok=true;R.seq=toSeq(P);R.G=null;R.wire=true}}
+  return R}
+function pingCore(S,D){
   const R={S,D,ok:false,seq:[],notes:[],fail:null,ttl:64,G:null,kind:'timeout'};
   const stop=(msg,kind)=>{R.fail={i:-1,msg};R.kind=kind||'error';return R};
   if(S.id===D.id)return stop('Quelle und Ziel sind dasselbe Gerät');
-  const a=pingNet(S),b=pingNet(D);
-  if(a.n==null)return stop(S.ip?`„${S.name}“: „${S.ip}“ ist keine gültige IPv4-Adresse`:`„${S.name}“ hat keine IP-Adresse – trag oben eine ein`,'noip');
-  if(b.n==null)return stop(D.ip?`„${D.name}“: „${D.ip}“ ist keine gültige IPv4-Adresse`:`„${D.name}“ hat keine IP-Adresse`,'noip');
+  const a=pingNet(S),b=pingNet(D);R.trace=a.n==null||b.n==null;
+  if(R.trace){const miss=[S,D].filter(x=>ip2n(x.ip)==null);R.notes.push(miss.length>1?`Ohne IP-Adressen an „${S.name}“ und „${D.name}“: nur Routenverfolgung über Kabel, Switches und VLANs`:`Ohne gültige IP-Adresse an „${miss[0].name}“: nur Routenverfolgung über Kabel, Switches und VLANs`)}
+  else{
   if(a.n===b.n)return stop(`„${S.name}“ und „${D.name}“ haben dieselbe IP-Adresse ${S.ip}`);
   const ib=IPI&&IPI.get(D.id),ia=IPI&&IPI.get(S.id);
   if(ib&&ib.dup)R.notes.push(`${D.ip} ist mehrfach vergeben – die Antwort kann von einem anderen Gerät kommen`);
-  if(ia&&ia.wrong&&a.vp&&!a.vi)R.notes.push(`Die IP von „${S.name}“ passt nicht zum Subnetz von ${vnm(a.vp)}`);
+  if(ia&&ia.wrong&&a.vp&&!a.vi)R.notes.push(`Die IP von „${S.name}“ passt nicht zum Subnetz von ${vnm(a.vp)}`)}
   const join=(A,B,extra)=>{const s=A.seq.slice(0,-1),g={...A.seq[A.seq.length-1],...extra,outP:B.seq[0].outP};return [...s,g,...B.seq.slice(1)]};
   const routed=a.vi&&b.vi?a.vi.id!==b.vi.id:!!(a.v&&b.v&&a.v!==b.v);
   if(!routed){const L=l2Leg(S,D,a.v,b.v);R.seq=L.seq;if(L.fail){R.fail=L.fail;return R}R.ok=true;return R}
@@ -2678,17 +2822,17 @@ function pingTargets(d){const L=state.devices.filter(x=>x.id!==d.id&&canPing(x))
   const ord=['host','server','ap','switch','fw','net','ups','pdu'];return ord.filter(k=>g.has(k)).map(k=>[k,g.get(k).sort((a,b)=>a.name.localeCompare(b.name,LOC))])}
 function seqHTML(R){
   const vb=v=>v?`<b class="vt" style="--vc:${vcol(v)}" translate="no">${esc(vnm(v))}</b>`:'';
-  const pio=(d,p,lbl)=>{if(!p)return '';const pv=pvlan(d,p);return `<span class="io"><span>${lbl}</span> <span>${esc(pname(d,p))}</span>${pv?` <span class="mute">${esc(pv.m==='access'?'Access '+vshort(pv.v):vlanTxt(pv))}</span>`:''}</span>`};
+  const pio=(d,p,lbl)=>{if(!p)return '';const pv=pvlan(d,p),sr=stpRole(d,p);return `<span class="io"><span>${lbl}</span> <span>${esc(pname(d,p))}</span>${pv?` <span class="mute">${esc(pv.m==='access'?'Access '+vshort(pv.v):vlanTxt(pv))}</span>`:''}${sr==='root'||sr==='designated'?` <span class="mute">${STPR[sr]}</span>`:''}</span>`};
   let h='',n=0;
   R.seq.forEach((it,i)=>{const bad=R.fail&&R.fail.i===i;
     if(it.k==='dev'){n++;const d=it.d,role=it.role==='gw'?'gw':i===0?'src':i===R.seq.length-1&&R.ok?'dst':'';
-      const what=role==='src'?`<small><span>sendet ICMP Echo Request</span> ${vb(it.v)}</small>`:role==='gw'?`<small><span>routet als Gateway</span> ${vb(it.v)} → ${vb(it.v2||it.v)}</small>`:role==='dst'?`<small>antwortet mit ICMP Echo Reply</small>`:isL2(d)?`<small><span>leitet weiter</span> ${vb(it.v)}</small>`:'';
+      const what=role==='src'?`<small><span>${R.trace?'Start':'sendet ICMP Echo Request'}</span> ${vb(it.v)}</small>`:role==='gw'?`<small><span>routet als Gateway</span> ${vb(it.v)} → ${vb(it.v2||it.v)}</small>`:role==='dst'?`<small>${R.trace?'Ziel erreicht':'antwortet mit ICMP Echo Reply'}</small>`:isL2(d)?`<small><span>leitet weiter</span> ${vb(it.v)}</small>`:isL3(d)?'<small>Router / Firewall</small>':'';
       const io=pio(d,it.inP,'Eingang')+pio(d,it.outP,'Ausgang');
       h+=`<li class="hd${bad?' bad':''}${role?' '+role:''}"><i>${bad?'!':n}</i><div><button type="button" class="link" data-act="seldev" data-id="${d.id}">${esc(d.name)}</button>${d.ip?` <small class="ip" translate="no">${esc(d.ip)}</small>`:''}${what}${io?`<small class="ios">${io}</small>`:''}${bad?`<em>${esc(R.fail.msg)}</em>`:''}</div></li>`}
     else{const cs=it.L.st.map(s=>`<button type="button" class="link" data-act="selcab" data-id="${s.c.id}">${esc(s.c.label||'(Kabel)')}</button>`),via=it.L.st.slice(0,-1).map(s=>{const pd=dev(s.to.d);return `<span translate="no">${esc(pd.name)} ${esc(pconf(pd,s.to.p).label||pname(pd,s.to.p))}</span>`});
       h+=`<li class="hc${bad?' bad':''}"><div><small>${cs.join(' → ')}${via.length?` <span>über</span> ${via.join(', ')}`:''}${it.t==='t'?' <span class="mute">getaggt</span>':''}</small>${bad?`<em>${esc(R.fail.msg)}</em>`:''}</div></li>`}});
   return `<ol class="hops">${h}</ol>`}
-function pingCon(R){const ip=R.D.ip,E=EN,L=[];if(R.kind==='noip'&&!R.S.ip)return '';
+function pingCon(R){const ip=R.D.ip,E=EN,L=[];if(R.trace)return '';
   L.push(`C:\\> ping ${ip}`,'',E?`Pinging ${ip} with 32 bytes of data:`:`Ping wird ausgeführt für ${ip} mit 32 Bytes Daten:`);
   const gwIp=R.G&&R.G.ip||'';let rec=0;
   for(let i=0;i<4;i++){if(R.ok){L.push(E?`Reply from ${ip}: bytes=32 time<1ms TTL=${R.ttl}`:`Antwort von ${ip}: Bytes=32 Zeit<1ms TTL=${R.ttl}`);rec++}
@@ -2699,16 +2843,17 @@ function pingCon(R){const ip=R.D.ip,E=EN,L=[];if(R.kind==='noip'&&!R.S.ip)return
   return `<pre class="pcon" translate="no">${esc(L.join('\n'))}</pre>`}
 function pingHTML(d){if(!canPing(d))return '';
   const T=pingTargets(d),cur=SIM.pick[d.id]||(SIM.src===d.id?SIM.dst:'')||'';
-  let h=`<h3>Verbindungstest</h3><div class="pingf">${fld('f-ping','Ping an',`<select id="f-ping"><option value="">Ziel wählen …</option>${T.map(([k,L])=>`<optgroup label="${esc(KINDP[k]||KIND[k].n)}">${L.map(x=>`<option value="${x.id}"${x.id===cur?' selected':''}${x.ip?'':' disabled'}>${esc(x.name)} – ${x.ip?esc(x.ip):'keine IP'}</option>`).join('')}</optgroup>`).join('')}</select>`)}<button type="button" class="btn pri" data-act="ping"${cur?'':' disabled'}>Ping senden</button></div>`;
+  let h=`<h3>Verbindungstest</h3><div class="pingf">${fld('f-ping','Ping an',`<select id="f-ping"><option value="">Ziel wählen …</option>${T.map(([k,L])=>`<optgroup label="${esc(KINDP[k]||KIND[k].n)}">${L.map(x=>`<option value="${x.id}"${x.id===cur?' selected':''}>${esc(x.name)} – ${x.ip?esc(x.ip):'keine IP'}</option>`).join('')}</optgroup>`).join('')}</select>`)}<button type="button" class="btn pri" data-act="ping"${cur?'':' disabled'}>${cur&&ip2n(d.ip)!=null&&dev(cur)&&ip2n(dev(cur).ip)!=null?'Ping senden':cur?'Route verfolgen':'Senden'}</button></div>`;
   const R=SIM.src===d.id&&SIM.res;
   if(R&&SIM.anim)return h+`<div class="pres run"><b>Paket unterwegs …</b><span><span translate="no">${esc(R.S.name)} → ${esc(R.D.name)}</span></span></div>`;
-  if(!R)return h+`<p class="note">Schickt ein simuliertes Ping-Paket los und zeigt im Plan, über welche Kabel, Patchpanels, Switches und Gateways es läuft – und wo es hängen bleibt.${d.ip?'':' Dafür braucht das Gerät eine IP-Adresse.'}</p>`;
+  if(!R)return h+`<p class="note">Schickt ein simuliertes Ping-Paket los und zeigt im Plan, über welche Kabel, Patchpanels, Switches und Gateways es läuft – und wo es hängen bleibt. Ohne IP-Adressen wird nur die Route verfolgt.</p>`;
   const mid=new Set(R.seq.filter(x=>x.k==='dev'&&x.d!==R.S&&x.d!==R.D).map(x=>x.d.id)).size;
-  h+=`<div class="pres ${R.ok?'ok':'bad'}"><b>${R.ok?'Ping erfolgreich':R.kind==='unreach'?'Zielnetz nicht erreichbar':'Ping fehlgeschlagen'}</b>${R.ok?`<span><span translate="no">${esc(R.S.name)} → ${esc(R.D.name)}</span></span><span>${mid>0?'über '+pl(mid,'Gerät','Geräte'):'direkt verbunden'}</span>${R.G&&R.G!==R.S?`<span>geroutet über „${esc(R.G.name)}“</span>`:''}`:`<span>${esc(R.fail.msg)}</span>`}</div>`;
+  const head=R.trace?(R.ok?(R.warn?'Kabelweg gefunden':'Route gefunden'):'Keine Route'):R.ok?'Ping erfolgreich':R.kind==='unreach'?'Zielnetz nicht erreichbar':'Ping fehlgeschlagen';
+  h+=`<div class="pres ${R.ok?(R.warn?'warn':'ok'):'bad'}"><b>${head}</b>${R.ok?`<span><span translate="no">${esc(R.S.name)} → ${esc(R.D.name)}</span></span><span>${mid>0?'über '+pl(mid,'Gerät','Geräte'):'direkt verbunden'}</span>${R.G&&R.G!==R.S?`<span>geroutet über „${esc(R.G.name)}“</span>`:''}${R.warn?`<span>Für Datenverkehr passt es nicht: ${esc(R.warn)}</span>`:''}`:`<span>${esc(R.fail.msg)}</span>`}</div>`;
   if(R.seq.length)h+=seqHTML(R);
   if(R.notes.length)h+=`<ul class="pnotes">${R.notes.map(t=>`<li>${esc(t)}</li>`).join('')}</ul>`;
   h+=pingCon(R);
-  h+=`<div class="row"><button type="button" class="btn" data-act="ping">Erneut senden</button><button type="button" class="btn" data-act="pingx">Pfad ausblenden</button></div><p class="note">Simuliert anhand der Doku: Kabel, Link, Port-Status, VLANs und Gateways. Firewall-Regeln und Routing-Tabellen werden nicht geprüft.</p>`;
+  h+=`<div class="row"><button type="button" class="btn" data-act="ping">${R.trace?'Erneut verfolgen':'Erneut senden'}</button><button type="button" class="btn" data-act="pingx">Pfad ausblenden</button></div><p class="note">Simuliert anhand der Doku: Kabel, Link, Port-Status, Spanning Tree, VLANs und Gateways. Firewall-Regeln und Routing-Tabellen werden nicht geprüft.</p>`;
   return h}
 /* ---------- Anzeige im Plan ---------- */
 function simStart(src,dst){const S=dev(src),D=dev(dst);if(!S||!D)return;SIM.src=src;SIM.dst=dst;SIM.pick[src]=dst;SIM.res=runPing(S,D);
@@ -2728,7 +2873,7 @@ function simPts(R){const pts=[],P=(d,p)=>{const e=endPos({d:d.id,p});return {x:e
   return {pts,T}}
 function simAt(S,t){const p=S.pts;if(!p.length)return null;if(t<=0)return p[0];for(let i=1;i<p.length;i++){const a=p[i-1],b=p[i],ta=a.t+a.dw;if(t<a.t+a.dw)return a;if(t<=b.t){const f=b.t>ta?(t-ta)/(b.t-ta):1;return {x:a.x+(b.x-a.x)*f,y:a.y+(b.y-a.y)*f}}}return p[p.length-1]}
 function simAnim(){cancelAnimationFrame(SIM.raf);const R=SIM.res,S=simPts(R);if(S.pts.length<2){simDone();return}
-  const k=S.T>2800?2800/S.T:S.T<1100?1100/S.T:1,dur=S.T*k,back=R.ok,t0=performance.now();SIM.anim={S,k,dur,back,t0};
+  const k=S.T>2800?2800/S.T:S.T<1100?1100/S.T:1,dur=S.T*k,back=R.ok&&!R.trace,t0=performance.now();SIM.anim={S,k,dur,back,t0};
   const step=now=>{if(!SIM.anim||SIM.res!==R)return;const el=(now-t0),g=$('#simpk');let p=null,rep=false;
     if(el<=dur)p=simAt(S,el/k);else if(back&&el<=dur*2+250){rep=true;p=simAt(S,Math.max(0,S.T-(el-dur-250)/k))}else{simDone();return}
     if(g&&p){const z=clamp(1/view.z,.8,3.5);g.setAttribute('transform',`translate(${p.x.toFixed(1)} ${p.y.toFixed(1)}) scale(${z.toFixed(3)})`);g.setAttribute('class','simpk'+(rep?' rep':''));g.style.display=''}
@@ -2740,7 +2885,7 @@ function simShow(){/* den Weg ins Bild holen, falls er nicht zu sehen ist */cons
   for(const it of R.seq){if(it.k==='dev'){const L=lay(it.d);inc(it.d.x,it.d.y);inc(it.d.x+L.W,it.d.y+L.H)}else for(const s of it.L.st){const rt=RTC&&RTC.get(s.c.id);if(rt)for(let t=0;t<=1;t+=.25){const q=rt.at(t);inc(q.x,q.y)}}}
   const sx=v=>v*view.z+view.x,sy=v=>v*view.z+view.y;if(sx(x1)>=0&&sy(y1)>=0&&sx(x2)<=r.width&&sy(y2)<=r.height-40)return;
   const pad=60,bw=x2-x1,bh=y2-y1,z=clamp(Math.min((r.width-pad*2)/bw,(r.height-pad*2-50)/bh),.08,1.1);view.z=z;view.x=(r.width-bw*z)/2-x1*z;view.y=(r.height-50-bh*z)/2-y1*z;applyView()}
-function simScale(){const z=clamp(1/view.z,.8,3.5).toFixed(3);for(const e of document.querySelectorAll('#l-sim .sk'))e.setAttribute('transform',`translate(${e.dataset.x} ${e.dataset.y}) scale(${z})`)}
+function simScale(){const z=clamp(1/view.z,.8,3.5).toFixed(3),z2=clamp(.7/view.z,1,2.6).toFixed(3);for(const e of document.querySelectorAll('#l-sim .sk'))e.setAttribute('transform',`translate(${e.dataset.x} ${e.dataset.y}) scale(${z})`);for(const e of document.querySelectorAll('#l-stp .sk'))e.setAttribute('transform',`translate(${e.dataset.x} ${e.dataset.y}) scale(${z2})`)}
 function renderSim(){const g=$('#l-sim'),bar=$('#simbar');if(!g)return;
   if(SIM.src&&(!dev(SIM.src)||!dev(SIM.dst))){SIM.src=SIM.dst=SIM.res=null}
   if(SIM.src&&!SIM.anim)SIM.res=runPing(dev(SIM.src),dev(SIM.dst));
@@ -2754,8 +2899,8 @@ function renderSim(){const g=$('#l-sim'),bar=$('#simbar');if(!g)return;
     if(p){s+=`<g class="sk" data-x="${p.x.toFixed(1)}" data-y="${p.y.toFixed(1)}"><circle r="17" fill="#dc2626" stroke="#fff" stroke-width="3"/><path d="M-7 -7L7 7M7 -7L-7 7" stroke="#fff" stroke-width="4" stroke-linecap="round"/></g>`}}
   s+=badges+`<g id="simpk" class="simpk" style="display:${SIM.anim?'':'none'}"><circle r="20" class="halo"/><rect x="-14" y="-10" width="28" height="20" rx="3" class="env"/><path d="M-14 -9L0 2L14 -9" fill="none" class="flap"/></g>`;
   g.innerHTML=s;simScale();
-  if(bar){const S=R.S,D=R.D,run=!!SIM.anim;bar.hidden=false;bar.className='simbar '+(run?'run':R.ok?'ok':'bad');
-    bar.innerHTML=`<span class="st">${run?'':R.ok?'✓':'✕'}</span><span class="tx"><span class="ln"><b>Ping</b> <button type="button" class="link" data-sim="src" translate="no">${esc(S.name)}</button> → <button type="button" class="link" data-sim="dst" translate="no">${esc(D.name)}</button></span><small${!run&&!R.ok?` title="${esc(R.fail.msg)}"`:''}>${run?'Paket unterwegs …':R.ok?(R.G&&R.G!==S?`geroutet über „${esc(R.G.name)}“`:'erfolgreich'):esc(R.fail.msg)}</small></span><button type="button" class="btn sm" data-sim="again">Erneut</button><button type="button" class="ib sm" data-sim="close" aria-label="Verbindungstest schließen" title="Schließen">×</button>`}}
+  if(bar){const S=R.S,D=R.D,run=!!SIM.anim;bar.hidden=false;bar.className='simbar '+(run?'run':R.ok?(R.warn?'warn':'ok'):'bad');
+    bar.innerHTML=`<span class="st">${run?'':R.ok?(R.warn?'!':'✓'):'✕'}</span><span class="tx"><span class="ln"><b>${R.trace?'Route':'Ping'}</b> <button type="button" class="link" data-sim="src" translate="no">${esc(S.name)}</button> → <button type="button" class="link" data-sim="dst" translate="no">${esc(D.name)}</button></span><small${!run&&(!R.ok||R.warn)?` title="${esc(R.warn||R.fail.msg)}"`:''}>${run?'Paket unterwegs …':R.ok?(R.warn?esc(R.warn):R.G&&R.G!==S?`geroutet über „${esc(R.G.name)}“`:R.trace?'Route gefunden':'erfolgreich'):esc(R.fail.msg)}</small></span><button type="button" class="btn sm" data-sim="again">Erneut</button><button type="button" class="ib sm" data-sim="close" aria-label="Verbindungstest schließen" title="Schließen">×</button>`}}
 
 $('#simbar').addEventListener('click',e=>{const b=e.target.closest('[data-sim]');if(!b||!SIM.res)return;const k=b.dataset.sim;if(k==='close')simClear();else if(k==='again')simStart(SIM.src,SIM.dst);else{const id=k==='src'?SIM.src:SIM.dst;select({kind:'dev',id});centerOn(dev(id))}});
 

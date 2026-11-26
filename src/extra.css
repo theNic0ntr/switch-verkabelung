@@ -351,3 +351,14 @@ table.pl{width:auto;min-width:min(100%,640px)}
 .simbar.run .st::after{content:"";width:12px;height:12px;border-radius:50%;border:2px solid #fff;border-right-color:transparent;animation:simspin .8s linear infinite}
 @keyframes simspin{to{transform:rotate(360deg)}}
 .hops .link{justify-self:start;text-align:left}
+.pres.warn{background:light-dark(#fef3c7,#3b2a0a);color:light-dark(#78350f,#fde68a)}
+.simbar.warn .st{background:#d97706}
+/* Spanning Tree */
+.stpbox{border-radius:10px;padding:10px 12px;margin:0 0 12px;display:grid;gap:2px;font-size:13px;background:var(--plane)}
+.stpbox b{font-size:15px}
+.stpbox.root{background:light-dark(#dbeafe,#132a4d);color:light-dark(#1e3a8a,#bfdbfe)}
+.stpbox.rp{background:light-dark(#e0f2fe,#0c2b3d)}
+.stpbox.bad{background:light-dark(#fef3c7,#3b2a0a);color:light-dark(#78350f,#fde68a)}
+.stpbox .link{color:inherit}
+.sr{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;background:#8a8f96;vertical-align:baseline}
+.sr.root{background:#2563eb}.sr.designated{background:#16a34a}.sr.alternate,.sr.backup{background:#f59e0b}
