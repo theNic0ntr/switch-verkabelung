@@ -127,6 +127,7 @@ const F={
  topo:{l:'Bauart (IEC 62040-3)',t:'sel',o:Object.entries(TOPO).map(([k,v])=>[k,v.n])},
  user:{l:'Raum / Benutzer',t:'text',max:60,ph:'z. B. Büro 1.12 · M. Weber'},
  location:{l:'Standort',t:'text',max:60,ph:'z. B. Serverraum UG'},
+ ptag:{l:'Kürzel (Patchlegung)',t:'text',max:12,ph:d=>'automatisch: '+panelTag({...d,ptag:''})},
  ip:{l:'IP-Adresse',t:'text',max:40,ph:'10.0.0.2'},
  mac:{l:'MAC-Adresse',t:'text',max:20,ph:'aa:bb:cc:dd:ee:ff'},
  notes:{l:'Notizen',t:'text',max:500},
@@ -154,8 +155,8 @@ const FORM={
  switch:['name','model','style','size','rack',['he','rows'],'pnum','u','pc',['rj45Speed'],'poe',['location','ip']],
  fw:['name','model','style','size','rack',['he','rows'],'pnum','u','pc',['rj45Speed','wan'],['location','ip']],
  net:['name','sub','model','style','size','rack',['he','rows'],'pnum','u','pc',['rj45Speed','wan'],['location','ip']],
- patch:['name','model','style','size','rack',['he','rows'],'pnum','u','pc',['cat'],'shield','location'],
- fiber:['name','model','style','size','rack',['he','rows'],'pnum','u','pc',['fg','pol'],'location'],
+ patch:['name','model','style','size','rack',['he','rows'],'pnum','u','pc',['cat'],'shield',['ptag','location']],
+ fiber:['name','model','style','size','rack',['he','rows'],'pnum','u','pc',['fg','pol'],['ptag','location']],
  server:['name','role','style','size','rack',['he','rows'],'pnum','u','pc',['bays','baysUsed'],'bayForm','bayDir','bayRows',['rj45Speed'],['model','ip'],'location'],
  ups:['name','model','style','size','rack',['he','va'],'u','topo','pc',['location','ip']],
  pdu:['name','model','style','size','rack',['he'],'u','pc',['o13','o19'],'amp',['location','ip']],
@@ -255,7 +256,7 @@ const heTxt=d=>'HE '+d.u+(d.he>1?'–'+(d.u+d.he-1):'');
 const where=d=>{const r=d.rack&&rackOf(d.rack);return r?`${r.name}, ${heTxt(d)}`:''};
 const whereAll=d=>{const rm=devRoom(d);return [where(d),rm?rm.name:''].filter(Boolean).join(' · ')};
 function mkDev(kind,o){
-  const base={id:'d'+rid(),kind,name:KIND[kind].n,model:'',style:KIND[kind].styles[0],x:40,y:40,size:KIND[kind].rack?'19':'frei',he:kind==='ups'?2:1,rows:'auto',pc:{},rj45Speed:'1G',poe:false,location:'',ip:'',notes:'',ports:{},cat:'cat6a',shield:true,fg:'os2',pol:'UPC',role:'',wifi:'Wi-Fi 6',poeStd:'at',sub:kind==='net'?'router':'pc',pd:false,user:'',mac:'',pnum:'col',bays:8,baysUsed:8,bayForm:'2.5',bayDir:'v',bayRows:'1',disks:{},raids:[],wan:kind==='fw'?1:0,year:'',lifeOld:'',lifeEol:'',watt:'',psu:'1',pa:'',pb:'',o13:8,o19:0,amp:'16',uw:'',bat:'',va:'1500',topo:'vi',rack:null,u:1};
+  const base={id:'d'+rid(),kind,name:KIND[kind].n,model:'',style:KIND[kind].styles[0],x:40,y:40,size:KIND[kind].rack?'19':'frei',he:kind==='ups'?2:1,rows:'auto',pc:{},rj45Speed:'1G',poe:false,location:'',ip:'',notes:'',ports:{},cat:'cat6a',shield:true,fg:'os2',pol:'UPC',role:'',wifi:'Wi-Fi 6',poeStd:'at',sub:kind==='net'?'router':'pc',pd:false,user:'',mac:'',pnum:'col',ptag:'',bays:8,baysUsed:8,bayForm:'2.5',bayDir:'v',bayRows:'1',disks:{},raids:[],wan:kind==='fw'?1:0,year:'',lifeOld:'',lifeEol:'',watt:'',psu:'1',pa:'',pb:'',o13:8,o19:0,amp:'16',uw:'',bat:'',va:'1500',topo:'vi',rack:null,u:1};
   const pcs={pdu:{},switch:{rj45:24,sfpp:4},fw:{rj45:8,sfpp:2},net:{rj45:8,sfpp:2},patch:{kj:24},fiber:{lc:24},server:{mgmt:1,rj45:2,sfp28:2},ups:{mgmt:1},ap:{rj45:1},host:{rj45:1}};
   return Object.assign(base,{pc:{...pcs[kind]}},o||{});
 }
@@ -845,7 +846,7 @@ function fieldsHTML(d,m,part,scope,rowsO){
   scope=scope||'dev';
   const A=k=>m==='a'?`data-k="${k}"`:`data-f="${scope}.${k}"`,ID=k=>(m==='a'?'a-':'f-')+k;
   const one=k=>{const f=F[k];if(!f||(f.show&&!f.show(d)))return '';const id=ID(k);
-    if(f.t==='text')return fld(id,f.l,`<input id="${id}" ${A(k)} value="${esc(d[k]??'')}" maxlength="${f.max}"${f.ph?` placeholder="${esc(f.ph)}"`:''}>`);
+    if(f.t==='text')return fld(id,f.l,`<input id="${id}" ${A(k)} value="${esc(d[k]??'')}" maxlength="${f.max}"${f.ph?` placeholder="${esc(typeof f.ph==='function'?f.ph(d):f.ph)}"`:''}>`);
     if(f.t==='num')return fld(id,f.l,`<input id="${id}" ${A(k)} type="number" min="${f.min}" max="${f.max}" step="${f.step||1}" inputmode="numeric" value="${esc(d[k]??'')}"${f.ph?` placeholder="${esc(typeof f.ph==='function'?f.ph(d):f.ph)}"`:''}>`);
     if(f.t==='sel')return fld(id,f.l,`<select id="${id}" ${A(k)}>${opts(fo(f,d),d[k]??'')}</select>`);
     if(f.t==='chk')return `<label class="chk"><input type="checkbox" id="${id}" ${A(k)}${d[k]?' checked':''}> ${f.l}</label>`;
@@ -1535,6 +1536,7 @@ $('#t-plan').onclick=()=>setMode('plan');$('#t-list').onclick=()=>setMode('list'
 function setTab(t){tmode=t;document.querySelectorAll('.vt button').forEach(x=>x.setAttribute('aria-selected',String(x.dataset.tm===t)));renderTable()}
 $('.vt').addEventListener('click',e=>{const b=e.target.closest('[data-tm]');if(b)setTab(b.dataset.tm)});
 $('#q').addEventListener('input',renderTable);
+$('#t-opts').addEventListener('change',e=>{if(e.target.id==='t-psep'){ck('view');state.view.psep=e.target.value;touched();renderAll()}if(e.target.id==='t-pfree'){ck('view');state.view.pfree=e.target.checked;touched();renderAll()}});
 $('#b-csv').onclick=exportTab;
 document.addEventListener('keydown',e=>{
   if(e.key==='Escape'){
@@ -1567,7 +1569,7 @@ document.addEventListener('keydown',e=>{
 /* ================= menu, export, import ================= */
 function buildMenu(){
   const can=!!DL;
-  const items=[['json',can?'Projekt speichern (.json)':'Projekt als JSON kopieren'],['open','Projekt laden …'],['-'],['csv',can?'Patchliste als CSV':'Patchliste kopieren (CSV)'],['csv2',can?'Strecken als CSV':'Strecken kopieren (CSV)'],['svg',can?'Plan als SVG-Bild':'Plan als SVG kopieren']];
+  const items=[['json',can?'Projekt speichern (.json)':'Projekt als JSON kopieren'],['open','Projekt laden …'],['-'],['csv',can?'Patchliste als CSV':'Patchliste kopieren (CSV)'],['csv2',can?'Patchlegung als CSV':'Patchlegung kopieren (CSV)'],['svg',can?'Plan als SVG-Bild':'Plan als SVG kopieren']];
   if(can)items.push(['png','Plan als PNG-Bild']);
   items.push(['-'],['pdf','PDF-Dokumentation'],['labels','Etiketten drucken …'],['-'],['versions','Versionsverlauf …'],['-'],['example','Beispielprojekt laden'],['new','Neues leeres Projekt']);
   $('#menu').innerHTML=items.map(([k,t])=>k==='-'?'<hr>':`<button type="button" role="menuitem" data-m="${k}">${t}</button>`).join('');
@@ -1595,15 +1597,48 @@ function cableRows(){
   return [...state.cables].sort((a,b)=>String(a.label).localeCompare(String(b.label),'de',{numeric:true})).map(c=>{const inf=AN.get(c.id);
     return {c,cells:[c.label||'–',devCell(dev(c.a.d)),portCell(c.a),devCell(dev(c.b.d)),portCell(c.b),cspec(c).replace(/ · [\d,]+ m$/,''),trTxt(c),fmtLen(c.len),inf.nolink?'kein Link':inf.speed?SP[inf.speed].n:'passiv',inf.iss.filter(i=>i[0]!=='info').map(i=>i[1]).join(' / ')]}});
 }
-function chanRows(){
-  return CH.map(ch=>{const S=ch.steps,a=S[0].from,b=S[S.length-1].to,via=S.slice(0,-1).map(s=>`${dev(s.to.d).name} ${pname(dev(s.to.d),s.to.p)}`),len=S.reduce((x,s)=>x+(+s.c.len||0),0),known=S.every(s=>s.c.len!=='');
-    const end=e=>`${devCell(dev(e.d))} · ${portCell(e)}${isPas(ptype(e.p))?' (offen)':''}`;
-    return {c:S[0].c,cells:[end(a),end(b),via.join(', ')||'direkt',S.map(s=>s.c.label||'–').join(' + '),len?(known?'':'≥ ')+de(len)+' m':'',ch.nl?'kein Link':ch.speed?SP[ch.speed].n:'passiv',ch.iss.filter(i=>i[0]!=='info').map(i=>i[1]).join(' / ')]}});
-}
+/* ---------- Patchlegung: je Raum und Switch, Port → Patchpanel → Endgerät ---------- */
+function panelTag(d){if(d.ptag)return d.ptag;const L=state.devices.filter(x=>(x.kind==='patch'||x.kind==='fiber')&&(x.rack||'')===(d.rack||'')&&x.id!==d.id);
+  const before=L.filter(x=>d.rack?(x.u<d.u):(x.y<d.y||(x.y===d.y&&x.x<d.x))).length;return String(before+1)}
+function patchDesig(d,pid){const p=lay(d).ports.find(q=>q.id===pid);return panelTag(d)+(state.view.psep||'.')+(p&&p.num?p.num:pname(d,pid))}
+const devClass=x=>x.kind==='host'||x.kind==='net'?subLbl(x):x.kind==='ap'?'Access Point':KIND[x.kind].n;
+const vlanName=id=>{const v=vlanOf(id);return v&&v.name?v.name:'VLAN '+id};
+function patchRows(){
+  const free=!!state.view.pfree,csvRows=[],tree=[];let nP=0,nS=0;
+  const sws=state.devices.filter(d=>d.kind==='switch');
+  const byRoom=new Map();for(const d of sws){const rm=devRoom(d),k=rm?rm.id:'';if(!byRoom.has(k))byRoom.set(k,[]);byRoom.get(k).push(d)}
+  const roomKeys=[...state.rooms.filter(r=>byRoom.has(r.id)).map(r=>r.id),...(byRoom.has('')?['']:[])];
+  const nat=(a,b)=>String(a).localeCompare(String(b),'de',{numeric:true});
+  for(const rk of roomKeys){const rm=roomOf(rk),R={name:rm?rm.name:'Ohne Raum',racks:[]};tree.push(R);
+    const byRack=new Map();for(const d of byRoom.get(rk)){const k=d.rack||'';if(!byRack.has(k))byRack.set(k,[]);byRack.get(k).push(d)}
+    const rackKeys=[...byRack.keys()].sort((a,b)=>a===''?1:b===''?-1:nat(rackOf(a).name,rackOf(b).name));
+    for(const kk of rackKeys){const r=kk&&rackOf(kk),K={name:r?r.name:'Ohne Schrank',meta:r?`${r.rsize}″ · ${rgeom(r).n} HE`:'frei stehend',sws:[]};R.racks.push(K);
+      for(const sw of byRack.get(kk).sort((a,b)=>(a.u||0)-(b.u||0)||nat(a.name,b.name))){nS++;const S={sw,meta:[r?heTxt(sw):'',sw.model,`${usedPorts(sw)}/${total(sw)} Ports belegt`].filter(Boolean).join(' · '),rows:[]};K.sws.push(S);
+        for(const p of lay(sw).ports){const c=cabOf(sw.id,p.id,'f');if(!c&&!free)continue;
+          let patch='',cls='',user='';
+          if(c){const ch=AN.get(c.id)&&AN.get(c.id).ch,St=ch?ch.steps:[];
+            if(St.length){const fwd=St[0].from.d===sw.id&&St[0].from.p===p.id,hops=fwd?St.slice(0,-1).map(x=>x.to):St.slice(1).map(x=>x.from).reverse(),far=fwd?St[St.length-1].to:St[0].from;
+              patch=hops.filter(e=>{const x=dev(e.d);return x&&(x.kind==='patch'||x.kind==='fiber')}).map(e=>patchDesig(dev(e.d),e.p)).join(' › ');
+              const x=dev(far.d);if(x&&x.id!==sw.id&&!isPas(ptype(far.p))){cls=devClass(x);user=x.user||(x.kind==='host'?'':x.name)}}nP++}
+          const pv=pvlan(sw,p.id),vl=!pv?'':pv.m==='access'?vlanName(pv.v):'Trunk'+(pv.tag.length?' ('+pv.tag.join(', ')+')':''),port=p.num?String(p.num).padStart(2,'0'):pname(sw,p.id);
+          S.rows.push({dv:sw.id,port:p.id,free:!c,vc:pv&&pv.m==='access'?vcol(pv.v):null,cells:[port,patch,vl,cls,user]});
+          csvRows.push([R.name,K.name,sw.name,port,patch,vl,cls,user])}}}}
+  const flat=tree.flatMap(R=>R.racks.flatMap(K=>K.sws.flatMap(S=>S.rows)));
+  return {heads:['Port','Patch','VLAN','Gerät','Nutzer'],tree,rows:flat,csv:{heads:['Raum','Schrank','Switch','Port','Patch','VLAN','Gerät','Nutzer'],rows:csvRows},sub:`${pl(nS,'Switch','Switches')} · ${pl(nP,'Port','Ports')} gepatcht`}}
+function renderPatch(T,q){const box=$('#tcustom'),H=T.heads,m=t=>String(t).toLowerCase().includes(q);let h='',hits=0;
+  for(const R of T.tree){let rh='';
+    for(const K of R.racks){let kh='';
+      for(const S of K.sws){const rows=q&&!m(S.sw.name)&&!m(K.name)&&!m(R.name)?S.rows.filter(r=>m(r.cells.join(' '))):S.rows;if(q&&!rows.length)continue;hits+=rows.length;
+        kh+=`<section class="plsw"><h5>${esc(S.sw.name)} <small>${esc(S.meta)}</small></h5>${rows.length?`<div class="scroll"><table class="patch pl"><thead><tr>${H.map(x=>`<th>${x}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr data-dv="${r.dv}" data-port="${r.port}" tabindex="0"${r.free?' class="free"':''}>${r.cells.map((v,i)=>`<td data-l="${H[i]}"><span>${i===2&&r.vc&&v?`<i class="dot" style="--c:${r.vc}"></i>`:''}${esc(v)}</span></td>`).join('')}</tr>`).join('')}</tbody></table></div>`:'<p class="note">Noch keine Ports gepatcht. Mit „Freie Ports“ siehst du alle Ports.</p>'}</section>`}
+      if(kh)rh+=`<section class="plrack"><h4>${esc(K.name)} <small>${esc(K.meta)}</small></h4>${kh}</section>`}
+    if(rh)h+=`<section class="plroom"><h3>${esc(R.name)}</h3>${rh}</section>`}
+  box.innerHTML=h||`<p class="note">${q?'Keine Treffer.':'Noch keine Switches im Plan. Lege einen Switch an und verbinde seine Ports – die Patchlegung entsteht automatisch.'}</p>`;return hits}
+$('#tcustom').addEventListener('click',e=>{const tr=e.target.closest('tr[data-dv]');tr&&openRow(tr)});
+$('#tcustom').addEventListener('keydown',e=>{const tr=e.target.closest('tr[data-dv]');if(tr&&e.key==='Enter')openRow(tr)});
 function csv(kind){
   const q=v=>{v=String(v??'');if(/^[=+\-@]/.test(v))v="'"+v;return /[";\n\r]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};
   let rows;
-  if(kind==='csv2')rows=[['Ende A','Ende B','Über','Kabel','Länge','Link','Hinweis'],...chanRows().map(r=>r.cells)];
+  if(kind==='csv2'){const P=patchRows();rows=[P.csv.heads,...P.csv.rows]}
   else rows=[['Kabel','Von Gerät','Von Port','Nach Gerät','Nach Port','Medium','Transceiver','Länge','Link','Hinweis','Farbe','Notiz'],...cableRows().map(r=>[...r.cells,COL[r.c.color].n,r.c.notes])];
   return '﻿'+rows.map(r=>r.map(q).join(';')).join('\r\n');
 }
@@ -1623,8 +1658,8 @@ async function exp(kind){
     catch(_){toast('Bild konnte nicht erzeugt werden')}finally{URL.revokeObjectURL(url)}
     return}
   const text=kind==='json'?JSON.stringify(state,null,2):kind==='csv'||kind==='csv2'?csv(kind):buildSVG().svg;
-  const label={json:'Projekt',csv:'Patchliste',csv2:'Streckenliste',svg:'SVG'}[kind];
-  if(DL)await save(name+({json:'.json',csv:'-patchliste.csv',csv2:'-strecken.csv',svg:'.svg'}[kind]),text);
+  const label={json:'Projekt',csv:'Patchliste',csv2:'Patchlegung',svg:'SVG'}[kind];
+  if(DL)await save(name+({json:'.json',csv:'-patchliste.csv',csv2:'-patchlegung.csv',svg:'.svg'}[kind]),text);
   else copyText(text,label);
 }
 async function save(filename,data){
@@ -1660,7 +1695,7 @@ function sanitize(o){
   const okId=v=>typeof v==='string'&&/^[A-Za-z0-9_-]{1,40}$/.test(v);
   const pick=(v,list,df)=>list.includes(v)?v:df;
   const ov_=o.view||{};
-  const out={v:3,name:S(o.name,80)||'Netzwerk',devices:[],cables:[],racks:[],rooms:[],view:{labelMode:pick(ov_.labelMode,['num','spec','off'],ov_.labels===false?'off':'num'),colorBy:ov_.colorBy==='cable'?'cable':'speed',hide:{cats:[],ids:[]},topoHosts:pick(ov_.topoHosts,['single','group','off'],''),topoColor:pick(ov_.topoColor,['speed','vlan'],'speed')},life:{old:N(o.life&&o.life.old,1,50,5),eol:N(o.life&&o.life.eol,1,60,10)},updated:Number(o.updated)||0,demo:!!o.demo};
+  const out={v:3,name:S(o.name,80)||'Netzwerk',devices:[],cables:[],racks:[],rooms:[],view:{labelMode:pick(ov_.labelMode,['num','spec','off'],ov_.labels===false?'off':'num'),colorBy:ov_.colorBy==='cable'?'cable':'speed',psep:pick(ov_.psep,['.','/','-'],'.'),pfree:!!ov_.pfree,hide:{cats:[],ids:[]},topoHosts:pick(ov_.topoHosts,['single','group','off'],''),topoColor:pick(ov_.topoColor,['speed','vlan'],'speed')},life:{old:N(o.life&&o.life.old,1,50,5),eol:N(o.life&&o.life.eol,1,60,10)},updated:Number(o.updated)||0,demo:!!o.demo};
   const oids=new Set();
   for(const r of (Array.isArray(o.racks)?o.racks:[]).slice(0,60)){if(!r||typeof r!=='object')continue;const id=okId(r.id)&&!oids.has(r.id)?r.id:'k'+rid();oids.add(id);out.racks.push({id,name:S(r.name,60)||'Schrank',rsize:pick(r.rsize,['19','10'],'19'),minHe:N(r.minHe,0,60,0),rcolor:pick(r.rcolor,['schwarz','grau'],'schwarz'),location:S(r.location,60),notes:S(r.notes,500),x:N(r.x,-50000,50000,40),y:N(r.y,-50000,50000,40)})}
   for(const m of (Array.isArray(o.rooms)?o.rooms:[]).slice(0,60)){if(!m||typeof m!=='object')continue;const id=okId(m.id)&&!oids.has(m.id)?m.id:'m'+rid();oids.add(id);out.rooms.push({id,name:S(m.name,60)||'Raum',roomc:pick(m.roomc,Object.keys(RCOL),'blau'),x:N(m.x,-50000,50000,0),y:N(m.y,-50000,50000,0),w:N(m.w,300,30000,1600),h:N(m.h,200,30000,1100),notes:S(m.notes,500)})}
@@ -1673,7 +1708,7 @@ function sanitize(o){
     x.name=S(d.name,40)||K.n;for(const k of ['model','role','location','ip','user','mac'])x[k]=S(d[k],F[k].max);x.notes=S(d.notes,500);
     x.style=K.styles.includes(d.style)?d.style:K.styles[0];
     x.x=N(d.x,-50000,50000,40);x.y=N(d.y,-50000,50000,40);
-    x.size=K.rack?pick(d.size,kind==='ups'?['frei','19']:['frei','10','19'],d.pc?x.size:'frei'):'frei';x.he=N(d.he,1,K.maxHe||1,x.he);x.rows=pick(d.rows,['auto','1','2'],'auto');x.pnum=pick(d.pnum,['col','colr','row','rowr'],'col');
+    x.size=K.rack?pick(d.size,kind==='ups'?['frei','19']:['frei','10','19'],d.pc?x.size:'frei'):'frei';x.he=N(d.he,1,K.maxHe||1,x.he);x.rows=pick(d.rows,['auto','1','2'],'auto');x.pnum=pick(d.pnum,['col','colr','row','rowr'],'col');x.ptag=S(d.ptag,12);
     if(kind==='server'){const big=x.size!=='frei'&&x.he>1&&d.bays==null;x.bays=N(d.bays,0,48,big?12:8);x.baysUsed=N(d.baysUsed,0,x.bays,x.bays);x.bayForm=pick(d.bayForm,['2.5','3.5'],big?'3.5':'2.5');x.bayDir=pick(d.bayDir,['v','h'],big?'h':'v');x.bayRows=pick(String(d.bayRows),['1','2','3','4'],big?'3':'1');
       x.disks={};if(d.disks&&typeof d.disks==='object')for(const [k,v] of Object.entries(d.disks)){if(!/^\d{1,2}$/.test(k)||+k>=x.bays)continue;let o=null;
         if(typeof v==='string'){const m=/^\s*(\d+(?:[.,]\d+)?)\s*(tib|tb|t|gib|gb|g)?/i.exec(v);if(m){const n=parseFloat(m[1].replace(',','.'));o={c:n,u:/^g/i.test(m[2]||'')||(!m[2]&&n>=100)?'GB':'TB'}}}
@@ -1889,29 +1924,33 @@ function matRows(){const M=new Map(),add=(g,art,det,n,u)=>{const k=g+'|'+art+'|'
   const ord=['Geräte','Schränke','Patchkabel','Verlegekabel','Direktkabel','Transceiver','Module','Festplatten'];
   const rows=[...M.values()].sort((a,b)=>ord.indexOf(a.g)-ord.indexOf(b.g)||a.art.localeCompare(b.art,'de')||a.det.localeCompare(b.det,'de',{numeric:true})).map(o=>({cells:[o.g,o.u==='m'?de(String(+o.n.toFixed(1))):String(o.n),o.u,o.art,o.det]}));
   return {heads:['Gruppe','Menge','Einheit','Artikel','Details'],rows,num:[1],sub:`${rows.length} Positionen · Kabel ${state.cables.length} · Geräte ${state.devices.length}`}}
-const TTL={kabel:'Patchliste',strecken:'Strecken',geraete:'Geräte',netze:'VLANs & IP-Adressen',strom:'Stromversorgung',material:'Materialliste'};
+const TTL={kabel:'Patchliste',strecken:'Patchlegung',geraete:'Geräte',netze:'VLANs & IP-Adressen',strom:'Stromversorgung',material:'Materialliste'};
 function devRows(){const byName=(a,b)=>String(a.name).localeCompare(String(b.name),'de',{numeric:true});
   return [...state.devices].sort((a,b)=>catOrder.indexOf(catOf(a)[0])-catOrder.indexOf(catOf(b)[0])||byName(a,b)).map(d=>{const z=lcs(d),hv=HVL.get(d.id),rm=devRoom(d);
     return {dv:d.id,cells:[d.name,d.kind==='host'||d.kind==='net'?subLbl(d):KIND[d.kind].n,[d.rack?where(d):'',rm?rm.name:''].filter(Boolean).join(' · '),d.model||d.role||'',d.ip||'',hv?vshort(hv):'',`${usedPorts(d)}/${total(d)}`,d.year?`${d.year}${z&&z.s!=='ok'?' · '+LCC[z.s].n:''}`:'',d.user||d.location||'']}})}
 function ipRows(){return state.devices.filter(d=>d.ip).map(d=>{const I=IPI&&IPI.get(d.id)||{},V=I.v?vlanOf(I.v):null,S=vnet(V);return {dv:d.id,n:I.n??Infinity,cells:[d.ip,d.name,d.kind==='host'?subLbl(d):KIND[d.kind].n,V?vshort(V.id):'',S?S.txt:'',I.bad?'ungültig':I.dup?'doppelt':I.wrong?'falsches Subnetz':'ok']}}).sort((a,b)=>a.n-b.n)}
 function tableData(m){
   if(m==='kabel')return {heads:['Kabel','Von','Port','Nach','Port','Medium','Transceiver','Länge','Link','Hinweis'],rows:cableRows(),link:8,num:[7],sub:`${state.cables.length} Kabel · ${state.devices.length} Geräte`};
-  if(m==='strecken')return {heads:['Ende A','Ende B','Über','Kabel','Länge','Link','Hinweis'],rows:chanRows(),link:5,num:[4],nw:[3],sub:`${CH.length} Strecken von Ende zu Ende`};
+  if(m==='strecken')return patchRows();
   if(m==='geraete')return {heads:['Name','Art','Ort','Modell','IP','VLAN','Ports','Kaufjahr','Benutzer / Standort'],rows:devRows(),num:[6],sub:`${state.devices.length} Geräte in ${pl(state.racks.length,'Schrank','Schränken')}`};
   if(m==='netze')return {heads:['IP-Adresse','Gerät','Art','VLAN','Subnetz','Status'],rows:ipRows(),sub:''};
   if(m==='strom')return typeof powerRows==='function'?powerRows():{heads:[],rows:[]};
   if(m==='material')return typeof matRows==='function'?matRows():{heads:[],rows:[]};
   return {heads:[],rows:[]}}
 function renderTable(){
-  const q=$('#q').value.trim().toLowerCase(),T=tableData(tmode),custom=tmode==='netze';
+  const q=$('#q').value.trim().toLowerCase(),T=tableData(tmode),pl_=tmode==='strecken',custom=tmode==='netze'||pl_;
   $('#t-h').textContent=TTL[tmode];
-  $('#tcustom').hidden=!custom;if(custom)renderNetze();
+  $('#tcustom').hidden=!custom;$('#tscroll').hidden=pl_;
+  $('#t-opts').hidden=!pl_;
+  if(pl_){$('#t-opts').innerHTML=`<label>Schreibweise Patch <select id="t-psep" aria-label="Trennzeichen zwischen Patchpanel und Port">${opts([['.','11.6'],['/','11/6'],['-','11-6']],state.view.psep||'.')}</select></label><label class="chk"><input type="checkbox" id="t-pfree"${state.view.pfree?' checked':''}> Freie Ports</label>`;
+    const n=renderPatch(T,q);$('#t-sub').textContent=(T.sub||'')+(q?' · '+n+' Treffer':'');return}
+  if(custom)renderNetze();
   const rows=T.rows.filter(r=>!q||r.cells.join(' ').toLowerCase().includes(q));
   $('#t-sub').textContent=(T.sub||'')+(q?(T.sub?' · ':'')+rows.length+' Treffer':'');
   $('#tscroll').classList.toggle('below',custom);
   $('#pth').innerHTML=`<tr>${T.heads.map(h=>`<th>${h}</th>`).join('')}</tr>`;
   const cab=tmode==='kabel',num=T.num||[],nw=T.nw||[];
-  $('#ptb').innerHTML=rows.length?rows.map(r=>`<tr ${r.c?`data-cab="${r.c.id}"`:r.dv?`data-dv="${r.dv}"`:''}${r.c||r.dv?' tabindex="0"':''}${r.cls?` class="${r.cls}"`:''}>${r.cells.map((v,i)=>`<td data-l="${T.heads[i]}" class="${cab&&i===0?'lb':num.includes(i)?'n':i===T.link||nw.includes(i)?'nw':''}"><span>${i===T.link?`<i class="dot" style="--c:${cab?ccolor(r.c,AN.get(r.c.id)):(v==='kein Link'||v==='passiv'?'#8a8f96':SP[Object.keys(SP).find(k=>SP[k].n===v)]?.c||'#8a8f96')}"></i>`:''}${tmode==='netze'&&i===5&&v!=='ok'?`<span class="wtag">${esc(v)}</span>`:tmode==='netze'&&i===3&&r.dv&&IPI.get(r.dv)&&IPI.get(r.dv).v?`<i class="dot" style="--c:${vcol(IPI.get(r.dv).v)}"></i>${esc(v)}`:esc(v)}</span></td>`).join('')}</tr>`).join(''):`<tr><td class="tempty" colspan="${T.heads.length||1}">${q?'Keine Treffer.':'Noch nichts vorhanden.'}</td></tr>`;
+  $('#ptb').innerHTML=rows.length?rows.map(r=>`<tr ${r.c?`data-cab="${r.c.id}"`:r.dv?`data-dv="${r.dv}"${r.port?` data-port="${r.port}"`:''}`:''}${r.c||r.dv?' tabindex="0"':''}${r.cls?` class="${r.cls}"`:''}>${r.cells.map((v,i)=>`<td data-l="${T.heads[i]}" class="${cab&&i===0?'lb':num.includes(i)?'n':i===T.link||nw.includes(i)?'nw':''}"><span>${i===T.link?`<i class="dot" style="--c:${cab?ccolor(r.c,AN.get(r.c.id)):(v==='kein Link'||v==='passiv'?'#8a8f96':SP[Object.keys(SP).find(k=>SP[k].n===v)]?.c||'#8a8f96')}"></i>`:''}${tmode==='netze'&&i===5&&v!=='ok'?`<span class="wtag">${esc(v)}</span>`:tmode==='netze'&&i===3&&r.dv&&IPI.get(r.dv)&&IPI.get(r.dv).v?`<i class="dot" style="--c:${vcol(IPI.get(r.dv).v)}"></i>${esc(v)}`:esc(v)}</span></td>`).join('')}</tr>`).join(''):`<tr><td class="tempty" colspan="${T.heads.length||1}">${q?'Keine Treffer.':'Noch nichts vorhanden.'}</td></tr>`;
 }
 function renderNetze(){
   const box=$('#tcustom'),fid=document.activeElement&&box.contains(document.activeElement)?document.activeElement.id:null;
@@ -1931,9 +1970,9 @@ $('#tcustom').addEventListener('change',e=>{const el=e.target,tr=el.closest('[da
 $('#tcustom').addEventListener('click',e=>{const b=e.target.closest('[data-vact]');if(!b)return;
   if(b.dataset.vact==='add'){let id=10;while(vlanOf(id))id+=10;if(id>4094){id=2;while(vlanOf(id))id++}ck();state.vlans.push({id,name:'',color:VLC[state.vlans.length%VLC.length],subnet:'',gw:''});state.vlans.sort((a,b)=>a.id-b.id);touched();renderAll();const n=document.getElementById('vn-'+id);n&&n.focus()}
   if(b.dataset.vact==='del'){const id=+b.closest('[data-vid]').dataset.vid;ck();state.vlans=state.vlans.filter(v=>v.id!==id);for(const d of state.devices)for(const [k,pc] of Object.entries(d.ports)){if(pc.vlan===id)delete pc.vlan;if(pc.tv)pc.tv=pc.tv.filter(x=>x!==id);if(!pc.tv||!pc.tv.length){if(pc.vm!=='trunk')delete pc.tv}if(!Object.keys(pc).length)delete d.ports[k]}touched();renderAll();toast('VLAN '+id+' gelöscht')}});
-function exportTab(){const T=tableData(tmode);if(!T.rows.length){toast('Die Liste ist leer');return}const q=v=>{v=String(v??'');if(/^[=+\-@]/.test(v))v="'"+v;return /[";\n\r]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};
+function exportTab(){const T0=tableData(tmode),T=T0.csv?{heads:T0.csv.heads,rows:T0.csv.rows.map(c=>({cells:c}))}:T0;if(!T.rows.length){toast('Die Liste ist leer');return}const q=v=>{v=String(v??'');if(/^[=+\-@]/.test(v))v="'"+v;return /[";\n\r]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};
   const text='﻿'+[T.heads,...T.rows.map(r=>r.cells)].map(r=>r.map(q).join(';')).join('\r\n');if(DL)save(slug()+'-'+tmode+'.csv',text);else copyText(text,TTL[tmode])}
-const openRow=tr=>{setMode('plan');if(tr.dataset.dv){select({kind:'dev',id:tr.dataset.dv});centerOn(dev(tr.dataset.dv))}else{select({kind:'cable',id:tr.dataset.cab});centerCable(tr.dataset.cab)}};
+const openRow=tr=>{setMode('plan');if(tr.dataset.dv&&tr.dataset.port){select({kind:'port',dev:tr.dataset.dv,port:tr.dataset.port});centerOn(dev(tr.dataset.dv))}else if(tr.dataset.dv){select({kind:'dev',id:tr.dataset.dv});centerOn(dev(tr.dataset.dv))}else{select({kind:'cable',id:tr.dataset.cab});centerCable(tr.dataset.cab)}};
 $('#ptb').addEventListener('click',e=>{const tr=e.target.closest('tr[data-cab],tr[data-dv]');tr&&openRow(tr)});
 $('#ptb').addEventListener('keydown',e=>{const tr=e.target.closest('tr[data-cab],tr[data-dv]');if(tr&&e.key==='Enter')openRow(tr)});
 
@@ -1954,7 +1993,7 @@ async function makeDoc(){
   toast('PDF wird erstellt …');let JS;try{JS=await needPDF()}catch(_){toast('PDF-Bibliothek konnte nicht geladen werden');return}
   analyze();
   const doc=new JS({orientation:'landscape',unit:'mm',format:'a4',compress:true}),PW_=297,PH_=210,M=12,date=new Date().toLocaleDateString('de-DE');
-  const AT=(o)=>{const f=window.autoTable||(doc.autoTable&&((d,op)=>d.autoTable(op)));f(doc,{theme:'striped',styles:{font:'helvetica',fontSize:7.6,cellPadding:1.4,overflow:'linebreak'},headStyles:{fillColor:[17,17,17],textColor:255,fontStyle:'bold'},alternateRowStyles:{fillColor:[243,243,240]},margin:{top:22,left:M,right:M,bottom:14},...o,head:o.head.map(r=>r.map(pT)),body:o.body.map(r=>r.map(pT))})};
+  const AT=(o)=>{const f=window.autoTable||(doc.autoTable&&((d,op)=>d.autoTable(op)));f(doc,{theme:'striped',styles:{font:'helvetica',fontSize:7.6,cellPadding:1.4,overflow:'linebreak'},headStyles:{fillColor:[17,17,17],textColor:255,fontStyle:'bold'},alternateRowStyles:{fillColor:[243,243,240]},margin:{top:22,left:M,right:M,bottom:14},...o,head:o.head.map(r=>r.map(c=>c&&typeof c==='object'?{...c,content:pT(c.content)}:pT(c))),body:o.body.map(r=>r.map(c=>c&&typeof c==='object'?{...c,content:pT(c.content)}:pT(c)))})};
   const H=(t,sub)=>{doc.setFont('helvetica','bold');doc.setFontSize(16);doc.setTextColor(17);doc.text(pT(t),M,17);if(sub){doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(100);doc.text(pT(sub),PW_-M,17,{align:'right'})}};
   const toc=[];const page=(t,sub)=>{doc.addPage();toc.push([t,doc.getNumberOfPages()]);H(t,sub)};
   // Deckblatt
@@ -1972,7 +2011,11 @@ async function makeDoc(){
   {const R=topoSVG();if(R){const b=R.box,svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${Math.ceil(b.w)}" height="${Math.ceil(b.h)}" viewBox="${b.x} ${b.y} ${b.w} ${b.h}" font-family="Arial, sans-serif"><rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" fill="#fff"/>${R.svg}</svg>`;try{page('Logische Topologie',`${R.M.nodes.size} Geräte · ${R.M.E.size} Verbindungen`);const I=await svgToJpeg(svg,b.w,b.h,5000);const s=Math.min((PW_-2*M)/b.w,(PH_-32)/b.h);doc.addImage(I.data,'JPEG',M+((PW_-2*M)-b.w*s)/2,24,b.w*s,b.h*s)}catch(_){}}}
   // Tabellen
   const tbl=(t,T)=>{if(!T.rows.length)return;page(t,T.sub||'');AT({startY:24,head:[T.heads],body:T.rows.map(r=>r.cells.map(String))})};
-  tbl('Geräte',tableData('geraete'));tbl('Patchliste',tableData('kabel'));tbl('Strecken',tableData('strecken'));
+  tbl('Geräte',tableData('geraete'));tbl('Patchliste',tableData('kabel'));
+  {const P=patchRows();if(P.tree.length){page('Patchlegung',P.sub);let y=26;const room=()=>{if(y>PH_-45){doc.addPage();y=26}};
+    for(const Rr of P.tree){room();doc.setFont('helvetica','bold');doc.setFontSize(13);doc.setTextColor(17);doc.text(pT(Rr.name),M,y+3);y+=8;
+      for(const K of Rr.racks){room();doc.setFont('helvetica','bold');doc.setFontSize(10.5);doc.setTextColor(40);doc.text(pT(K.name),M,y+2);doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.setTextColor(110);doc.text(pT(K.meta),M+doc.getTextWidth(pT(K.name))*10.5/8.5+4,y+2);y+=5;
+        for(const S of K.sws){room();AT({startY:y,head:[[{content:S.sw.name+'   '+S.meta,colSpan:5,styles:{fillColor:[228,228,222],textColor:17,fontStyle:'bold'}}],P.heads],body:S.rows.length?S.rows.map(r=>r.cells.map(String)):[[{content:'Noch keine Ports gepatcht',colSpan:5}]],columnStyles:{0:{cellWidth:16,fontStyle:'bold'},1:{cellWidth:30},2:{cellWidth:46},3:{cellWidth:34}},margin:{top:24,left:M,right:M,bottom:14}});y=doc.lastAutoTable.finalY+7}}}}}
   if(state.vlans.length){page('VLANs',`${state.vlans.length} VLANs`);AT({startY:24,head:[['ID','Name','Subnetz','Gateway','Farbe']],body:state.vlans.map(v=>[String(v.id),v.name,v.subnet,v.gw,v.color])});}
   tbl('IP-Adressen',tableData('netze'));
   if(PW.size)tbl('Stromversorgung',powerRows());

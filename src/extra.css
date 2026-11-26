@@ -234,3 +234,32 @@ table.etab{width:100%;border-collapse:collapse;font-size:14px;margin-bottom:22px
 .qrbox{display:grid;place-items:center;margin:4px 0 12px}
 .qrbox svg{width:min(240px,70vw);height:auto;background:#fff;padding:6px;border-radius:8px}
 code{font-size:13px;overflow-wrap:anywhere}
+/* --- Patchlegung: Raum > Schrank > je Switch eine Tabelle --- */
+.topts{display:flex;align-items:center;gap:14px;flex-wrap:wrap;font-size:14px}
+.topts[hidden]{display:none}
+.topts label{display:flex;align-items:center;gap:6px;margin:0}
+.topts select{min-height:38px;padding:4px 8px;font-size:14px;width:auto}
+.plroom{margin:0 0 30px}
+.plroom>h3{margin:6px 0 14px;font-size:22px;padding-bottom:8px;border-bottom:3px solid var(--ink)}
+.plrack{margin:0 0 22px;padding-left:14px;border-left:3px solid var(--line)}
+.plrack>h4{margin:0 0 12px;font-size:17px}
+.plrack small,.plsw small{font-weight:500;color:var(--mute);font-size:13px;margin-left:6px}
+.plsw{margin:0 0 18px}
+.plsw>h5{margin:0 0 6px;font-size:15px;font-weight:700}
+table.pl{width:auto;min-width:min(100%,640px)}
+.pl th,.pl td{padding:7px 14px 7px 0}
+.pl td:first-child{font-variant-numeric:tabular-nums;font-weight:700;width:56px}
+.pl td:nth-child(2){font-variant-numeric:tabular-nums;white-space:nowrap}
+.pl tr.free td{color:var(--mute)}
+.topts label{flex:none;white-space:nowrap}
+.topts .chk{margin:0;min-height:38px}
+@media(max-width:600px){
+  table.pl{font-size:13px;min-width:0;width:100%}
+  table.pl thead{display:table-header-group}
+  table.pl tr{display:table-row;padding:0;border:0}
+  table.pl td{display:table-cell;text-align:left;padding:7px 8px 7px 0;border-bottom:1px solid var(--line)}
+  table.pl td::before{content:none}
+  .pl td:first-child{width:auto}
+  .plrack{padding-left:8px}
+}
+.topts input[type=checkbox]{width:20px;height:20px;min-width:0;flex:none;padding:0}
