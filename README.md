@@ -1,4 +1,4 @@
-# Switch-Verkabelung
+# Switch-Verkabelungstool - Dokutool
 
 Netzwerk-Verkabelung im Browser planen und dokumentieren. Switches, Firewalls, Patchpanels, LWL-Panels, Server, USVs, Access Points und Hosts legst du in Schränken und Räumen an. Ihre Ports verbindest du per Drag & Drop.
 
