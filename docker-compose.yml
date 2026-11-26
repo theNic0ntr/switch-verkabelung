@@ -10,9 +10,9 @@ services:
       - daten:/data
     environment:
       TZ: Europe/Berlin
-      # Anmeldung (HTTP Basic Auth) – dringend empfohlen, sobald der Server nicht nur lokal erreichbar ist:
-      # AUTH_USER: admin
-      # AUTH_PASSWORD: bitte-ein-langes-passwort
+      # Anmeldung (HTTP Basic Auth) – dringend empfohlen, sobald der Server nicht nur lokal erreichbar ist.
+      # Je Person name:passwort, mehrere durch Komma getrennt; der Name erscheint bei den anderen am Mauszeiger:
+      # AUTH_USERS: "nico:bitte-ein-langes-passwort,anna:noch-ein-langes-passwort"
 
 volumes:
   daten:

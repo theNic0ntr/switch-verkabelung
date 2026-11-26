@@ -22,6 +22,7 @@ Netzwerk-Verkabelung im Browser planen und dokumentieren. Switches, Firewalls, P
 - **PDF und Etiketten:** komplette Dokumentation als PDF (Plan, Schränke, Topologie, alle Listen); Etiketten für Kabel, Ports und Geräte auf A4-Bögen, für Etikettendrucker oder als Kabelfahne, wahlweise mit QR-Code. In der Server-Version öffnet der QR-Code das Objekt direkt (`#dev-…`, `#cab-…`, `#port-…`).
 - **Patchlegung:** wird automatisch aus dem Plan erzeugt – nach Raum und Schrank gegliedert, je Switch eine Tabelle mit Port, Patch (Kürzel des Patchpanels + Port, z. B. 11.6), VLAN, Geräteklasse und Nutzer. Hat ein Patchpanel-Port eine eigene Beschriftung, steht genau diese in der Spalte Patch; sonst wird sie aus Kürzel und Port gebildet. Das Kürzel lässt sich am Patchpanel festlegen, sonst wird je Schrank von oben durchnummeriert.
 - **Export:** Patchliste und Patchlegung als CSV, der Plan als SVG oder PNG, das Projekt als JSON.
+- **Live zusammenarbeiten:** Jede Änderung wird sofort gespeichert und erscheint bei allen, die den Plan offen haben. Arbeiten zwei Leute gleichzeitig, werden ihre Änderungen je Gerät, Kabel und Feld zusammengeführt. Gleichzeitige Änderungen an verschiedenen Dingen gehen also nicht verloren; am selben Feld gilt die zuletzt gespeicherte. Oben rechts siehst du, wer gerade im Plan ist. Im Plan erscheinen ihre Mauszeiger mit Namen und Farbe, außerdem das Gerät, das jemand gerade verschiebt, als Umriss an der neuen Stelle, das Kabel, das jemand zieht, und was gerade ausgewählt ist. Rückgängig (Strg+Z) nimmt nur deine eigenen Schritte zurück.
 
 ## Screenshots
 
@@ -56,19 +57,18 @@ cd switch-verkabelung
 docker compose up -d --build
 ```
 
-Die App läuft danach auf `http://<server>:8080`. Der Plan wird auf dem Server gespeichert, also im Docker-Volume `daten` unter `/data/plan.json`, und ist damit in jedem Browser gleich. Speichern zwei Browser gleichzeitig, fragt die App, welche Version gelten soll.
+Die App läuft danach auf `http://<server>:8080`. Der Plan wird auf dem Server gespeichert, also im Docker-Volume `daten` unter `/data/plan.json`, und ist damit in jedem Browser gleich. Änderungen anderer kommen live über eine dauerhafte Verbindung (`/api/live`, Server-Sent Events) an und werden mit deinen eigenen zusammengeführt.
 
 ### Anmeldung einschalten
 
-Ohne Anmeldung kann jeder, der den Server erreicht, den Plan ändern. Trage in `docker-compose.yml` Benutzer und Passwort ein:
+Ohne Anmeldung kann jeder, der den Server erreicht, den Plan ändern. Trage in `docker-compose.yml` die Konten ein, je Person `name:passwort`, getrennt durch Komma:
 
 ```yaml
     environment:
-      AUTH_USER: admin
-      AUTH_PASSWORD: ein-langes-passwort
+      AUTH_USERS: "nico:ein-langes-passwort,anna:noch-ein-passwort"
 ```
 
-Danach `docker compose up -d` ausführen. Die Anmeldung läuft über HTTP Basic Auth. Ist der Server von außen erreichbar, gehört davor ein Reverse Proxy mit HTTPS (z. B. Caddy, Traefik oder nginx), sonst gehen die Zugangsdaten unverschlüsselt über das Netz.
+Danach `docker compose up -d` ausführen. Der Name des Kontos steht bei den anderen am Mauszeiger. Für ein einzelnes Konto gehen weiterhin `AUTH_USER` und `AUTH_PASSWORD`. Ohne Anmeldung legt jeder seinen Namen selbst fest (Klick auf den eigenen Kreis oben rechts). Die Anmeldung läuft über HTTP Basic Auth. Ist der Server von außen erreichbar, gehört davor ein Reverse Proxy mit HTTPS (z. B. Caddy, Traefik oder nginx), sonst gehen die Zugangsdaten unverschlüsselt über das Netz.
 
 Beispiel mit Caddy, das sich automatisch um das Zertifikat kümmert:
 
@@ -78,12 +78,15 @@ netz.example.de {
 }
 ```
 
+Bei nginx darf die Live-Verbindung nicht gepuffert werden. Der Server schickt dafür `X-Accel-Buffering: no`; bei eigenen Einstellungen zusätzlich für `/api/live` `proxy_buffering off;` und ein langes `proxy_read_timeout` setzen. Fällt die Live-Verbindung aus, holt die App neue Stände alle 30 Sekunden ab.
+
 ### Einstellungen
 
 | Variable | Standard | Bedeutung |
 |---|---|---|
 | `PORT` | `8080` | Port im Container |
-| `AUTH_USER` / `AUTH_PASSWORD` | – | Anmeldung, nur zusammen gesetzt |
+| `AUTH_USERS` | – | Mehrere Konten: `name:passwort,name2:passwort2` (Komma oder Zeilenumbruch, kein Komma im Passwort) |
+| `AUTH_USER` / `AUTH_PASSWORD` | – | Ein einzelnes Konto, nur zusammen gesetzt |
 | `DATA_DIR` | `/data` | Ablage für `plan.json` und Sicherungen |
 | `BACKUPS` | `50` | Anzahl der aufbewahrten Sicherungen (`0` = keine) |
 | `BACKUP_MINUTES` | `10` | Höchstens eine Sicherung pro Zeitraum |
@@ -130,7 +133,7 @@ dist/         Build-Ergebnis (nicht im Repository)
 `node scripts/build.mjs` erzeugt zwei Varianten:
 
 - `dist/public/` ist die Server-Version mit lokal eingebundenen Schriften. Sie lädt nichts von Google und speichert über `/api/plan`.
-- `dist/artifact.html` ist eine Einzeldatei mit Google Fonts, die auch ohne Server läuft und im Browser speichert (localStorage).
+- `dist/artifact.html` ist eine Einzeldatei mit Google Fonts, die auch ohne Server läuft und im Browser speichert (localStorage). Als Claude-Artifact veröffentlicht, nutzt sie einen gemeinsamen Plan für alle, mit denen das Artifact geteilt ist, samt Live-Präsenz.
 
 ## Lizenz
 

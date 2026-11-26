@@ -29,7 +29,7 @@
       <button type="button" class="btn ghost" id="b-file" aria-haspopup="menu" aria-expanded="false">Datei<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="m6 9 6 6 6-6"/></svg></button>
       <div class="menu" id="menu" role="menu" hidden></div>
     </div>
-    <span class="save" id="save" role="status" title=""></span>
+    <div class="people" id="people" hidden aria-label="Wer gerade im Plan ist"></div><span class="save" id="save" role="status" title=""></span>
   </div>
 </header>
 <main class="main" id="main">
@@ -46,7 +46,7 @@
   <div class="stage" id="stage">
     <svg id="cv" aria-label="Verkabelungsplan">
       <defs id="defs"></defs>
-      <g id="world"><g id="l-room"></g><g id="l-rack"></g><g id="l-hit"></g><g id="l-dev"></g><g id="l-cab"></g><g id="l-plug"></g><g id="l-lab"></g><g id="l-pow"></g><g id="l-num"></g><g id="tmpw" style="display:none"><path id="tmpE" fill="none" stroke="#111" stroke-width="8" stroke-linecap="round"/><path id="tmp" fill="none" stroke="#ffe600" stroke-width="4.5" stroke-linecap="round"/></g><rect id="band" fill="#ffe600" fill-opacity=".12" stroke="#111" stroke-width="2" stroke-dasharray="8 6" style="display:none"/><rect id="snap" rx="6" fill="#ffe600" fill-opacity=".18" stroke="#ffe600" stroke-width="6" stroke-dasharray="16 10" style="display:none"/></g>
+      <g id="world"><g id="l-room"></g><g id="l-rack"></g><g id="l-hit"></g><g id="l-dev"></g><g id="l-cab"></g><g id="l-plug"></g><g id="l-lab"></g><g id="l-pow"></g><g id="l-num"></g><g id="tmpw" style="display:none"><path id="tmpE" fill="none" stroke="#111" stroke-width="8" stroke-linecap="round"/><path id="tmp" fill="none" stroke="#ffe600" stroke-width="4.5" stroke-linecap="round"/></g><rect id="band" fill="#ffe600" fill-opacity=".12" stroke="#111" stroke-width="2" stroke-dasharray="8 6" style="display:none"/><rect id="snap" rx="6" fill="#ffe600" fill-opacity=".18" stroke="#ffe600" stroke-width="6" stroke-dasharray="16 10" style="display:none"/><g id="l-peer" pointer-events="none"></g></g>
     </svg>
     <div class="empty" id="empty" hidden><div class="box"><h2>Noch nichts im Plan</h2><p>Lege Räume, Schränke und Geräte an – Switches, Patchpanels, Server, USVs, Access Points oder Hosts – und verbinde ihre Ports per Ziehen.</p><button type="button" class="btn pri" id="b-add2">Hinzufügen</button></div></div>
     <p class="hint" id="hint"></p>

@@ -229,7 +229,7 @@ function setHid(ids,hide,quiet){const T=visTree(),H=hidLeaves(T);for(const id of
 function findNode(T,key){for(const n of T){if(n.key===key)return n;if(n.kids&&n.kids[0]&&n.kids[0].kids!==undefined){const f=findNode(n.kids,key);if(f)return f}}return null}
 
 /* ================= state ================= */
-let state,sel=null,view={x:0,y:0,z:1},mode='plan',tmode='kabel',AN=new Map(),ISS=[],CH=[],CM=new Map(),HL=null,DL=null,hov=null,drag=null,tipKey='',askRes=null,lastRack='',raf=0,HID=new Set(),FD=new Set(),FR=new Set(),FM=new Set(),closedCats=new Set();
+let RTC=null,state,sel=null,view={x:0,y:0,z:1},mode='plan',tmode='kabel',AN=new Map(),ISS=[],CH=[],CM=new Map(),HL=null,DL=null,hov=null,drag=null,tipKey='',askRes=null,lastRack='',raf=0,HID=new Set(),FD=new Set(),FR=new Set(),FM=new Set(),closedCats=new Set();
 const H={u:[],r:[],key:null,t:0};
 const store={ref:null,busy:false,pending:false,tl:0,tc:0};
 
@@ -606,7 +606,7 @@ function routes(){
   return m;
 }
 function cablesSVG(o){
-  let hit='',vis='',plug='',lab='';const placed=[],RT=routes(),rects=devRects(),lm=state.view.labelMode,hl=o.hl;
+  let hit='',vis='',plug='',lab='';const placed=[],RT=RTC=routes(),rects=devRects(),lm=state.view.labelMode,hl=o.hl;
   for(const c of state.cables){
     const A=endPos(c.a),B=endPos(c.b),rt=RT.get(c.id),D=rt.d,inf=AN.get(c.id),col=ccolor(c,inf),isSel=hl?hl.cab.has(c.id):o.sel===c.id,dim=!!hl&&!isSel,inst=c.a.s==='r'||c.b.s==='r';
     if(HID.has(c.a.d)||HID.has(c.b.d)){for(const [E,e] of [[A,c.a],[B,c.b]])if(!HID.has(e.d))plug+=plugSVG(E,col,c.id,c,e.s,dim,FD.has(e.d));continue}
@@ -765,6 +765,7 @@ function renderCanvas(){
   $('#l-pow').innerHTML=powSVG();
   drawCables();
   $('#empty').hidden=state.devices.length+state.racks.length+state.rooms.length>0;
+  lvSel();renderPeers();
   $('#hint').textContent=state.demo?'Beispielprojekt zum Ausprobieren – unter „Datei“ startest du ein leeres Projekt.':'Port anklicken zeigt die ganze Strecke · Port auf Port ziehen steckt ein Kabel · Geräte in Schränke ziehen';
 }
 function powSVG(){if(!SDV)return '';const d=dev(SDV);if(!d||HID.has(d.id))return '';const pairs=[];
@@ -1107,11 +1108,30 @@ function inspCab(c){
 }
 
 /* ================= edits ================= */
-function ck(key){const now=Date.now();if(key&&key===H.key&&now-H.t<1500){H.t=now;return}H.u.push(JSON.stringify(state));if(H.u.length>150)H.u.shift();H.r=[];H.key=key||null;H.t=now}
-function touched(){state.updated=Date.now();state.demo=false;store.dirty=true;clearTimeout(store.tl);store.tl=setTimeout(saveLocal,300);if(store.ref){clearTimeout(store.tc);setSave('saving');store.tc=setTimeout(saveCloud,1200)}else setSave('local')}
+/* Zusammenführen: theirs + (mine − base), je Objekt-ID und Feld. Grundlage für Live-Zusammenarbeit und Undo. */
+const COLL=['devices','cables','racks','rooms','vlans','templates'];
+const isObj=v=>!!v&&typeof v==='object'&&!Array.isArray(v);
+function same(a,b){if(a===b)return true;if(!a||!b||typeof a!=='object'||typeof b!=='object')return false;const A=Array.isArray(a);if(A!==Array.isArray(b))return false;
+  if(A){if(a.length!==b.length)return false;for(let i=0;i<a.length;i++)if(!same(a[i],b[i]))return false;return true}
+  const ka=Object.keys(a);if(ka.length!==Object.keys(b).length)return false;for(const k of ka)if(!Object.prototype.hasOwnProperty.call(b,k)||!same(a[k],b[k]))return false;return true}
+const clone=v=>v===undefined?undefined:JSON.parse(JSON.stringify(v));
+function mergeObj(b,m,t){b=b||{};m=m||{};const r={...t};
+  for(const k of new Set([...Object.keys(b),...Object.keys(m)])){const bv=b[k],mv=m[k];if(same(bv,mv))continue;if(mv===undefined){delete r[k];continue}r[k]=isObj(bv)&&isObj(mv)&&isObj(t[k])?mergeObj(bv,mv,t[k]):clone(mv)}
+  return r}
+function mergeList(B,M,T){B=B||[];M=M||[];T=T||[];const bm=new Map(B.map(x=>[x.id,x])),mm=new Map(M.map(x=>[x.id,x])),out=T.slice(),ix=new Map(out.map((x,i)=>[x.id,i]));
+  for(const x of M){const b=bm.get(x.id);
+    if(!b){if(ix.has(x.id))out[ix.get(x.id)]=mergeObj({},x,out[ix.get(x.id)]);else{ix.set(x.id,out.length);out.push(clone(x))}}
+    else if(!same(b,x)&&ix.has(x.id))out[ix.get(x.id)]=mergeObj(b,x,out[ix.get(x.id)])}/* anderswo gelöscht und hier geändert: Löschen gewinnt */
+  return out.filter(x=>!(bm.has(x.id)&&!mm.has(x.id)))}
+function mergeInto(B,M,T){const strip=o=>{const x={...o};for(const k of [...COLL,'updated','demo','v'])delete x[k];return x};const R=mergeObj(strip(B),strip(M),T);for(const k of COLL)R[k]=mergeList(B[k],M[k],T[k]);return R}
+/* Undo/Redo als Delta: nimmt nur die eigene Änderung zurück, Änderungen anderer bleiben erhalten */
+function ck(key){const now=Date.now();if(key&&key===H.key&&now-H.t<1500){H.t=now;return}const j=JSON.stringify(state),top=H.u[H.u.length-1];if(top&&top.post==null)top.post=j;H.u.push({pre:j,post:null});if(H.u.length>150)H.u.shift();H.r=[];H.key=key||null;H.t=now}
+function hSeal(){const top=H.u[H.u.length-1];if(top&&top.post==null)top.post=JSON.stringify(state);H.key=null}
+function hApply(from,to){const R=sanitize(mergeInto(JSON.parse(from),JSON.parse(to),state));R.updated=state.updated;return R}
+function touched(){state.updated=Date.now();state.demo=false;store.dirty=true;clearTimeout(store.tl);store.tl=setTimeout(saveLocal,300);if(store.ref&&!SY.ro){clearTimeout(store.tc);setSave('saving');store.tc=setTimeout(saveCloud,250)}else if(!store.ref)setSave('local')}
 function fixSel(){for(const id of [...MS])if(!dev(id))MS.delete(id);if(sel&&sel.kind==='multi'&&MS.size<2){const o=[...MS][0];MS.clear();sel=o?{kind:'dev',id:o}:null}if(!sel)return;if(sel.kind==='dev'&&!dev(sel.id))sel=null;else if(sel.kind==='port'&&!(dev(sel.dev)&&pexists(dev(sel.dev),sel.port)))sel=null;else if(sel.kind==='cable'&&!state.cables.some(c=>c.id===sel.id))sel=null;else if(sel.kind==='rack'&&!rackOf(sel.id))sel=null;else if(sel.kind==='room'&&!roomOf(sel.id))sel=null}
-function undo(){if(!H.u.length)return;H.r.push(JSON.stringify(state));state=JSON.parse(H.u.pop());H.key=null;fixSel();touched();renderAll()}
-function redo(){if(!H.r.length)return;H.u.push(JSON.stringify(state));state=JSON.parse(H.r.pop());H.key=null;fixSel();touched();renderAll()}
+function undo(){const e=H.u.pop();if(!e)return;if(e.post==null)e.post=JSON.stringify(state);state=hApply(e.post,e.pre);H.r.push(e);H.key=null;LC.clear();fixSel();touched();renderAll()}
+function redo(){const e=H.r.pop();if(!e)return;state=hApply(e.pre,e.post);H.u.push(e);H.key=null;LC.clear();fixSel();touched();renderAll()}
 function select(s){if(!s||s.kind!=='multi')MS.clear();sel=s;if(raidEdit&&!(s&&s.kind==='dev'&&s.id===raidEdit.dev))raidEdit=null;if(innerWidth<=1100)$('#rail').classList.remove('open');$('#insp').classList.toggle('min',!s&&innerWidth<=760);$('#itog').setAttribute('aria-expanded',String(!!s||innerWidth>760));renderAll()}
 function nextLabel(){let m=0;for(const c of state.cables){const r=/^K-(\d+)$/.exec(c.label);if(r)m=Math.max(m,+r[1])}return 'K-'+String(m+1).padStart(3,'0')}
 function pickSide(d,pid,other){const pf=other&&(other.kind==='host'||other.kind==='ap')?'r':'f',alt=pf==='f'?'r':'f';if(!cabOf(d.id,pid,pf))return pf;if(!cabOf(d.id,pid,alt))return alt;return null}
@@ -1286,7 +1306,7 @@ function applyField(el,live){
 
 /* ================= view ================= */
 const stage=$('#stage'),cv=$('#cv'),world=$('#world');
-function applyView(){world.setAttribute('transform',`translate(${view.x.toFixed(1)} ${view.y.toFixed(1)}) scale(${view.z.toFixed(4)})`);stage.style.backgroundSize=`${20*view.z}px ${20*view.z}px`;stage.style.backgroundPosition=`${view.x}px ${view.y}px`;$('#z-lbl').textContent=Math.round(view.z*100)+' %'}
+function applyView(){if(LV.peers.size){cancelAnimationFrame(LV.raf);LV.raf=requestAnimationFrame(renderPeers)}world.setAttribute('transform',`translate(${view.x.toFixed(1)} ${view.y.toFixed(1)}) scale(${view.z.toFixed(4)})`);stage.style.backgroundSize=`${20*view.z}px ${20*view.z}px`;stage.style.backgroundPosition=`${view.x}px ${view.y}px`;$('#z-lbl').textContent=Math.round(view.z*100)+' %'}
 function bbox(){const B=contentBox(true)||{x1:0,y1:0,x2:400,y2:300};let {x1,y1,x2,y2}=B;
   for(const rt of routes().values()){const ps=rt.pts?rt.pts.map(([x,y])=>({x,y})):[];for(let t=0;t<=1.001;t+=.05)ps.push(rt.at(t));for(const p of ps){x1=Math.min(x1,p.x);y1=Math.min(y1,p.y);x2=Math.max(x2,p.x);y2=Math.max(y2,p.y)}}
   return {x1,y1,x2,y2}}
@@ -1345,14 +1365,15 @@ cv.addEventListener('pointerdown',e=>{
   e.preventDefault();
 });
 cv.addEventListener('pointermove',e=>{
-  if(drag){onDrag(e);return}
+  if(drag){onDrag(e);lvDrag(e);return}
+  lvMove(e);
   if(e.pointerType!=='mouse')return;
   const pe=e.target.closest&&e.target.closest('[data-port]');
   if(pe){const did=pe.closest('[data-dev]').dataset.dev,pid=pe.dataset.port;showTip(e,did,pid);const c=cabOf(did,pid,'f')||cabOf(did,pid,'r');setHov(c?c.id:null);return}
   const be=e.target.closest&&e.target.closest('[data-bay]');if(be){showBayTip(e,be.closest('[data-dev]').dataset.dev,+be.dataset.bay);setHov(null);return}
   hideTip();const ce=e.target.closest&&e.target.closest('[data-cable]');setHov(ce?ce.dataset.cable:null);
 });
-cv.addEventListener('pointerleave',()=>{if(!drag){hideTip();setHov(null)}});
+cv.addEventListener('pointerleave',()=>{if(!drag){hideTip();setHov(null);if(LV.send)lvSet({x:null,y:null})}});
 function snapShow(r,u,d){const sn_=$('#snap');if(!r){sn_.style.display='none';return}const w=Math.min(TW[d.size==='frei'?r.rsize:d.size]||TW[r.rsize],TW[r.rsize]);sn_.setAttribute('x',r.x+RAIL);sn_.setAttribute('y',r.y+HEAD+(u-1)*U);sn_.setAttribute('width',w);sn_.setAttribute('height',d.he*U);sn_.style.display=''}
 function onDrag(e){
   const dx=e.clientX-drag.sx,dy=e.clientY-drag.sy;
@@ -1439,8 +1460,8 @@ function endDrag(e,cancel){
     renderCanvas();
   }
 }
-cv.addEventListener('pointerup',e=>endDrag(e,false));
-cv.addEventListener('pointercancel',e=>endDrag(e,true));
+cv.addEventListener('pointerup',e=>{const was=!!drag;endDrag(e,false);if(was){if(LV.mine.d)lvSet({d:null});flushPend()}});
+cv.addEventListener('pointercancel',e=>{const was=!!drag;endDrag(e,true);if(was){if(LV.mine.d)lvSet({d:null});flushPend()}});
 cv.addEventListener('dblclick',e=>{const dg=e.target.closest('[data-dev]');if(dg&&!e.target.closest('[data-port]')){select({kind:'dev',id:dg.dataset.dev});const f=$('#f-name');f&&(f.focus(),f.select())}});
 stage.addEventListener('wheel',e=>{if(mode!=='plan')return;e.preventDefault();const r=cv.getBoundingClientRect();zoomAt(e.clientX-r.left,e.clientY-r.top,Math.exp(-e.deltaY*(e.deltaMode===1?.05:.0016)))},{passive:false});
 
@@ -1532,7 +1553,7 @@ $('#b-rail').onclick=()=>$('#rail').classList.toggle('open');
 $('#itog').onclick=()=>{const m=$('#insp').classList.toggle('min');$('#itog').setAttribute('aria-expanded',String(!m))};
 $('#z-in').onclick=()=>zoomBy(1.25);$('#z-out').onclick=()=>zoomBy(.8);$('#z-fit').onclick=fit;$('#z-arr').onclick=arrange;
 $('#z-lbl').onclick=()=>{const r=stage.getBoundingClientRect();zoomAt(r.width/2,r.height/2,1/view.z)};
-function setMode(m){mode=m;for(const [id,k] of [['#t-plan','plan'],['#t-topo','topo'],['#t-list','list']])$(id).setAttribute('aria-selected',String(m===k));$('#main').classList.toggle('tbl',m!=='plan');$('#tview').hidden=m!=='list';$('#topo').hidden=m!=='topo';if(m==='list')renderTable();else if(m==='topo')renderTopo(true);else requestAnimationFrame(applyView)}
+function setMode(m){mode=m;if(LV.send)lvSet({m:m==='plan'?null:m});peersChanged();for(const [id,k] of [['#t-plan','plan'],['#t-topo','topo'],['#t-list','list']])$(id).setAttribute('aria-selected',String(m===k));$('#main').classList.toggle('tbl',m!=='plan');$('#tview').hidden=m!=='list';$('#topo').hidden=m!=='topo';if(m==='list')renderTable();else if(m==='topo')renderTopo(true);else requestAnimationFrame(applyView)}
 $('#t-plan').onclick=()=>setMode('plan');$('#t-list').onclick=()=>setMode('list');$('#t-topo').onclick=()=>setMode('topo');
 function setTab(t){tmode=t;document.querySelectorAll('.vt button').forEach(x=>x.setAttribute('aria-selected',String(x.dataset.tm===t)));renderTable()}
 $('.vt').addEventListener('click',e=>{const b=e.target.closest('[data-tm]');if(b)setTab(b.dataset.tm)});
@@ -2091,7 +2112,7 @@ async function showQR(kind,id){let QR;try{QR=await needQR()}catch(_){toast('QR-B
   $('#m-cp').onclick=()=>copyText(url,'Link')}
 
 /* ================= saving ================= */
-function setSave(s){const m={local:['Im Browser gespeichert','#8a8a85'],cloud:[store.kind==='server'?'Auf dem Server gespeichert':'Gespeichert','#3ddc6a'],conflict:['Nicht gespeichert – Konflikt','#ff6b5f'],offline:['Server nicht erreichbar','#ff6b5f'],saving:['Speichert …','#ffe600'],err:['Speichern fehlgeschlagen','#ff6b5f'],demo:['Beispiel','#8a8a85'],boot:['Lädt …','#8a8a85']}[s]||['',''];const el=$('#save');el.textContent=m[0];el.title=m[0];el.style.setProperty('--sc',m[1])}
+function setSave(s){const m={local:['Im Browser gespeichert','#8a8a85'],cloud:[store.kind==='server'?'Auf dem Server gespeichert':'Gespeichert','#3ddc6a'],conflict:['Nicht gespeichert – Konflikt','#ff6b5f'],offline:['Server nicht erreichbar','#ff6b5f'],saving:['Speichert …','#ffe600'],err:['Speichern fehlgeschlagen','#ff6b5f'],demo:['Beispiel','#8a8a85'],boot:['Lädt …','#8a8a85'],ro:['Nur Ansicht','#8a8a85']}[s]||['',''];const el=$('#save');el.textContent=m[0];el.title=m[0];el.style.setProperty('--sc',m[1])}
 function saveLocal(){try{localStorage.setItem(LS,JSON.stringify(state))}catch(_){}if(store.kind!=='server'&&!state.demo)autoVersion()}
 function loadLocal(){try{const t=localStorage.getItem(LS);return t?sanitize(JSON.parse(t)):null}catch(_){return null}}
 /* ---------- Versionsverlauf ---------- */
@@ -2131,68 +2152,197 @@ async function showVersions(){const box=$('#vlist');if(!box)return;let L=[];try{
     if(b.dataset.vop==='restore'){closeModal();if(!(await ask('Version wiederherstellen?',`Der Plan wird durch „${v.name||'Automatische Sicherung'}“ vom ${new Date(v.updated).toLocaleString('de-DE')} ersetzt. Der aktuelle Stand wird vorher als Version gesichert.`,'Wiederherstellen')))return;
       await VER.add('Vor Wiederherstellung');ck();const keepT=state.templates;state=plan;if(!state.templates||!state.templates.length)state.templates=keepT||[];state.demo=false;sel=null;MS.clear();LC.clear();touched();renderAll();fit();toast('Version wiederhergestellt – Strg+Z macht es rückgängig')}};
 }
+/* ================= Speichern und Live-Zusammenarbeit =================
+   Jede Änderung wird sofort gespeichert. Kommt ein neuerer Stand von jemand anderem, werden die
+   eigenen, noch nicht übertragenen Änderungen je Objekt und Feld darauf angewendet (mergeInto). */
+const SY={cid:(rid()+rid()).slice(0,14),rev:null,synced:null,pend:null,hist:new Map(),ro:false,n:0,inspStale:false};
+const LSB='switch-verkabelung-sync';
+function sbSave(){if(!store.kind)return;try{localStorage.setItem(LSB,JSON.stringify({k:store.kind,rev:SY.rev,json:SY.synced}))}catch(_){}}
+function sbLoad(){try{const o=JSON.parse(localStorage.getItem(LSB)||'null');return o&&o.k===store.kind&&typeof o.json==='string'?o:null}catch(_){return null}}
+function histAdd(rev,json){if(rev==null)return;SY.hist.set(rev,json);while(SY.hist.size>40)SY.hist.delete(SY.hist.keys().next().value)}
 async function saveCloud(){
-  if(!store.ref)return;if(store.busy){store.pending=true;return}
-  store.busy=true;const body={json:JSON.stringify(state),updated:state.updated||Date.now(),v:3};if(store.force){body.force=true;store.force=false}
-  try{if(body.json.length>(store.max||240000))throw {code:'too_big'};const res=await store.ref.set(body);if(res&&res.updated&&state.updated===body.updated){state.updated=res.updated;saveLocal()}if(!store.pending)store.dirty=false;setSave('cloud')}
+  if(!store.ref||SY.ro)return;if(store.busy){store.pending=true;return}
+  const json=JSON.stringify(state);
+  if(json===SY.synced){store.dirty=false;setSave('cloud');return}
+  store.busy=true;store.pending=false;
+  try{if(json.length>(store.max||240000))throw {code:'too_big'};
+    const r=await store.ref.push(json);
+    SY.rev=r.rev;SY.synced=json;histAdd(r.rev,json);sbSave();if(JSON.stringify(state)===json)store.dirty=false;setSave('cloud')}
   catch(e){const c=e&&e.code;
-    if(c==='unavailable'){await new Promise(r=>setTimeout(r,700+Math.random()*900));try{await store.ref.set(body);setSave('cloud')}catch(_){setSave('err')}}
-    else if(c==='too_big'){setSave('err');toast('Projekt ist zu groß für den Online-Speicher – bitte als JSON sichern')}
+    if(c==='conflict'&&e.cur){store.busy=false;onRemote(e.cur);return}
+    if(c==='unavailable'){await new Promise(r=>setTimeout(r,700+Math.random()*900));store.pending=true}
+    else if(c==='too_big'){setSave('err');toast(store.kind==='server'?'Projekt ist zu groß für den Server':'Projekt ist zu groß für den Online-Speicher – bitte als JSON sichern')}
     else if(c==='quota_exceeded'){setSave('err');toast('Online-Speicher ist voll – Projekt als JSON sichern')}
-    else if(c==='conflict'){store.busy=false;store.pending=false;conflict(e.cur);return}
-    else if(c==='offline'){setSave('offline')}
-    else if(store.kind==='server'){setSave('err');if(c==='auth')toast('Anmeldung am Server abgelaufen – Seite neu laden')}
+    else if(c==='invalid_argument'&&store.kind==='shared'){SY.ro=true;setSave('ro');toast('Nur Ansicht – deine Änderungen werden nicht gespeichert')}
+    else if(c==='offline'){setSave('offline');setTimeout(()=>{if(store.dirty)saveCloud()},5000)}
+    else if(c==='auth'){setSave('err');toast('Anmeldung am Server abgelaufen – Seite neu laden')}
+    else if(store.kind==='server')setSave('err');
     else{store.ref=null;setSave('local')}}
-  store.busy=false;if(store.pending){store.pending=false;saveCloud()}
+  store.busy=false;
+  if(SY.pend)flushPend();
+  else if(store.pending){store.pending=false;saveCloud()}
+}
+function flushPend(){if(!SY.pend||drag||store.busy)return;const d=SY.pend;SY.pend=null;onRemote(d)}
+/* neuer Stand von jemand anderem (oder Antwort auf einen Konflikt) */
+function onRemote(doc){
+  if(!doc||typeof doc.json!=='string')return;
+  if(doc.rev!=null&&(doc.rev===SY.rev||SY.hist.has(doc.rev)||(typeof doc.rev==='number'&&typeof SY.rev==='number'&&doc.rev<SY.rev)))return;/* schon bekannt oder älter */
+  if(drag||store.busy){SY.pend=doc;return}
+  let remote;try{remote=sanitize(JSON.parse(doc.json))}catch(_){return}
+  remote.updated=+doc.updated||remote.updated||0;remote.demo=false;if(state&&state.view)remote.view=state.view;
+  const rj=JSON.stringify(remote),base=(doc.parent!=null&&SY.hist.get(doc.parent))||SY.synced,cur=JSON.stringify(state);
+  let next=remote;
+  if(base&&cur!==base&&!state.demo){try{next=sanitize(mergeInto(JSON.parse(base),state,remote));next.view=state.view;next.updated=remote.updated}catch(_){next=remote}}
+  hSeal();
+  const prevSel=sel&&JSON.stringify(sel);
+  state=next;SY.rev=doc.rev??SY.rev;SY.synced=rj;histAdd(doc.rev,rj);LC.clear();fixSel();
+  const ae=document.activeElement,editing=!!(ae&&$('#insp').contains(ae)&&/^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName)),keep=editing&&prevSel===(sel&&JSON.stringify(sel));
+  renderAll(keep);if(keep)SY.inspStale=true;
+  try{localStorage.setItem(LS,JSON.stringify(state))}catch(_){}sbSave();
+  if(JSON.stringify(state)!==rj){store.dirty=true;saveCloud()}else{store.dirty=false;setSave(SY.ro?'ro':'cloud')}
+}
+$('#insp').addEventListener('focusout',()=>setTimeout(()=>{if(SY.inspStale&&!$('#insp').contains(document.activeElement)){SY.inspStale=false;renderInsp()}},0));
+/* erster Stand beim Laden: offline gemachte Änderungen werden mit dem Stand vom Server zusammengeführt */
+function firstRemote(doc){
+  let remote;try{remote=sanitize(JSON.parse(doc.json))}catch(_){setSave('err');return}
+  remote.updated=+doc.updated||remote.updated||0;remote.demo=false;
+  const lb=sbLoad(),cur=JSON.stringify(state);
+  if(!state.demo&&lb&&lb.json&&cur!==lb.json){SY.synced=lb.json;SY.rev=lb.rev;onRemote({...doc,parent:undefined});return}
+  if(!state.demo&&!lb&&(state.updated||0)>remote.updated){remote.view=state.view;SY.rev=doc.rev;SY.synced=JSON.stringify(remote);histAdd(doc.rev,SY.synced);setSave('saving');saveCloud();return}
+  if(!state.demo)remote.view=state.view;
+  state=remote;sel=null;MS.clear();H.u=[];H.r=[];LC.clear();SY.rev=doc.rev;SY.synced=JSON.stringify(state);histAdd(doc.rev,SY.synced);
+  try{localStorage.setItem(LS,SY.synced)}catch(_){}sbSave();renderAll();fit();setSave(SY.ro?'ro':'cloud');
 }
 /* eigener Server (Docker): Speicherung über /api/plan */
 function fileSaver(){return {save:async({filename,data})=>{const type=/\.json$/.test(filename)?'application/json':/\.csv$/.test(filename)?'text/csv;charset=utf-8':/\.svg$/.test(filename)?'image/svg+xml':'application/octet-stream';
   const blob=data instanceof Blob?data:new Blob([data],{type}),u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download=filename;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),5000)}}}
 async function api(method,body){let r;try{r=await fetch('api/plan',{method,cache:'no-store',headers:body?{'Content-Type':'application/json'}:{},body:body?JSON.stringify(body):undefined})}catch(_){throw {code:'offline'}}
   if(r.status===204)return null;if(r.status===409)throw {code:'conflict',cur:await r.json().catch(()=>null)};if(r.status===413)throw {code:'too_big'};if(r.status===401)throw {code:'auth'};if(r.status>=500)throw {code:'unavailable'};if(!r.ok)throw {code:'http'};return r.json()}
-function applyRemote(b,msg){let remote;try{remote=sanitize(JSON.parse(b.json))}catch(_){return false}remote.updated=+b.updated||0;store.base=remote.updated;store.dirty=false;
-  if(!state.demo&&state.devices.length)ck();state=remote;state.demo=false;sel=null;LC.clear();saveLocal();renderAll();fit();setSave('cloud');if(msg)toast(msg);return true}
-function conflict(cur){setSave('conflict');if(!cur){toast('Speichern abgelehnt – Seite neu laden');return}
-  modal(`<div class="mbox" role="alertdialog" aria-modal="true" aria-labelledby="m-t"><h2 id="m-t">Plan wurde auf dem Server geändert</h2><p>Seit du den Plan geladen hast, wurde er in einem anderen Browser gespeichert. Welche Version soll gelten? Deine Änderungen bleiben bis zur Entscheidung nur hier im Browser.</p><div class="mf"><button type="button" class="btn" id="m-srv">Server-Version laden</button><button type="button" class="btn pri" id="m-mine">Meine Version speichern</button></div></div>`);
-  $('#m-srv').onclick=()=>{closeModal();applyRemote(cur,'Server-Version geladen – Strg+Z holt deine Version zurück')};
-  $('#m-mine').onclick=()=>{closeModal();store.force=true;setSave('saving');saveCloud()};
-}
-async function pullServer(){if(store.kind!=='server'||store.busy||store.dirty||document.hidden||!$('#modal').hidden)return;
-  try{const b=await api('GET');if(b&&+b.updated>(store.base||0)&&!store.dirty)applyRemote(b,'Neuere Version vom Server geladen')}catch(_){}}
+async function pullServer(){if(store.kind!=='server'||store.busy||document.hidden||(LV.es&&LV.es.readyState===1))return;
+  try{const b=await api('GET');if(b&&+b.updated!==SY.rev)onRemote({json:b.json,updated:b.updated,rev:+b.updated})}catch(_){}}
 async function initServer(){
   DL=fileSaver();buildMenu();store.kind='server';store.max=20e6;
-  store.ref={set:async body=>{const r=await api('PUT',{...body,base:store.base??null});store.base=r.updated;return r}};
+  store.ref={push:async json=>{try{const r=await api('PUT',{json,updated:state.updated||Date.now(),base:SY.rev??null,cid:SY.cid});return {rev:+r.updated}}
+    catch(e){if(e&&e.code==='conflict'&&e.cur&&typeof e.cur.json==='string')e.cur={json:e.cur.json,updated:+e.cur.updated,rev:+e.cur.updated};throw e}}};
+  let me={user:'',auth:false};try{const r=await fetch('api/me',{cache:'no-store'});if(r.ok)me=await r.json()}catch(_){}
   try{const b=await api('GET');
-    if(b){store.base=+b.updated||0;const lu=state.demo?-1:(state.updated||0);
-      if(lu<=store.base)applyRemote(b);else{setSave('saving');saveCloud()}}
-    if(location.hash.length>1)openHash();
+    if(b)firstRemote({json:b.json,updated:+b.updated,rev:+b.updated});
     else if(!state.demo){setSave('saving');saveCloud()}else setSave('demo');
+    if(location.hash.length>1)openHash();
   }catch(e){setSave(e&&e.code==='auth'?'err':'offline')}
-  document.addEventListener('visibilitychange',pullServer);setInterval(pullServer,30000);
+  liveServer(me);
+  document.addEventListener('visibilitychange',()=>{if(document.hidden){if(store.dirty)saveCloud()}else pullServer()});
+  setInterval(pullServer,30000);
 }
 async function initCloud(tries){
   if(window.SV_SERVER)return initServer();
   const C=window.claude;
   if(!C||typeof C.use!=='function'){if((tries||0)<6)return setTimeout(()=>initCloud((tries||0)+1),500);DL=fileSaver();buildMenu();setSave(state.demo?'demo':'local');return}
   const use=n=>Promise.resolve().then(()=>C.use(n)).catch(()=>null);
-  const [db,user,dl]=await Promise.all([use('db'),use('user'),use('downloads')]);
+  const [db,user,dl,room]=await Promise.all([use('db'),use('user'),use('downloads'),use('room')]);
   DL=dl||null;buildMenu();
   if(!db||!user){setSave(state.demo?'demo':'local');return}
   let id=null;try{id=await user.id()}catch(_){}
   if(!id){setSave(state.demo?'demo':'local');return}
-  let ref;try{ref=db.doc('data/users/'+id+'/plan')}catch(_){setSave('local');return}
-  try{
-    const snap=await Promise.race([ref.get(),new Promise((_,no)=>setTimeout(()=>no({code:'timeout'}),10000))]);
-    store.ref=ref;
-    if(snap.exists){
-      let remote=null;try{const b=snap.data();remote=sanitize(JSON.parse(b.json));remote.updated=+b.updated||remote.updated||0}catch(_){}
-      if(remote&&(state.demo||remote.updated>=(state.updated||0))){state=remote;state.demo=false;sel=null;H.u=[];H.r=[];LC.clear();renderAll();fit();setSave('cloud')}
-      else{setSave('saving');saveCloud()}
-    }else if(!state.demo){setSave('saving');saveCloud()}
-    else setSave('demo');
-  }catch(e){setSave(state.demo?'demo':'local')}
+  let ref;try{ref=db.doc('shared/plan')}catch(_){setSave('local');return}
+  store.kind='shared';store.max=240000;
+  try{SY.ro=(await user.can('data.write'))===false}catch(_){}
+  store.ref={push:async json=>{const rev=SY.cid+'.'+(++SY.n),body={json,updated:state.updated||Date.now(),rev,parent:SY.rev??null,by:SY.cid,v:3};await ref.set(body);return {rev}}};
+  initRoom(room,user);
+  let first=true;const to=setTimeout(()=>{if(first)setSave(state.demo?'demo':'local')},10000);
+  const norm=d=>({json:d.json,updated:+d.updated||0,rev:d.rev??null,parent:d.parent??null});
+  ref.onSnapshot(async snap=>{
+    if(first){if(!snap.exists&&snap.metadata&&snap.metadata.fromCache)return;first=false;clearTimeout(to);
+      if(snap.exists){const d=snap.data();if(d&&typeof d.json==='string'){firstRemote(norm(d));return}}
+      /* noch kein gemeinsamer Plan: der Eigentümer übernimmt seinen bisherigen privaten Plan */
+      let own=false;try{own=await user.isOwner()}catch(_){}
+      if(own){try{const ps=await db.doc('data/users/'+id+'/plan').get();if(ps.exists){const b=ps.data(),pv=sanitize(JSON.parse(b.json));pv.updated=+b.updated||pv.updated||0;
+        if(state.demo||pv.updated>=(state.updated||0)){state=pv;state.demo=false;sel=null;H.u=[];H.r=[];LC.clear();renderAll();fit()}}}catch(_){}}
+      if(own&&!state.demo&&!SY.ro){setSave('saving');saveCloud()}else setSave(SY.ro?'ro':state.demo?'demo':'local');
+      return}
+    if(!snap.exists)return;const d=snap.data();if(!d||d.by===SY.cid||typeof d.json!=='string')return;onRemote(norm(d));
+  },e=>{clearTimeout(to);if(first){first=false;setSave(state.demo?'demo':'local')}});
 }
 
+/* ================= Präsenz: wer ist da, wo ist die Maus, was wird gerade bewegt ================= */
+const PCOL=['#e8590c','#7048e8','#0ca678','#d6336c','#1c7ed6','#f08c00','#2f9e44','#ae3ec9','#c2255c','#1098ad','#5c940d','#9c36b5'];
+const colorFor=s=>{let h=0;for(const ch of String(s))h=(h*31+ch.charCodeAt(0))>>>0;return PCOL[h%PCOL.length]};
+const LSN='switch-verkabelung-name';
+const LV={peers:new Map(),mine:{},me:null,send:null,ready:false,last:0,tm:0,es:null,raf:0,selK:'',auth:false};
+function lvSet(patch){for(const [k,v] of Object.entries(patch)){if(v==null)delete LV.mine[k];else LV.mine[k]=v}
+  if(!LV.send||!LV.ready)return;const now=Date.now(),wait=Math.max(0,60-(now-LV.last));clearTimeout(LV.tm);
+  LV.tm=setTimeout(()=>{LV.last=Date.now();LV.send({...LV.mine})},wait)}
+function lvMove(e){if(!LV.send)return;const w=toWorld(e);lvSet({x:Math.round(w.x),y:Math.round(w.y)})}
+function lvDrag(e){if(!LV.send||!drag||!drag.moved)return;const w=toWorld(e);let d=null;
+  if(drag.kind==='dev'){const L=drag.grp?drag.grp.map(m=>m.d):[dev(drag.id)];d={k:'dev',l:L.filter(Boolean).slice(0,30).map(x=>[x.id,Math.round(x.x),Math.round(x.y)])}}
+  else if(drag.kind==='port'&&drag.fixed)d={k:'wire',f:{d:drag.fixed.d,p:drag.fixed.p,...(drag.fixed.s?{s:drag.fixed.s}:{})},x:Math.round(w.x),y:Math.round(w.y)};
+  else if(drag.kind==='rack'){const r=rackOf(drag.id);if(r)d={k:'rack',id:r.id,x:r.x,y:r.y}}
+  else if(drag.kind==='room'||drag.kind==='resize'){const r=roomOf(drag.id);if(r)d={k:'room',id:r.id,x:r.x,y:r.y,w:r.w,h:r.h}}
+  lvSet({d,x:Math.round(w.x),y:Math.round(w.y)})}
+function lvSel(){if(!LV.send)return;const k=!sel?'':sel.kind==='dev'?'dev:'+sel.id:sel.kind==='port'?'port:'+sel.dev+':'+sel.port:sel.kind==='cable'?'cable:'+sel.id:sel.kind==='rack'?'rack:'+sel.id:sel.kind==='room'?'room:'+sel.id:sel.kind==='multi'?'multi:'+[...MS].slice(0,30).join(','):'';
+  if(k!==LV.selK){LV.selK=k;lvSet({s:k||null})}}
+function peersChanged(){renderPeople();cancelAnimationFrame(LV.raf);LV.raf=requestAnimationFrame(renderPeers)}
+const ink=c=>{const n=parseInt(String(c).slice(1),16);if(!Number.isFinite(n))return '#fff';const r=n>>16&255,g=n>>8&255,b=n&255;return (r*299+g*587+b*114)/1000>150?'#111':'#fff'};
+const initials=n=>{const p=String(n||'?').trim().split(/[\s._-]+/).filter(Boolean);return ((p[0]||'?')[0]+(p.length>1?p[p.length-1][0]:(p[0]||'')[1]||'')).toUpperCase()};
+function renderPeople(){const el=$('#people');if(!el)return;const L=[...LV.peers.values()].filter(p=>!p.self);
+  if(!LV.me||(!L.length&&!LV.send)){el.hidden=true;el.innerHTML='';return}
+  const av=(p,me)=>`<span class="pav${me?' me':''}" style="--pc:${esc(p.color)};--pt:${ink(p.color)}" title="${esc(me?p.name+' (du)'+(LV.auth||store.kind==='shared'?'':' – klicken zum Ändern'):p.name+(p.p&&p.p.m&&p.p.m!=='plan'?' · '+({topo:'Topologie',list:'Listen'}[p.p.m]||''):''))}">${esc(initials(p.name))}</span>`;
+  el.hidden=false;el.innerHTML=`${L.slice(0,6).map(p=>av(p,false)).join('')}${L.length>6?`<span class="pav more">+${L.length-6}</span>`:''}<button type="button" class="pme" id="pme" aria-label="Du: ${esc(LV.me.name)}">${av(LV.me,true)}</button>`;
+  el.title=L.length?pl(L.length+1,'Person','Personen')+' im Plan: '+[LV.me.name+' (du)',...L.map(p=>p.name)].join(', '):'Nur du bist gerade im Plan'}
+$('#people').addEventListener('click',e=>{if(!e.target.closest('#pme')||LV.auth||store.kind!=='server')return;
+  modal(`<form class="mbox" id="nmf" role="dialog" aria-modal="true" aria-labelledby="m-t"><div class="mh"><h2 id="m-t">Dein Name</h2>${closeBtn}</div><p>So sehen dich die anderen an deinem Mauszeiger.</p><label class="fld"><span>Name</span><input id="m-nm" maxlength="30" value="${esc(LV.me.name)}" required></label><div class="mf"><button type="submit" class="btn pri">Übernehmen</button></div></form>`);
+  $('#m-nm').select();$('#nmf').onsubmit=ev=>{ev.preventDefault();const n=$('#m-nm').value.trim().slice(0,30);if(!n)return;try{localStorage.setItem(LSN,n)}catch(_){}LV.me.name=n;LV.me.color=colorFor(n);lvSet({n,c:LV.me.color});closeModal();renderPeople()}});
+function liveServer(me){
+  LV.auth=!!me.auth;let n='';try{n=localStorage.getItem(LSN)||''}catch(_){}
+  const name=me.user||n||'Gast '+SY.cid.slice(0,3).toUpperCase();LV.me={name,color:colorFor(name),self:true};
+  if(!LV.auth)Object.assign(LV.mine,{n:name,c:LV.me.color});
+  LV.send=p=>fetch('api/presence',{method:'POST',cache:'no-store',headers:{'Content-Type':'application/json'},body:JSON.stringify({cid:SY.cid,p})}).then(r=>{if(r.status===404)LV.ready=false}).catch(()=>{});
+  const from=x=>{const p=x.p&&typeof x.p==='object'?x.p:{},nm=(x.user||(typeof p.n==='string'?p.n:'')||'Gast').slice(0,40);return {name:nm,color:x.user?colorFor(x.user):(/^#[0-9a-f]{6}$/i.test(p.c)?p.c:colorFor(nm)),p}};
+  let es;try{es=new EventSource('api/live?cid='+encodeURIComponent(SY.cid))}catch(_){return}LV.es=es;
+  es.addEventListener('hello',e=>{let h;try{h=JSON.parse(e.data)}catch(_){return}LV.peers=new Map((h.peers||[]).map(x=>[x.cid,from(x)]));LV.ready=true;LV.last=Date.now();LV.send({...LV.mine});peersChanged();
+    if(h.rev&&h.rev!==SY.rev&&!store.busy)api('GET').then(b=>{if(b&&+b.updated!==SY.rev)onRemote({json:b.json,updated:+b.updated,rev:+b.updated})}).catch(()=>{})});
+  es.addEventListener('presence',e=>{try{const x=JSON.parse(e.data);if(x.cid!==SY.cid){LV.peers.set(x.cid,from(x));peersChanged()}}catch(_){}});
+  es.addEventListener('leave',e=>{try{LV.peers.delete(JSON.parse(e.data).cid);peersChanged()}catch(_){}});
+  es.addEventListener('plan',e=>{let x;try{x=JSON.parse(e.data)}catch(_){return}if(x.cid===SY.cid)return;onRemote({json:x.json,updated:+x.updated,rev:+x.updated})});
+  es.onerror=()=>{LV.ready=false;if(LV.peers.size){LV.peers.clear();peersChanged()}};
+  peersChanged();
+}
+function initRoom(room,user){
+  if(!room)return;
+  LV.me={name:'Du',color:PCOL[0],self:true};LV.ready=true;
+  LV.send=p=>{try{room.presence({x:null,y:null,d:null,s:null,m:null,...p}).catch(()=>{})}catch(_){}};
+  user.me().then(m=>{LV.me={name:m.name||'Du',color:m.color||PCOL[0],self:true};try{room.presence({who:{c:LV.me.color,t:Date.now()}}).catch(()=>{})}catch(_){}renderPeople()}).catch(()=>{});
+  try{room.onPeers(ch=>{const L=ch.peers.filter(p=>!p.sameTab&&p.kind==='viewer'),ids=[...new Set(L.map(p=>p.by).filter(Boolean))];
+    Promise.resolve(ids.length?user.profiles(ids):{}).catch(()=>({})).then(ps=>{LV.peers=new Map(L.map(p=>{const pr=p.by&&ps[p.by];return [p.peer,{name:((pr&&pr.name)||'Jemand')+(p.isMe?' (anderer Tab)':''),color:(pr&&pr.color)||colorFor(p.peer),p:p.presence||{}}]}));peersChanged()})},()=>{})}catch(_){}
+  peersChanged();
+}
+/* Präsenz der anderen im Plan zeichnen – in Weltkoordinaten, Beschriftungen in Bildschirmgröße */
+function renderPeers(){const g=$('#l-peer');if(!g)return;if(mode!=='plan'||!LV.peers.size){g.innerHTML='';return}
+  const k=1/view.z,f=v=>(+v).toFixed(1);let s='';
+  const tag=(x,y,txt,col)=>{const w=Math.min(260,txt.length*6.7+14);return `<g transform="translate(${f(x)} ${f(y)}) scale(${k.toFixed(4)})"><rect width="${w}" height="20" rx="5" fill="${col}"/><text x="7" y="14" font-size="12" font-weight="600" fill="${ink(col)}">${esc(txt)}</text></g>`};
+  const box=(x,y,w,h,col,o)=>`<rect x="${f(x)}" y="${f(y)}" width="${f(w)}" height="${f(h)}" rx="${f(6*k)}" fill="${o.fill?col:'none'}" fill-opacity="${o.fill||0}" stroke="${col}" stroke-width="${f((o.sw||3)*k)}"${o.dash?` stroke-dasharray="${f(10*k)} ${f(6*k)}"`:''}/>`;
+  const devBox=id=>{const d=dev(id);if(!d||HID.has(d.id))return null;const L=lay(d);return {x:d.x,y:d.y,w:L.W,h:L.H,d}};
+  for(const P of LV.peers.values()){const p=P.p||{},col=/^#[0-9a-f]{6}$/i.test(P.color)?P.color:'#888';if(p.m&&p.m!=='plan')continue;let act='';
+    const D=p.d&&typeof p.d==='object'?p.d:null,busy=new Set();
+    try{
+      if(D&&D.k==='dev'&&Array.isArray(D.l)){D.l.forEach(([id,x,y],i)=>{const b=devBox(id);if(!b||!Number.isFinite(x)||!Number.isFinite(y))return;busy.add(id);
+          s+=box(b.x-3,b.y-3,b.w+6,b.h+6,col,{sw:2,dash:1})+box(x,y,b.w,b.h,col,{fill:.16,sw:3.5});if(!i)act=' verschiebt '+b.d.name+(D.l.length>1?' +'+(D.l.length-1):'')})}
+      else if(D&&D.k==='wire'&&D.f&&dev(D.f.d)&&lay(dev(D.f.d)).by[D.f.p]&&Number.isFinite(D.x)){const A=endPos(D.f),Q=pathD(cpath(A,{x:D.x,y:D.y,dir:0}));
+          s+=`<path d="${Q}" fill="none" stroke="#111" stroke-width="${f(8*k)}" stroke-linecap="round" opacity=".35"/><path d="${Q}" fill="none" stroke="${col}" stroke-width="${f(4.5*k)}" stroke-linecap="round" stroke-dasharray="${f(12*k)} ${f(7*k)}"/><circle cx="${f(A.x)}" cy="${f(A.y)}" r="${f(Math.max(A.p.w,A.p.h)/2+5)}" fill="none" stroke="${col}" stroke-width="${f(4*k)}"/>`;
+          act=' zieht ein Kabel von '+pfull(D.f)}
+      else if(D&&D.k==='rack'){const r=rackOf(D.id);if(r){const G=rgeom(r);s+=box(r.x,r.y,G.W,G.H,col,{sw:2,dash:1})+box(D.x,D.y,G.W,G.H,col,{fill:.12,sw:3.5});act=' verschiebt '+r.name;busy.add(r.id)}}
+      else if(D&&D.k==='room'){const r=roomOf(D.id);if(r){s+=box(D.x,D.y,D.w,D.h,col,{fill:.08,sw:3.5,dash:1});act=' bewegt '+r.name;busy.add(r.id)}}
+      const sk=typeof p.s==='string'?p.s:'',[sk0,...sr]=sk.split(':'),sid=sr.join(':');
+      if(sk0==='dev'&&!busy.has(sid)){const b=devBox(sid);if(b){s+=box(b.x-5,b.y-5,b.w+10,b.h+10,col,{sw:3});s+=tag(b.x-5,b.y-5-24*k,P.name,col)}}
+      else if(sk0==='multi'){for(const id of sid.split(',')){if(busy.has(id))continue;const b=devBox(id);if(b)s+=box(b.x-5,b.y-5,b.w+10,b.h+10,col,{sw:3})}}
+      else if(sk0==='port'){const [did,...pp]=sr,pid=pp.join(':'),d=dev(did);if(d&&!HID.has(did)&&lay(d).by[pid]){const A=endPos({d:did,p:pid});s+=`<circle cx="${f(A.x)}" cy="${f(A.y)}" r="${f(Math.max(A.p.w,A.p.h)/2+6)}" fill="none" stroke="${col}" stroke-width="${f(4*k)}"/>`}}
+      else if(sk0==='cable'){const rt=RTC&&RTC.get(sid);if(rt)s+=`<path d="${rt.d}" fill="none" stroke="${col}" stroke-width="${f(9*k)}" stroke-linecap="round" opacity=".55"/>`}
+      else if(sk0==='rack'&&!busy.has(sid)){const r=rackOf(sid);if(r){const G=rgeom(r);s+=box(r.x-6,r.y-6,G.W+12,G.H+12,col,{sw:3})}}
+      else if(sk0==='room'&&!busy.has(sid)){const r=roomOf(sid);if(r)s+=box(r.x-4,r.y-4,r.w+8,r.h+8,col,{sw:3})}
+    }catch(_){}
+    if(Number.isFinite(p.x)&&Number.isFinite(p.y))s+=`<g transform="translate(${f(p.x)} ${f(p.y)}) scale(${k.toFixed(4)})"><path d="M0 0L0 18L4.8 13.6L8 21L11.2 19.6L8.1 12.4L14 12.4Z" fill="${col}" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/></g>`+tag(p.x+14*k,p.y+16*k,P.name+act,col);
+  }
+  g.innerHTML=s}
 /* ================= example ================= */
 function demo(){
   const D=(k,o)=>mkDev(k,o);

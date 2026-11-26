@@ -22,6 +22,20 @@ if (Boolean(USER) !== Boolean(PASS)) {
   console.error('AUTH_USER und AUTH_PASSWORD müssen zusammen gesetzt werden.');
   process.exit(1);
 }
+// Konten: AUTH_USER/AUTH_PASSWORD für eines, AUTH_USERS="nico:pw1,anna:pw2" (Komma oder Zeilenumbruch) für mehrere
+const ACCOUNTS = new Map();
+if (USER) ACCOUNTS.set(USER, PASS);
+for (const part of String(process.env.AUTH_USERS || '').split(/[\n,]+/)) {
+  const t = part.trim();
+  if (!t) continue;
+  const i = t.indexOf(':');
+  if (i < 1 || i === t.length - 1) {
+    console.error(`AUTH_USERS: Eintrag „${t.slice(0, 20)}“ braucht die Form name:passwort.`);
+    process.exit(1);
+  }
+  ACCOUNTS.set(t.slice(0, i).trim().slice(0, 40), t.slice(i + 1));
+}
+const AUTH = ACCOUNTS.size > 0;
 if (!fs.existsSync(path.join(PUB, 'index.html'))) {
   console.error(`App nicht gefunden in ${PUB} – vorher "node scripts/build.mjs" ausführen.`);
   process.exit(1);
@@ -47,16 +61,21 @@ const SEC = {
 };
 
 const hash = s => crypto.createHash('sha256').update(String(s)).digest();
-function authed(req) {
-  if (!USER) return true;
+// Liefert den angemeldeten Namen, '' ohne Anmeldung, null bei falschen Zugangsdaten
+function login(req) {
+  if (!AUTH) return '';
   const h = req.headers.authorization || '';
-  if (!h.startsWith('Basic ')) return false;
+  if (!h.startsWith('Basic ')) return null;
   const raw = Buffer.from(h.slice(6), 'base64').toString('utf8');
   const i = raw.indexOf(':');
-  if (i < 0) return false;
-  const u = crypto.timingSafeEqual(hash(raw.slice(0, i)), hash(USER));
-  const p = crypto.timingSafeEqual(hash(raw.slice(i + 1)), hash(PASS));
-  return u && p;
+  if (i < 0) return null;
+  const hu = hash(raw.slice(0, i)), hp = hash(raw.slice(i + 1));
+  let who = null;
+  for (const [u, p] of ACCOUNTS) {
+    const ok = crypto.timingSafeEqual(hu, hash(u)) & crypto.timingSafeEqual(hp, hash(p));
+    if (ok && who === null) who = u;
+  }
+  return who;
 }
 
 function send(res, status, body, headers = {}) {
@@ -70,13 +89,13 @@ function send(res, status, body, headers = {}) {
   res.end(buf);
 }
 
-function readBody(req) {
+function readBody(req, limit = MAX + 4096) {
   return new Promise((ok, no) => {
     let size = 0;
     const chunks = [];
     req.on('data', c => {
       size += c.length;
-      if (size > MAX + 4096) { no(Object.assign(new Error('zu groß'), { status: 413 })); req.destroy(); return; }
+      if (size > limit) { no(Object.assign(new Error('zu groß'), { status: 413 })); req.destroy(); return; }
       chunks.push(c);
     });
     req.on('end', () => ok(Buffer.concat(chunks).toString('utf8')));
@@ -121,11 +140,52 @@ async function apiPlan(req, res) {
   } catch { return send(res, 400, 'Das ist kein Plan dieser App'); }
   if (cur && !b.force && b.base !== cur.updated) return send(res, 409, cur);
   const updated = Math.max(Date.now(), (cur ? cur.updated : 0) + 1);
+  const cid = typeof b.cid === 'string' && CID.test(b.cid) ? b.cid : '';
   try { await writePlan({ json: b.json, updated }); } catch (e) {
     console.error('Speichern fehlgeschlagen:', e.message);
     return send(res, 500, 'Speichern fehlgeschlagen');
   }
-  return send(res, 200, { updated });
+  send(res, 200, { updated });
+  // allen anderen offenen Browsern den neuen Stand schicken
+  bcast('plan', { json: b.json, updated, cid, user: req.user || '' }, cid);
+}
+
+// ---------- Live: Server-Sent Events für Planänderungen und Präsenz ----------
+const LIVE = new Map(); // cid -> { res, user, p }
+const CID = /^[A-Za-z0-9_-]{6,40}$/;
+const sse = (res, ev, data) => { try { res.write(`event: ${ev}\ndata: ${JSON.stringify(data)}\n\n`); } catch {} };
+function bcast(ev, data, except) { for (const [cid, c] of LIVE) if (cid !== except) sse(c.res, ev, data); }
+const peer = (cid, c) => ({ cid, user: c.user, p: c.p });
+setInterval(() => { for (const c of LIVE.values()) { try { c.res.write(': ping\n\n'); } catch {} } }, 25000).unref();
+
+function apiLive(req, res, url) {
+  if (req.method !== 'GET') return send(res, 405, 'Methode nicht erlaubt', { Allow: 'GET' });
+  const cid = url.searchParams.get('cid') || '';
+  if (!CID.test(cid)) return send(res, 400, 'cid fehlt');
+  const old = LIVE.get(cid);
+  if (old) { LIVE.delete(cid); try { old.res.end(); } catch {} }
+  res.writeHead(200, { ...SEC, 'Content-Type': 'text/event-stream; charset=utf-8', 'Cache-Control': 'no-store', 'X-Accel-Buffering': 'no', Connection: 'keep-alive' });
+  res.write('retry: 2000\n\n');
+  const c = { res, user: req.user || '', p: {} };
+  LIVE.set(cid, c);
+  sse(res, 'hello', { cid, user: c.user, auth: AUTH, rev: cur ? cur.updated : 0, peers: [...LIVE].filter(([k]) => k !== cid).map(([k, v]) => peer(k, v)) });
+  bcast('presence', peer(cid, c), cid);
+  req.socket.setTimeout(0);
+  req.on('close', () => { if (LIVE.get(cid) === c) { LIVE.delete(cid); bcast('leave', { cid }); } });
+}
+
+async function apiPresence(req, res) {
+  if (req.method !== 'POST') return send(res, 405, 'Methode nicht erlaubt', { Allow: 'POST' });
+  let b;
+  try { b = JSON.parse(await readBody(req, 8192)); } catch { return send(res, 400, 'Ungültiges JSON'); }
+  const c = b && LIVE.get(b.cid);
+  if (!c) return send(res, 404, 'Nicht verbunden');
+  if (c.user !== (req.user || '')) return send(res, 403, 'Fremde Sitzung');
+  const p = b.p && typeof b.p === 'object' && !Array.isArray(b.p) ? b.p : {};
+  if (JSON.stringify(p).length > 4096) return send(res, 413, 'Zu groß');
+  c.p = p;
+  bcast('presence', peer(b.cid, c), b.cid);
+  return send(res, 204, null);
 }
 
 // Versionen: automatische Sicherungen (plan-*.json) und benannte Stände (named-*.json)
@@ -197,8 +257,13 @@ const server = http.createServer(async (req, res) => {
   const { pathname } = new URL(req.url, 'http://x');
   try {
     if (pathname === '/healthz') return send(res, 200, 'ok', { 'Cache-Control': 'no-store' });
-    if (!authed(req)) return send(res, 401, 'Anmeldung erforderlich', { 'WWW-Authenticate': 'Basic realm="Switch-Verkabelung", charset="UTF-8"' });
+    const user = login(req);
+    if (user === null) return send(res, 401, 'Anmeldung erforderlich', { 'WWW-Authenticate': 'Basic realm="Switch-Verkabelung", charset="UTF-8"' });
+    req.user = user;
     if (pathname === '/api/plan') return await apiPlan(req, res);
+    if (pathname === '/api/me') return send(res, 200, { user, auth: AUTH }, { 'Cache-Control': 'no-store' });
+    if (pathname === '/api/live') return apiLive(req, res, new URL(req.url, 'http://x'));
+    if (pathname === '/api/presence') return await apiPresence(req, res);
     if (pathname === '/api/versions' || pathname.startsWith('/api/versions/')) return await apiVersions(req, res, pathname.slice('/api/versions'.length).replace(/^\//, ''));
     if (pathname.startsWith('/api/')) return send(res, 404, 'Nicht gefunden');
     return await serveStatic(req, res, pathname);
@@ -209,10 +274,12 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, HOST, () => {
-  console.log(`Switch-Verkabelung läuft auf http://${HOST}:${PORT} – Daten in ${DATA}${USER ? ' – Anmeldung aktiv' : ''}`);
+  console.log(`Switch-Verkabelung läuft auf http://${HOST}:${PORT} – Daten in ${DATA}${AUTH ? ` – Anmeldung aktiv (${ACCOUNTS.size} ${ACCOUNTS.size === 1 ? 'Konto' : 'Konten'})` : ''}`);
 });
 for (const sig of ['SIGTERM', 'SIGINT']) {
   process.on(sig, () => {
+    for (const c of LIVE.values()) { try { c.res.end(); } catch {} }
+    LIVE.clear();
     server.close(() => queue.finally(() => process.exit(0)));
     setTimeout(() => process.exit(0), 5000).unref();
   });

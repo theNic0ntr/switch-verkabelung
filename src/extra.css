@@ -263,3 +263,11 @@ table.pl{width:auto;min-width:min(100%,640px)}
   .plrack{padding-left:8px}
 }
 .topts input[type=checkbox]{width:20px;height:20px;min-width:0;flex:none;padding:0}
+/* Live-Zusammenarbeit: wer ist da */
+.people{display:flex;align-items:center;margin-right:2px;padding-left:7px}
+.people .pav{width:30px;height:30px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:var(--pc,#555);color:var(--pt,#fff);font:700 11.5px/1 inherit;letter-spacing:.02em;border:2px solid #111;margin-left:-7px;flex:none}
+.people .pav.more{background:#2b2b28;color:#fff}
+.people .pme{border:0;background:transparent;padding:0;margin:0 0 0 6px;cursor:pointer;border-radius:50%;display:inline-flex}
+.people .pme .pav{margin-left:0;box-shadow:0 0 0 2px #fff}
+.people .pme:focus-visible{outline:2px solid #ffe600;outline-offset:2px}
+@media(max-width:600px){.people .pav:not(.me){display:none}.people .pav.more{display:none}}
