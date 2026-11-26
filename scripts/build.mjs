@@ -12,11 +12,12 @@ const head = src('head.html');
 const css = src('base.css') + src('extra.css');
 const body = src('body.html').trimEnd();
 const app = src('app.js').trimEnd();
+const i18n = src('i18n-en.js').trimEnd() + '\n' + src('i18n.js').trimEnd();
 if (!head.includes('<!--FONTS-->')) throw new Error('head.html braucht den Platzhalter <!--FONTS-->');
 
 const page = (fonts, boot = '') =>
   head.replace('<!--FONTS-->', fonts + boot) +
-  '<style>\n' + css + '</style>\n' + body + '\n<script>\n' + app + '\n</script>\n</body>\n</html>\n';
+  '<style>\n' + css + '</style>\n' + body + '\n<script>\n' + i18n + '\n</script>\n<script>\n' + app + '\n</script>\n</body>\n</html>\n';
 
 const google =
   '<link rel="preconnect" href="https://fonts.googleapis.com">\n' +

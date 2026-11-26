@@ -1,5 +1,6 @@
 {
 const $=s=>document.querySelector(s);
+const I18=window.I18N||{lang:'de',tr:t=>t,markup:t=>t,loc:'de-DE',set(){}},W=t=>I18.tr(t),LOC=I18.loc,EN=I18.lang==='en';
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const rid=()=>Math.random().toString(36).slice(2,10);
@@ -123,7 +124,7 @@ const F={
  poeStd:{l:'PoE-Bedarf',t:'sel',o:[['af','802.3af · PoE, bis 15,4 W'],['at','802.3at · PoE+, bis 30 W'],['bt','802.3bt · PoE++, bis 90 W']]},
  sub:{l:'Gerät',t:'sel',o:d=>d.kind==='net'?NETS:HOSTS},
  pd:{l:'Wird über PoE versorgt',t:'chk'},
- va:{l:'Leistung',t:'sel',o:VAS.map(v=>[v,Number(v).toLocaleString('de-DE')+' VA'])},
+ va:{l:'Leistung',t:'sel',o:VAS.map(v=>[v,Number(v).toLocaleString(LOC)+' VA'])},
  topo:{l:'Bauart (IEC 62040-3)',t:'sel',o:Object.entries(TOPO).map(([k,v])=>[k,v.n])},
  user:{l:'Raum / Benutzer',t:'text',max:60,ph:'z. B. Büro 1.12 · M. Weber'},
  location:{l:'Standort',t:'text',max:60,ph:'z. B. Serverraum UG'},
@@ -256,7 +257,7 @@ const heTxt=d=>'HE '+d.u+(d.he>1?'–'+(d.u+d.he-1):'');
 const where=d=>{const r=d.rack&&rackOf(d.rack);return r?`${r.name}, ${heTxt(d)}`:''};
 const whereAll=d=>{const rm=devRoom(d);return [where(d),rm?rm.name:''].filter(Boolean).join(' · ')};
 function mkDev(kind,o){
-  const base={id:'d'+rid(),kind,name:KIND[kind].n,model:'',style:KIND[kind].styles[0],x:40,y:40,size:KIND[kind].rack?'19':'frei',he:kind==='ups'?2:1,rows:'auto',pc:{},rj45Speed:'1G',poe:false,location:'',ip:'',notes:'',ports:{},cat:'cat6a',shield:true,fg:'os2',pol:'UPC',role:'',wifi:'Wi-Fi 6',poeStd:'at',sub:kind==='net'?'router':'pc',pd:false,user:'',mac:'',pnum:'col',ptag:'',bays:8,baysUsed:8,bayForm:'2.5',bayDir:'v',bayRows:'1',disks:{},raids:[],wan:kind==='fw'?1:0,year:'',lifeOld:'',lifeEol:'',watt:'',psu:'1',pa:'',pb:'',o13:8,o19:0,amp:'16',uw:'',bat:'',va:'1500',topo:'vi',rack:null,u:1};
+  const base={id:'d'+rid(),kind,name:W(KIND[kind].n),model:'',style:KIND[kind].styles[0],x:40,y:40,size:KIND[kind].rack?'19':'frei',he:kind==='ups'?2:1,rows:'auto',pc:{},rj45Speed:'1G',poe:false,location:'',ip:'',notes:'',ports:{},cat:'cat6a',shield:true,fg:'os2',pol:'UPC',role:'',wifi:'Wi-Fi 6',poeStd:'at',sub:kind==='net'?'router':'pc',pd:false,user:'',mac:'',pnum:'col',ptag:'',bays:8,baysUsed:8,bayForm:'2.5',bayDir:'v',bayRows:'1',disks:{},raids:[],wan:kind==='fw'?1:0,year:'',lifeOld:'',lifeEol:'',watt:'',psu:'1',pa:'',pb:'',o13:8,o19:0,amp:'16',uw:'',bat:'',va:'1500',topo:'vi',rack:null,u:1};
   const pcs={pdu:{},switch:{rj45:24,sfpp:4},fw:{rj45:8,sfpp:2},net:{rj45:8,sfpp:2},patch:{kj:24},fiber:{lc:24},server:{mgmt:1,rj45:2,sfp28:2},ups:{mgmt:1},ap:{rj45:1},host:{rj45:1}};
   return Object.assign(base,{pc:{...pcs[kind]}},o||{});
 }
@@ -267,7 +268,7 @@ function summary(d){
   if(d.kind==='ap')return `${d.wifi} · ${d.pc.rj45||0} × LAN`;
   if(d.kind==='server'&&d.bays){const parts=KIND[d.kind].types.filter(t=>t!=='mgmt'&&d.pc[t]).map(t=>`${d.pc[t]} × ${PT[t].n}`);const DI=diskInfo(d);return [`${d.baysUsed}/${d.bays} × ${d.bayForm.replace('.',',')}″`+(DI.total?` · ${fmtTB(DI.total)}`:''),...parts].join(' · ')+(d.size!=='frei'?` · ${d.size}″ ${d.he} HE`:'')}
   if(d.kind==='pdu')return `${d.o13} × C13${+d.o19?' + '+d.o19+' × C19':''} · ${d.amp==='3x16'?'3 × 16':d.amp} A`+(d.size!=='frei'?` · ${d.size}″ ${d.he} HE`:'');
-  if(d.kind==='ups')return `${Number(d.va).toLocaleString('de-DE')} VA · ${TOPO[d.topo].s}${d.size==='frei'?' · Tower':` · ${d.he} HE`}`;
+  if(d.kind==='ups')return `${Number(d.va).toLocaleString(LOC)} VA · ${TOPO[d.topo].s}${d.size==='frei'?' · Tower':` · ${d.he} HE`}`;
   const parts=KIND[d.kind].types.filter(t=>t!=='mgmt'&&d.pc[t]).map(t=>`${d.pc[t]} × ${t==='kj'?CAT[d.cat].n:PT[t].n}`);
   return (d.kind==='net'?subLbl(d)+' · ':'')+parts.join(' · ')+(d.size!=='frei'?` · ${d.size}″ ${d.he} HE`:'');
 }
@@ -381,7 +382,7 @@ function hole(p){const x=p.x+3.5,w=p.w-7,cx=p.x+p.w/2,n=4,nw=6,y=p.y+3.5,yb=p.y+
   return p.dir<0?`M${x} ${y+n}H${cx-nw}V${y}H${cx+nw}V${y+n}H${x+w}V${yb}H${x}Z`:`M${x} ${y}H${x+w}V${yb-n}H${cx+nw}V${yb}H${cx-nw}V${yb-n}H${x}Z`}
 function bolt(x,y){return `<path d="M${x+3.4} ${y}L${x} ${y+5}h2.5L${x+1.6} ${y+9}L${x+5.2} ${y+3.6}h-2.5Z" fill="#f59e0b"/>`}
 function iconSVG(sub,x,y){return `<g transform="translate(${x} ${y})" fill="none" stroke="#1d2126" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${HICON[sub]||HICON.other}</g>`}
-function lcdSVG(d,st,x,y,w,h){const va=Number(d.va).toLocaleString('de-DE');return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="4" fill="${st.lcd}" stroke="#000" stroke-opacity=".5"/><text x="${x+12}" y="${y+h/2-2}" font-size="${h>50?18:15}" font-weight="700" fill="${st.lcdT}">${va} VA</text><text x="${x+12}" y="${y+h/2+15}" font-size="11" fill="${st.lcdT}" opacity=".8">${(P=>P&&P.load?`Last ${Math.round(P.pct)} %${P.min!=null?' · '+P.min+' min':''}`:TOPO[d.topo].s)(PW.get(d.id))}</text>`}
+function lcdSVG(d,st,x,y,w,h){const va=Number(d.va).toLocaleString(LOC);return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="4" fill="${st.lcd}" stroke="#000" stroke-opacity=".5"/><text x="${x+12}" y="${y+h/2-2}" font-size="${h>50?18:15}" font-weight="700" fill="${st.lcdT}">${va} VA</text><text x="${x+12}" y="${y+h/2+15}" font-size="11" fill="${st.lcdT}" opacity=".8">${(P=>P&&P.load?`Last ${Math.round(P.pct)} %${P.min!=null?' · '+P.min+' min':''}`:TOPO[d.topo].s)(PW.get(d.id))}</text>`}
 function infoSVG(d,st,L){
   const x=L.ear,Hh=L.H,cmp=L.info<140,big=Hh>=U,y0=big?34:28,sz=L.rack?`${d.size}″ · ${d.he} HE`:'',used=usedPorts(d),tot=total(d);
   if(d.kind==='pdu'){const P=PW.get(d.id),a=P?P.load/230:0;let s=`<rect x="${x+14}" y="${Hh/2-17}" width="58" height="34" rx="4" fill="#0b0f0a" stroke="#000"/><text x="${x+66}" y="${Hh/2+7}" text-anchor="end" font-size="17" font-weight="700" fill="#ff5a3c" font-family="monospace">${a.toFixed(1)}</text><text x="${x+80}" y="${Hh/2-4}" font-size="13" font-weight="700" fill="${st.text}">${esc(trunc(d.name,cmp?9:13))}</text><text x="${x+80}" y="${Hh/2+12}" font-size="10.5" fill="${st.sub}">${d.amp==='3x16'?'3 × 16':d.amp} A${P?' · '+Math.round(P.pct)+' %':''}</text>`;return s}
@@ -754,7 +755,9 @@ function hlSet(){
 }
 
 /* ================= render ================= */
-function renderAll(keepInsp){analyze();renderCanvas();renderRail();if(!keepInsp)renderInsp();renderTop();if(mode==='list')renderTable();else if(mode==='topo')renderTopo()}
+function userWords(){const o=[state.name];for(const d of state.devices){o.push(d.name,d.user,d.location,d.role,d.model,d.notes);for(const pc of Object.values(d.ports||{}))o.push(pc.label,pc.notes);for(const r of d.raids||[])o.push(r.name)}
+  for(const r of state.racks)o.push(r.name,r.location,r.notes);for(const r of state.rooms)o.push(r.name,r.notes);for(const v of state.vlans)o.push(v.name);for(const c of state.cables)o.push(c.label,c.notes);for(const t of state.templates||[])o.push(t.name);for(const p of PL.list)o.push(p.name);return o}
+function renderAll(keepInsp){if(EN&&I18.setData)I18.setData(userWords());analyze();renderCanvas();renderRail();if(!keepInsp)renderInsp();renderTop();if(mode==='list')renderTable();else if(mode==='topo')renderTopo()}
 function renderCanvas(){
   HL=hlSet();computeVis();SDV=sel&&(sel.kind==='dev'?sel.id:sel.kind==='port'?sel.dev:null);
   const sd=sel&&sel.kind==='dev'?sel.id:null,sp=sel&&sel.kind==='port'?sel:null;
@@ -1216,7 +1219,7 @@ function fitRoom(rm){
   let x1=1e9,y1=1e9,x2=-1e9,y2=-1e9;for(const i of its){let x,y,w,h;if(i.t==='rack'){const G=rgeom(i.o);x=i.o.x;y=i.o.y;w=G.W;h=G.H}else{const L=lay(i.o);x=i.o.x;y=i.o.y;w=L.W;h=L.H}x1=Math.min(x1,x);y1=Math.min(y1,y);x2=Math.max(x2,x+w);y2=Math.max(y2,y+h)}
   ck();rm.x=sn(x1-80);rm.y=sn(y1-140);rm.w=sn(x2-x1+160);rm.h=sn(y2-y1+220);touched();renderAll();
 }
-function dupDev(d){const n=JSON.parse(JSON.stringify(d));n.id='d'+rid();n.name=trunc(d.name+' (Kopie)',40);ck();if(d.rack){n.rack=null;state.devices.push(n);rackInsert(n,rackOf(d.rack),null)}else{n.rack=null;place(n);state.devices.push(n)}touched();sel={kind:'dev',id:n.id};renderAll();centerOn(n)}
+function dupDev(d){const n=JSON.parse(JSON.stringify(d));n.id='d'+rid();n.name=trunc(d.name+' '+W('(Kopie)'),40);ck();if(d.rack){n.rack=null;state.devices.push(n);rackInsert(n,rackOf(d.rack),null)}else{n.rack=null;place(n);state.devices.push(n)}touched();sel={kind:'dev',id:n.id};renderAll();centerOn(n)}
 function setCount(d,t,n){
   const old=d.pc[t]||0;if(n===old)return;
   const tryd={...d,pc:{...d.pc,[t]:n}};if(total(tryd)<minPorts(d)){toast('Dieses Gerät braucht mindestens einen Port');renderInsp();return}
@@ -1482,7 +1485,7 @@ ic.addEventListener('click',e=>{
     else if(a==='delroom')delRoom(roomOf(sel.id));
     else if(a==='fitroom')fitRoom(roomOf(sel.id));
     else if(a==='diskok'){const d=dev(sel.id),i=b.dataset.i;if(d&&d.disks&&d.disks[i]){ck();d.disks[i].ok=true;touched();renderAll()}}
-    else if(a==='raidadd'){const d=dev(sel.id);if(!d)return;ck();d.raids=d.raids||[];const used=new Set(d.raids.map(r=>r.col));let col=0;while(used.has(col)&&col<RAIDC.length)col++;const r={id:'r'+rid(),name:'Verbund '+(d.raids.length+1),lvl:'5',col:col%RAIDC.length,disks:[]};d.raids.push(r);raidEdit={dev:d.id,id:r.id};touched();renderAll();toast('Platten im Plan oder über die Nummern auswählen')}
+    else if(a==='raidadd'){const d=dev(sel.id);if(!d)return;ck();d.raids=d.raids||[];const used=new Set(d.raids.map(r=>r.col));let col=0;while(used.has(col)&&col<RAIDC.length)col++;const r={id:'r'+rid(),name:W('Verbund')+' '+(d.raids.length+1),lvl:'5',col:col%RAIDC.length,disks:[]};d.raids.push(r);raidEdit={dev:d.id,id:r.id};touched();renderAll();toast('Platten im Plan oder über die Nummern auswählen')}
     else if(a==='raidtog'){const d=dev(sel.id);d&&raidToggle(d,b.dataset.r,+b.dataset.i)}
     else if(a==='raidedit'){const d=dev(sel.id);raidEdit=raidEdit&&raidEdit.id===b.dataset.r?null:{dev:d.id,id:b.dataset.r};renderAll()}
     else if(a==='raiddel'){const d=dev(sel.id);if(!d)return;ck();d.raids=(d.raids||[]).filter(r=>r.id!==b.dataset.r);if(raidEdit&&raidEdit.id===b.dataset.r)raidEdit=null;touched();renderAll()}
@@ -1501,7 +1504,7 @@ ic.addEventListener('click',e=>{
       touched();renderAll()}
     else if(a==='mset'){const k=b.dataset.k,L=[...MS].map(dev).filter(Boolean);if(k==='year'){const v=parseInt($('#f-my').value,10);if(!(v>=1980&&v<=2100)){toast('Bitte ein Jahr eingeben');return}ck();L.forEach(d=>d.year=v);toast('Kaufjahr '+v+' gesetzt')}
       else if(k==='pa'){const v=$('#f-mpa').value;ck();let n=0;for(const d of L)if(pwrDev(d)&&d.id!==v&&srcOpts(d).some(o=>o[0]===v)){d.pa=v;n++}toast(pl(n,'Gerät','Geräten')+' zugeordnet')}touched();renderAll()}
-    else if(a==='mdup'){const L=[...MS].map(dev).filter(Boolean);ck();const nw=[];for(const d of L){const n=JSON.parse(JSON.stringify(d));n.id='d'+rid();n.name=trunc(d.name+' (Kopie)',40);if(n.rack){const r=rackOf(n.rack);n.rack=null;if(r){n.x=sn(r.x+rgeom(r).W+80);n.y=d.y}}else{n.x+=60;n.y+=60}state.devices.push(n);nw.push(n.id)}MS=new Set(nw);touched();select({kind:'multi'});toast(pl(nw.length,'Kopie','Kopien')+' angelegt')}
+    else if(a==='mdup'){const L=[...MS].map(dev).filter(Boolean);ck();const nw=[];for(const d of L){const n=JSON.parse(JSON.stringify(d));n.id='d'+rid();n.name=trunc(d.name+' '+W('(Kopie)'),40);if(n.rack){const r=rackOf(n.rack);n.rack=null;if(r){n.x=sn(r.x+rgeom(r).W+80);n.y=d.y}}else{n.x+=60;n.y+=60}state.devices.push(n);nw.push(n.id)}MS=new Set(nw);touched();select({kind:'multi'});toast(pl(nw.length,'Kopie','Kopien')+' angelegt')}
     else if(a==='mhide'){const ids=[...MS];setHid(ids,true);MS.clear();sel=null;renderAll();toast('Ausgeblendet – über „Ansicht“ wieder einblenden')}
     else if(a==='mdel')msDelete();
     else if(a==='hide'){const id=b.dataset.id,h=HIDL.has(id);setHid([id],!h);if(!h){sel=null;toast('Ausgeblendet – über „Ansicht“ oben wieder einblenden')}renderAll()}
@@ -1601,7 +1604,7 @@ function toggleMenu(open){const m=$('#menu');m.hidden=!open;$('#b-file').setAttr
 $('#b-file').onclick=e=>{e.stopPropagation();toggleMenu($('#menu').hidden)};
 document.addEventListener('click',e=>{if(!$('#menu').hidden&&!e.target.closest('.menuw'))toggleMenu(false)});
 $('#menu').addEventListener('click',e=>{const b=e.target.closest('[data-m]');if(!b)return;toggleMenu(false);menuAct(b.dataset.m)});
-const emptyState=()=>({v:3,name:'Neues Netzwerk',devices:[],cables:[],racks:[],rooms:[],view:{labelMode:'num',colorBy:'speed',hide:{cats:[],ids:[]}},life:{old:5,eol:10},vlans:[],templates:[],updated:0,demo:false});
+const emptyState=()=>({v:3,name:W('Neues Netzwerk'),devices:[],cables:[],racks:[],rooms:[],view:{labelMode:'num',colorBy:'speed',hide:{cats:[],ids:[]}},life:{old:5,eol:10},vlans:[],templates:[],updated:0,demo:false});
 async function menuAct(m){
   if(['json','csv','csv2','svg','png'].includes(m))return exp(m);
   if(m==='open')return openImport();
@@ -1664,13 +1667,13 @@ function csv(kind){
   let rows;
   if(kind==='csv2'){const P=patchRows();rows=[P.csv.heads,...P.csv.rows]}
   else rows=[['Kabel','Von Gerät','Von Port','Nach Gerät','Nach Port','Medium','Transceiver','Länge','Link','Hinweis','Farbe','Notiz'],...cableRows().map(r=>[...r.cells,COL[r.c.color].n,r.c.notes])];
-  return '﻿'+rows.map(r=>r.map(q).join(';')).join('\r\n');
+  return '﻿'+rows.map(r=>r.map(v=>q(W(v))).join(';')).join('\r\n');
 }
-function buildSVG(crop){const keep=[HID,FD,FR,FM,HL,SDV];HID=new Set();FD=new Set();FR=new Set();FM=new Set();HL=null;SDV=null;try{return buildSVG_(crop)}finally{[HID,FD,FR,FM,HL,SDV]=keep}}
+function buildSVG(crop){const keep=[HID,FD,FR,FM,HL,SDV];HID=new Set();FD=new Set();FR=new Set();FM=new Set();HL=null;SDV=null;try{const r=buildSVG_(crop);r.svg=I18.markup(r.svg);return r}finally{[HID,FD,FR,FM,HL,SDV]=keep}}
 function buildSVG_(crop){
   const b=crop||bbox(),pad=crop?0:36,x=b.x1-pad,y=b.y1-pad-(crop?0:44),w=Math.ceil(b.x2-b.x1+pad*2),h=Math.ceil(b.y2-b.y1+pad*2+(crop?0:44)),cs=cablesSVG({exp:true});
   const rooms=state.rooms.map(rm=>roomSVG(rm,{})).join(''),racks=state.racks.map(r=>rackFrameSVG(r,{})).join(''),devs=state.devices.map(d=>devSVG(d,{})).join(''),nums=state.devices.map(d=>numSVG(d,{})).join('');
-  return {w,h,svg:`<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="${x.toFixed(1)} ${y.toFixed(1)} ${w} ${h}" font-family="Hanken Grotesk, Arial, Helvetica, sans-serif"><defs>${defsSVG()}</defs><rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#e4e4e0"/><text x="${b.x1}" y="${b.y1-pad-10}" font-size="22" font-weight="700" fill="#111">${esc(state.name)}</text><text x="${b.x2}" y="${b.y1-pad-10}" text-anchor="end" font-size="13" fill="#5b5b56">${state.devices.length} Geräte · ${state.racks.length} Schränke · ${state.cables.length} Kabel · Stand ${new Date().toLocaleDateString('de-DE')}</text>${rooms}${racks}${devs}${cs.vis}${cs.plug}${cs.lab}${nums}</svg>`};
+  return {w,h,svg:`<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="${x.toFixed(1)} ${y.toFixed(1)} ${w} ${h}" font-family="Hanken Grotesk, Arial, Helvetica, sans-serif"><defs>${defsSVG()}</defs><rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#e4e4e0"/><text x="${b.x1}" y="${b.y1-pad-10}" font-size="22" font-weight="700" fill="#111">${esc(state.name)}</text><text x="${b.x2}" y="${b.y1-pad-10}" text-anchor="end" font-size="13" fill="#5b5b56">${state.devices.length} Geräte · ${state.racks.length} Schränke · ${state.cables.length} Kabel · Stand ${new Date().toLocaleDateString(LOC)}</text>${rooms}${racks}${devs}${cs.vis}${cs.plug}${cs.lab}${nums}</svg>`};
 }
 async function exp(kind){
   if(kind==='csv'&&tmode==='strecken'&&mode==='list')kind='csv2';
@@ -1710,7 +1713,7 @@ function openImport(){
 $('#file').addEventListener('change',async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;try{importText(await f.text())}catch(_){const m=$('#m-err');m&&(m.textContent='Datei konnte nicht gelesen werden.')}});
 function importText(t){
   let s;try{s=sanitize(JSON.parse(t))}catch(_){const m=$('#m-err');if(m)m.textContent='Das ist keine gültige Projektdatei dieser App.';else toast('Keine gültige Projektdatei');return}
-  closeModal();setMode('plan');createPlan(s.name&&s.name!=='Netzwerk'?s.name:'Importierter Plan',s);
+  closeModal();setMode('plan');createPlan(s.name&&s.name!=='Netzwerk'?s.name:W('Importierter Plan'),s);
 }
 function sanitize(o){
   if(!o||typeof o!=='object'||!Array.isArray(o.devices))throw new Error('bad');
@@ -1793,9 +1796,9 @@ const addName=k=>k==='rack'||k==='room'?OBJ[k].n:KIND[k].n;
 function defaultRack(){if(sel&&sel.kind==='rack')return sel.id;if(sel&&sel.kind==='dev'){const d=dev(sel.id);if(d&&d.rack)return d.rack}if(lastRack&&rackOf(lastRack))return lastRack;return state.racks.length===1?state.racks[0].id:''}
 function draft(k,target){
   if(k==='rack')return {id:'preview',kind:'rack',name:'Rack '+String.fromCharCode(65+state.racks.length%26)+'1',rsize:'19',minHe:0,rcolor:'schwarz',location:'',notes:'',x:0,y:0};
-  if(k==='room')return {id:'preview',kind:'room',name:'Raum '+(state.rooms.length+1),roomc:'blau',w:1600,h:1100,place:contentBox()?'around':'right',notes:'',x:0,y:0};
+  if(k==='room')return {id:'preview',kind:'room',name:W('Raum')+' '+(state.rooms.length+1),roomc:'blau',w:1600,h:1100,place:contentBox()?'around':'right',notes:'',x:0,y:0};
   const n=state.devices.filter(d=>d.kind===k).length+1,d=mkDev(k,{id:'preview',x:0,y:0});
-  d.name=k==='host'?subLbl(d)+' '+n:(k==='ap'?'AP':k==='net'?subLbl(d):KIND[k].n)+' '+n;
+  d.name=W(k==='host'?subLbl(d):k==='ap'?'AP':k==='net'?subLbl(d):KIND[k].n)+' '+n;
   if(KIND[k].rack){const tr=(target&&target.rack)||defaultRack();d.rack=tr||'';if(tr){const r=rackOf(tr);if(d.size==='frei'||(d.size==='19'&&r.rsize==='10'))d.size=r.rsize}}
   d._u=target&&target.u;return d;
 }
@@ -1930,8 +1933,8 @@ $('#tsvg').addEventListener('wheel',e=>{e.preventDefault();const r=$('#tstage').
 $('#tsvg').addEventListener('pointerdown',e=>{tdrag={x:e.clientX,y:e.clientY,vx:TV.x,vy:TV.y,m:false,t:e.target};try{$('#tsvg').setPointerCapture(e.pointerId)}catch(_){}});
 $('#tsvg').addEventListener('pointermove',e=>{if(!tdrag)return;const dx=e.clientX-tdrag.x,dy=e.clientY-tdrag.y;if(!tdrag.m&&Math.hypot(dx,dy)<5)return;tdrag.m=true;TV.x=tdrag.vx+dx;TV.y=tdrag.vy+dy;topoApply()});
 $('#tsvg').addEventListener('pointerup',e=>{const g=tdrag;tdrag=null;if(!g||g.m)return;const n=g.t.closest&&g.t.closest('[data-tdev]');if(n){setMode('plan');select({kind:'dev',id:n.dataset.tdev});centerOn(dev(n.dataset.tdev))}const gr=g.t.closest&&g.t.closest('[data-tgrp]');if(gr){ck('view');state.view.topoHosts='single';touched();renderTopo(true)}});
-$('#tp-svg').onclick=()=>{const R=topoSVG();if(!R){toast('Noch keine Topologie');return}const b=R.box,svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${Math.ceil(b.w)}" height="${Math.ceil(b.h)}" viewBox="${b.x} ${b.y} ${b.w} ${b.h}" font-family="Hanken Grotesk, Arial, sans-serif"><rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" fill="#f4f4f1"/><text x="${b.x+40}" y="${b.y+34}" font-size="20" font-weight="700">${esc(state.name)} – logische Topologie</text>${R.svg}</svg>`;if(DL)save(slug()+'-topologie.svg',svg);else copyText(svg,'SVG')};
-function powerRows(){const rows=[...PW].map(([id,P])=>{const d=dev(id);return {dv:id,cells:[d.name,d.kind==='ups'?'USV':'PDU',d.kind==='ups'?`${Number(d.va).toLocaleString('de-DE')} VA · ${P.cap} W`:`${d.amp==='3x16'?'3 × 16':d.amp} A · ${P.cap} W`,Math.round(P.load)+' W',Math.round(P.pct)+' %',P.min!=null?P.min+' min':'',d.kind==='pdu'?`${P.plugs}/${(+d.o13||0)+(+d.o19||0)}`:String(P.plugs),P.list.map(x=>x.d.name+(x.d.kind==='pdu'?'':' ('+x.ab+')')).join(', ')],cls:P.pct>100?'over':P.pct>=80?'high':''}});
+$('#tp-svg').onclick=()=>{const R=topoSVG();if(!R){toast('Noch keine Topologie');return}let b=R.box,svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${Math.ceil(b.w)}" height="${Math.ceil(b.h)}" viewBox="${b.x} ${b.y} ${b.w} ${b.h}" font-family="Hanken Grotesk, Arial, sans-serif"><rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" fill="#f4f4f1"/><text x="${b.x+40}" y="${b.y+34}" font-size="20" font-weight="700">${esc(state.name)} – ${esc(W('logische Topologie'))}</text>${R.svg}</svg>`;svg=I18.markup(svg);if(DL)save(slug()+'-topologie.svg',svg);else copyText(svg,'SVG')};
+function powerRows(){const rows=[...PW].map(([id,P])=>{const d=dev(id);return {dv:id,cells:[d.name,d.kind==='ups'?'USV':'PDU',d.kind==='ups'?`${Number(d.va).toLocaleString(LOC)} VA · ${P.cap} W`:`${d.amp==='3x16'?'3 × 16':d.amp} A · ${P.cap} W`,Math.round(P.load)+' W',Math.round(P.pct)+' %',P.min!=null?P.min+' min':'',d.kind==='pdu'?`${P.plugs}/${(+d.o13||0)+(+d.o19||0)}`:String(P.plugs),P.list.map(x=>x.d.name+(x.d.kind==='pdu'?'':' ('+x.ab+')')).join(', ')],cls:P.pct>100?'over':P.pct>=80?'high':''}});
   const loose=state.devices.filter(d=>pwrDev(d)&&d.kind!=='pdu'&&!feedsOf(d).length),tot=state.devices.filter(d=>pwrDev(d)&&d.kind!=='pdu').reduce((a,d)=>a+devW(d),0);
   return {heads:['Quelle','Art','Kapazität','Last','Auslastung','Laufzeit','Stecker','Versorgt'],rows,num:[3,4,5,6],sub:`Gesamtverbrauch ca. ${Math.round(tot)} W · ${pl(loose.length,'Gerät','Geräte')} ohne USV/PDU`}}
 function matRows(){const M=new Map(),add=(g,art,det,n,u)=>{const k=g+'|'+art+'|'+det+'|'+u;const o=M.get(k)||{g,art,det,n:0,u};o.n+=n;M.set(k,o)};
@@ -2006,7 +2009,7 @@ function loadScript(src){return VEND[src]||(VEND[src]=new Promise((ok,no)=>{cons
 async function needPDF(){await loadScript('vendor/jspdf.umd.min.js');await loadScript('vendor/jspdf.plugin.autotable.min.js');if(!window.jspdf||!window.jspdf.jsPDF)throw new Error('jspdf');return window.jspdf.jsPDF}
 async function needQR(){await loadScript('vendor/qrcode.js');if(!window.qrcode)throw new Error('qr');return window.qrcode}
 const PDFMAP={'″':'"','′':"'",'↔':'<->','→':'->','←':'<-','−':'-','≈':'~','≥':'>=','≤':'<=','★':'*','✓':'ok',' ':' ',' ':' ','​':'','–':'-','—':'-'};
-const pT=t=>String(t??'').replace(/[″′↔→←−≈≥≤★✓  ​–—]/g,c=>PDFMAP[c]).replace(/[^\x00-\xff€„“”‘’•…™‰]/g,'?');
+const pT=t=>String(W(String(t??''))).replace(/[″′↔→←−≈≥≤★✓  ​–—]/g,c=>PDFMAP[c]).replace(/[^\x00-\xff€„“”‘’•…™‰]/g,'?');
 function svgToJpeg(svg,w,h,maxPx){return new Promise((ok,no)=>{const sc=Math.min(2,maxPx/Math.max(w,h)),url=URL.createObjectURL(new Blob([svg],{type:'image/svg+xml'})),img=new Image();
   img.onload=()=>{try{const c=document.createElement('canvas');c.width=Math.max(1,Math.round(w*sc));c.height=Math.max(1,Math.round(h*sc));const g=c.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,c.width,c.height);g.drawImage(img,0,0,c.width,c.height);ok({data:c.toDataURL('image/jpeg',.9),w:c.width,h:c.height})}catch(e){no(e)}finally{URL.revokeObjectURL(url)}};
   img.onerror=e=>{URL.revokeObjectURL(url);no(e)};img.src=url})}
@@ -2016,13 +2019,13 @@ async function makeDoc(){
   if(!DL&&!window.claude)DL=fileSaver();if(!DL){toast('Speichern ist in dieser Ansicht nicht möglich');return}
   toast('PDF wird erstellt …');let JS;try{JS=await needPDF()}catch(_){toast('PDF-Bibliothek konnte nicht geladen werden');return}
   analyze();
-  const doc=new JS({orientation:'landscape',unit:'mm',format:'a4',compress:true}),PW_=297,PH_=210,M=12,date=new Date().toLocaleDateString('de-DE');
+  const doc=new JS({orientation:'landscape',unit:'mm',format:'a4',compress:true}),PW_=297,PH_=210,M=12,date=new Date().toLocaleDateString(LOC);
   const AT=(o)=>{const f=window.autoTable||(doc.autoTable&&((d,op)=>d.autoTable(op)));f(doc,{theme:'striped',styles:{font:'helvetica',fontSize:7.6,cellPadding:1.4,overflow:'linebreak'},headStyles:{fillColor:[17,17,17],textColor:255,fontStyle:'bold'},alternateRowStyles:{fillColor:[243,243,240]},margin:{top:22,left:M,right:M,bottom:14},...o,head:o.head.map(r=>r.map(c=>c&&typeof c==='object'?{...c,content:pT(c.content)}:pT(c))),body:o.body.map(r=>r.map(c=>c&&typeof c==='object'?{...c,content:pT(c.content)}:pT(c)))})};
   const H=(t,sub)=>{doc.setFont('helvetica','bold');doc.setFontSize(16);doc.setTextColor(17);doc.text(pT(t),M,17);if(sub){doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(100);doc.text(pT(sub),PW_-M,17,{align:'right'})}};
   const toc=[];const page=(t,sub)=>{doc.addPage();toc.push([t,doc.getNumberOfPages()]);H(t,sub)};
   // Deckblatt
   doc.setFillColor(17,17,17);doc.rect(0,0,PW_,62,'F');doc.setFillColor(255,230,0);doc.rect(0,62,PW_,3,'F');
-  doc.setTextColor(255);doc.setFont('helvetica','bold');doc.setFontSize(30);doc.text(pT(state.name),M+4,32);doc.setFont('helvetica','normal');doc.setFontSize(13);doc.text('Netzwerkdokumentation · Stand '+date,M+4,46);
+  doc.setTextColor(255);doc.setFont('helvetica','bold');doc.setFontSize(30);doc.text(pT(state.name),M+4,32);doc.setFont('helvetica','normal');doc.setFontSize(13);doc.text(pT('Netzwerkdokumentation · Stand '+date),M+4,46);
   const used=state.devices.reduce((a,d)=>a+usedPorts(d),0),tot=state.devices.reduce((a,d)=>a+total(d),0),nE=state.devices.filter(d=>(lcs(d)||{}).s==='eol').length,nO=state.devices.filter(d=>(lcs(d)||{}).s==='old').length;
   const K=[['Geräte',state.devices.length],['Kabel',state.cables.length],['Strecken',CH.length],['Ports belegt',used+'/'+tot],['Schränke',state.racks.length],['Räume',state.rooms.length],['VLANs',state.vlans.length],['Hinweise',ISS.filter(i=>i.s!=='info').length],['EOL / veraltet',nE+' / '+nO]];
   K.forEach(([k,v],i)=>{const x=M+4+(i%5)*54,y=82+Math.floor(i/5)*30;doc.setDrawColor(210);doc.setFillColor(246,246,243);doc.roundedRect(x,y,50,24,2,2,'F');doc.setTextColor(17);doc.setFont('helvetica','bold');doc.setFontSize(17);doc.text(pT(String(v)),x+4,y+12);doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.setTextColor(100);doc.text(pT(k),x+4,y+19)});
@@ -2032,7 +2035,7 @@ async function makeDoc(){
   for(const r of state.racks){const G=rgeom(r),crop={x1:r.x-12,y1:r.y-12,x2:r.x+G.W+12,y2:r.y+G.H+12};try{const P=buildSVG(crop);page('Schrank '+r.name,`${r.rsize}″ · ${G.n} HE · ${G.heUsed} HE belegt${rackRoom(r)?' · '+rackRoom(r).name:''}`);const I=await svgToJpeg(P.svg,P.w,P.h,3600);const iw=150,s=Math.min(iw/P.w,(PH_-32)/P.h);doc.addImage(I.data,'JPEG',M,24,P.w*s,P.h*s);
       const occ=G.devs.map(d=>[heTxt(d).replace('HE ',''),d.name,d.kind==='net'?subLbl(d):KIND[d.kind].n,d.model||d.role||'',d.ip||'',d.year?String(d.year):'']);AT({startY:24,margin:{top:22,left:M+P.w*s+8,right:M,bottom:14},head:[['HE','Gerät','Art','Modell','IP','Kauf']],body:occ.length?occ:[['–','leer','','','','']]})}catch(_){}}
   // Topologie
-  {const R=topoSVG();if(R){const b=R.box,svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${Math.ceil(b.w)}" height="${Math.ceil(b.h)}" viewBox="${b.x} ${b.y} ${b.w} ${b.h}" font-family="Arial, sans-serif"><rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" fill="#fff"/>${R.svg}</svg>`;try{page('Logische Topologie',`${R.M.nodes.size} Geräte · ${R.M.E.size} Verbindungen`);const I=await svgToJpeg(svg,b.w,b.h,5000);const s=Math.min((PW_-2*M)/b.w,(PH_-32)/b.h);doc.addImage(I.data,'JPEG',M+((PW_-2*M)-b.w*s)/2,24,b.w*s,b.h*s)}catch(_){}}}
+  {const R=topoSVG();if(R){let b=R.box,svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${Math.ceil(b.w)}" height="${Math.ceil(b.h)}" viewBox="${b.x} ${b.y} ${b.w} ${b.h}" font-family="Arial, sans-serif"><rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" fill="#fff"/>${R.svg}</svg>`;svg=I18.markup(svg);try{page('Logische Topologie',`${R.M.nodes.size} Geräte · ${R.M.E.size} Verbindungen`);const I=await svgToJpeg(svg,b.w,b.h,5000);const s=Math.min((PW_-2*M)/b.w,(PH_-32)/b.h);doc.addImage(I.data,'JPEG',M+((PW_-2*M)-b.w*s)/2,24,b.w*s,b.h*s)}catch(_){}}}
   // Tabellen
   const tbl=(t,T)=>{if(!T.rows.length)return;page(t,T.sub||'');AT({startY:24,head:[T.heads],body:T.rows.map(r=>r.cells.map(String))})};
   tbl('Geräte',tableData('geraete'));tbl('Patchliste',tableData('kabel'));
@@ -2047,9 +2050,9 @@ async function makeDoc(){
   tbl('Materialliste',matRows());
   if(ISS.length){page('Hinweise',`${ISS.length} Einträge`);AT({startY:24,head:[['Art','Hinweis']],body:ISS.map(i=>[i.s==='err'?'Fehler':i.s==='warn'?'Warnung':'Info',(i.c?(state.cables.find(c=>c.id===i.c)||{}).label+': ':'')+i.m]),columnStyles:{0:{cellWidth:22}}})}
   // Inhaltsverzeichnis auf dem Deckblatt, Kopf/Fuß auf allen Seiten
-  doc.setPage(1);doc.setTextColor(17);doc.setFont('helvetica','bold');doc.setFontSize(12);doc.text('Inhalt',M+4,152);doc.setFont('helvetica','normal');doc.setFontSize(9.5);
+  doc.setPage(1);doc.setTextColor(17);doc.setFont('helvetica','bold');doc.setFontSize(12);doc.text(pT('Inhalt'),M+4,152);doc.setFont('helvetica','normal');doc.setFontSize(9.5);
   toc.forEach(([t,p],i)=>{const col=Math.floor(i/9),y=160+(i%9)*5.2,x=M+4+col*90;doc.text(pT(t),x,y);doc.text(String(p),x+78,y,{align:'right'})});
-  const n=doc.getNumberOfPages();for(let i=2;i<=n;i++){doc.setPage(i);doc.setDrawColor(17);doc.setLineWidth(.4);doc.line(M,20,PW_-M,20);doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(120);doc.text(pT(state.name)+' · Netzwerkdokumentation · '+date,M,PH_-7);doc.text(`Seite ${i} von ${n}`,PW_-M,PH_-7,{align:'right'})}
+  const n=doc.getNumberOfPages();for(let i=2;i<=n;i++){doc.setPage(i);doc.setDrawColor(17);doc.setLineWidth(.4);doc.line(M,20,PW_-M,20);doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(120);doc.text(pT(state.name)+' · '+pT('Netzwerkdokumentation')+' · '+date,M,PH_-7);doc.text(pT(`Seite ${i} von ${n}`),PW_-M,PH_-7,{align:'right'})}
   await save(slug()+'-dokumentation.pdf',doc.output('blob'))}
 /* Etiketten */
 const LFMT={'a4-44':{n:'A4-Bogen 48,5 × 25,4 mm (44 Stück)',page:[210,297],w:48.5,h:25.4,cols:4,rows:11,gx:0,gy:0},'a4-65':{n:'A4-Bogen 38,1 × 21,2 mm (65 Stück)',page:[210,297],w:38.1,h:21.2,cols:5,rows:13,gx:2.5,gy:0},'roll62':{n:'Etikettendrucker 62 × 29 mm',page:[62,29],w:62,h:29,cols:1,rows:1,gx:0,gy:0},'tape12':{n:'Kabelfahne 12-mm-Band (70 mm)',page:[70,12],w:70,h:12,cols:1,rows:1,gx:0,gy:0,flag:1}};
@@ -2147,13 +2150,13 @@ async function openVersions(){if(PL.cur==='demo'){toast('Im Beispiel gibt es kei
   $('#vaddf').onsubmit=async e=>{e.preventDefault();const ok=await VER.add($('#m-vn').value.trim());toast(ok?'Stand gespeichert':'Konnte nicht gespeichert werden');$('#m-vn').value='';showVersions()};
   showVersions()}
 async function showVersions(){const box=$('#vlist');if(!box)return;let L=[];try{L=await VER.list()}catch(_){}
-  box.innerHTML=L.length?`<ul class="vers">${L.map(v=>`<li data-ver="${esc(v.id)}"><div class="vrow2"><span><b>${esc(v.name||'Automatische Sicherung')}</b><small>${new Date(v.updated).toLocaleString('de-DE',{dateStyle:'medium',timeStyle:'short'})} · ${pl(v.devices,'Gerät','Geräte')} · ${v.cables} Kabel</small></span><span class="vbtns"><button type="button" class="btn sm" data-vop="cmp">Vergleichen</button><button type="button" class="btn sm" data-vop="dl">JSON</button><button type="button" class="btn sm pri" data-vop="restore">Wiederherstellen</button>${v.named?`<button type="button" class="ib sm" data-vop="del" aria-label="Version löschen">×</button>`:''}</span></div><div class="vdiff"></div></li>`).join('')}</ul>`:'<p class="note">Noch keine Versionen vorhanden.</p>';
+  box.innerHTML=L.length?`<ul class="vers">${L.map(v=>`<li data-ver="${esc(v.id)}"><div class="vrow2"><span><b>${esc(v.name||'Automatische Sicherung')}</b><small>${new Date(v.updated).toLocaleString(LOC,{dateStyle:'medium',timeStyle:'short'})} · ${pl(v.devices,'Gerät','Geräte')} · ${v.cables} Kabel</small></span><span class="vbtns"><button type="button" class="btn sm" data-vop="cmp">Vergleichen</button><button type="button" class="btn sm" data-vop="dl">JSON</button><button type="button" class="btn sm pri" data-vop="restore">Wiederherstellen</button>${v.named?`<button type="button" class="ib sm" data-vop="del" aria-label="Version löschen">×</button>`:''}</span></div><div class="vdiff"></div></li>`).join('')}</ul>`:'<p class="note">Noch keine Versionen vorhanden.</p>';
   box.onclick=async e=>{const b=e.target.closest('[data-vop]');if(!b)return;const li=b.closest('[data-ver]'),id=li.dataset.ver;let v;try{v=await VER.get(id)}catch(_){toast('Version nicht lesbar');return}
     let plan;try{plan=sanitize(JSON.parse(v.json))}catch(_){toast('Version ist beschädigt');return}
     if(b.dataset.vop==='cmp'){const t=li.querySelector('.vdiff');t.innerHTML=t.innerHTML?'':'<p class="note">Seit dieser Version:</p>'+diffPlans(plan,state);return}
     if(b.dataset.vop==='dl'){const txt=JSON.stringify(plan,null,2),fn=slug()+'-'+new Date(v.updated).toISOString().slice(0,16).replace(/[:T]/g,'-')+'.json';if(DL)save(fn,txt);else copyText(txt,'Version');return}
     if(b.dataset.vop==='del'){if(await VER.del(id))showVersions();return}
-    if(b.dataset.vop==='restore'){closeModal();if(!(await ask('Version wiederherstellen?',`Der Plan wird durch „${v.name||'Automatische Sicherung'}“ vom ${new Date(v.updated).toLocaleString('de-DE')} ersetzt. Der aktuelle Stand wird vorher als Version gesichert.`,'Wiederherstellen')))return;
+    if(b.dataset.vop==='restore'){closeModal();if(!(await ask('Version wiederherstellen?',`Der Plan wird durch „${v.name||'Automatische Sicherung'}“ vom ${new Date(v.updated).toLocaleString(LOC)} ersetzt. Der aktuelle Stand wird vorher als Version gesichert.`,'Wiederherstellen')))return;
       await VER.add('Vor Wiederherstellung');ck();const keepT=state.templates;state=plan;if(!state.templates||!state.templates.length)state.templates=keepT||[];state.demo=false;sel=null;MS.clear();LC.clear();touched();renderAll();fit();toast('Version wiederhergestellt – Strg+Z macht es rückgängig')}};
 }
 /* ================= Speichern und Live-Zusammenarbeit =================
@@ -2243,7 +2246,7 @@ function migrateLocal(){try{if(localStorage.getItem(LSI)!=null)return;const list
     const sb=localStorage.getItem(LSB);if(sb)localStorage.setItem(LSB+'-main',sb);const v=localStorage.getItem(LSV);if(v)localStorage.setItem(LSV+'-main',v);localStorage.setItem(LSC,'main')}}
   localStorage.setItem(LSI,JSON.stringify(list))}catch(_){}}
 const pmeta=()=>({name:state.name,devices:state.devices.length,cables:state.cables.length});
-const ago=t=>{const s=(Date.now()-t)/1000;return !t?'':s<60?'gerade eben':s<3600?'vor '+Math.round(s/60)+' Min.':s<86400?'vor '+Math.round(s/3600)+' Std.':new Date(t).toLocaleDateString('de-DE',{day:'numeric',month:'short',year:new Date(t).getFullYear()===new Date().getFullYear()?undefined:'numeric'})};
+const ago=t=>{const s=(Date.now()-t)/1000;return !t?'':s<60?'gerade eben':s<3600?'vor '+Math.round(s/60)+' Min.':s<86400?'vor '+Math.round(s/3600)+' Std.':new Date(t).toLocaleDateString(LOC,{day:'numeric',month:'short',year:new Date(t).getFullYear()===new Date().getFullYear()?undefined:'numeric'})};
 function setPlanUrl(id){try{const u=new URL(location.href);if(id&&id!=='demo')u.searchParams.set('plan',id);else u.searchParams.delete('plan');history.replaceState(null,'',u.pathname+u.search+u.hash)}catch(_){}}
 async function waitSaved(){for(let i=0;i<100&&store.busy;i++)await new Promise(r=>setTimeout(r,50));if(store.dirty&&store.ref&&PL.cur&&PL.cur!=='demo'&&!SY.ro){clearTimeout(store.tc);await saveCloud();for(let i=0;i<100&&store.busy;i++)await new Promise(r=>setTimeout(r,50))}}
 async function openPlan(id,force){
@@ -2266,13 +2269,13 @@ async function openPlan(id,force){
 }
 /* der geöffnete Plan wurde gelöscht (von dir in einem anderen Fenster oder von jemand anderem) */
 function planGone(id,who){if(PL.cur!==id||PL.deleting===id)return;PL.list=PL.list.filter(x=>x.id!==id);try{localStorage.removeItem(lsPlan(id))}catch(_){}
-  toast(who?`${who} hat diesen Plan gelöscht`:'Dieser Plan existiert nicht mehr');const n=PL.list[0];openPlan(n?n.id:'demo',true)}
+  toast(who?`„${who}“ hat diesen Plan gelöscht`:'Dieser Plan existiert nicht mehr');const n=PL.list[0];openPlan(n?n.id:'demo',true)}
 function pickStart(){const q=new URLSearchParams(location.search).get('plan'),ok=id=>id&&PL.list.some(x=>x.id===id);let last=null;try{last=localStorage.getItem(LSC)}catch(_){}
   return ok(q)?q:ok(last)?last:last==='demo'?'demo':PL.list.length?PL.list.slice().sort((a,b)=>(b.updated||0)-(a.updated||0))[0].id:'demo'}
 async function loadPlanList(){if(PL.be!=='server')return;try{const r=await fetch('api/plans',{cache:'no-store'});if(r.ok){PL.list=await r.json();renderPlans()}}catch(_){}}
 async function createPlan(name,src){
   if(SY.ro){toast('Nur Ansicht – du kannst keine Pläne anlegen');return}
-  const s=src?sanitize(JSON.parse(JSON.stringify(src))):emptyState();s.name=String(name||'Neuer Plan').slice(0,80);s.demo=false;s.updated=Date.now();if(!src)s.templates=clone(state.templates||[]);
+  const s=src?sanitize(JSON.parse(JSON.stringify(src))):emptyState();s.name=String(name||W('Neuer Plan')).slice(0,80);s.demo=false;s.updated=Date.now();if(!src)s.templates=clone(state.templates||[]);
   const json=JSON.stringify(s);let id;
   try{
     if(PL.be==='server'){const r=await fetch('api/plans',{method:'POST',cache:'no-store',headers:{'Content-Type':'application/json'},body:JSON.stringify({json})});if(!r.ok)throw new Error(await r.text());id=(await r.json()).id}
@@ -2294,7 +2297,7 @@ async function deletePlan(id){
   PL.list=PL.list.filter(x=>x.id!==id);if(PL.cur===id){store.dirty=false;const n=PL.list[0];await openPlan(n?n.id:'demo',true)}else renderPlans();toast(`„${m.name}“ gelöscht`)}
 function planDialog(kind){
   const cur=PL.cur==='demo'?null:state.name,t={new:['Neuer Plan','Anlegen'],ren:['Plan umbenennen','Umbenennen'],dup:['Plan duplizieren','Kopie anlegen'],adopt:['Beispiel als eigenen Plan speichern','Speichern']}[kind];
-  const val=kind==='ren'?state.name:kind==='dup'?state.name+' (Kopie)':kind==='adopt'?'Mein Plan':'Neuer Plan';
+  const val=kind==='ren'?state.name:kind==='dup'?state.name+' '+W('(Kopie)'):W(kind==='adopt'?'Mein Plan':'Neuer Plan');
   modal(`<form class="mbox" id="plf" role="dialog" aria-modal="true" aria-labelledby="m-t"><div class="mh"><h2 id="m-t">${t[0]}</h2>${closeBtn}</div>
     ${kind==='new'?'<p>Ein leerer Plan, den alle mit Zugang sehen und bearbeiten können. Deine Vorlagen werden übernommen.</p>':kind==='adopt'?'<p>Übernimmt das Beispiel mit deinen Änderungen als eigenen Plan, der gespeichert wird.</p>':kind==='dup'?'<p>Legt eine Kopie des aktuellen Plans an.</p>':''}
     <label class="fld"><span>Name</span><input id="m-pn" maxlength="80" required value="${esc(val)}"></label>
@@ -2304,7 +2307,7 @@ function planDialog(kind){
   $('#plf').onsubmit=e=>{e.preventDefault();const n=f.value.trim().slice(0,80);if(!n)return;const cp=$('#m-pcopy'),copy=!!(cp&&cp.checked);closeModal();
     if(kind==='ren'){if(n!==state.name){ck('proj');state.name=n;touched();renderAll()}return}
     createPlan(n,kind==='new'&&!copy?null:state)}}
-function renderPlans(){
+function renderPlans(){if(EN&&I18.setData&&state)I18.setData(userWords());
   const nm=PL.cur==='demo'?'Beispiel (Tutorial)':state&&state.name||'Plan';$('#pl-name').textContent=nm;$('#b-plans').title='Pläne – aktuell: '+nm;
   const box=$('#plmenu');if(box.hidden)return;
   const here=id=>[...LV.peers.values()].filter(p=>p.p&&p.p.pl===id);
@@ -2402,22 +2405,24 @@ const ink=c=>{const n=parseInt(String(c).slice(1),16);if(!Number.isFinite(n))ret
 const initials=n=>{const p=String(n||'?').trim().split(/[\s._-]+/).filter(Boolean);return ((p[0]||'?')[0]+(p.length>1?p[p.length-1][0]:(p[0]||'')[1]||'')).toUpperCase()};
 function renderPeople(){const el=$('#people');if(!el)return;const L=[...LV.peers.values()].filter(p=>!p.self&&samePlan(p));if(!$('#plmenu').hidden)renderPlans();
   if(!LV.me||(!L.length&&!LV.send)){el.hidden=true;el.innerHTML='';return}
-  const av=(p,me)=>`<span class="pav${me?' me':''}" style="--pc:${esc(p.color)};--pt:${ink(p.color)}" title="${esc(me?p.name+' (du)'+(LV.auth||store.kind==='shared'?'':' – klicken zum Ändern'):p.name+(p.p&&p.p.m&&p.p.m!=='plan'?' · '+({topo:'Topologie',list:'Listen'}[p.p.m]||''):''))}">${esc(initials(p.name))}</span>`;
+  const av=(p,me)=>`<span class="pav${me?' me':''}" style="--pc:${esc(p.color)};--pt:${ink(p.color)}" title="${esc(me?p.name+' '+W('(du)')+(LV.auth||store.kind==='shared'?'':' – '+W('klicken zum Ändern')):p.name+(p.p&&p.p.m&&p.p.m!=='plan'?' · '+({topo:'Topologie',list:'Listen'}[p.p.m]||''):''))}">${esc(initials(p.name))}</span>`;
   el.hidden=false;el.innerHTML=`${L.slice(0,6).map(p=>av(p,false)).join('')}${L.length>6?`<span class="pav more">+${L.length-6}</span>`:''}<button type="button" class="pme" id="pme" aria-label="Du: ${esc(LV.me.name)}">${av(LV.me,true)}</button>`;
-  el.title=PL.cur==='demo'?'Im Beispiel arbeitet jeder für sich':L.length?pl(L.length+1,'Person','Personen')+' im Plan: '+[LV.me.name+' (du)',...L.map(p=>p.name)].join(', '):'Nur du bist gerade im Plan'}
+  el.title=PL.cur==='demo'?W('Im Beispiel arbeitet jeder für sich'):L.length?W(pl(L.length+1,'Person','Personen')+' im Plan:')+' '+[LV.me.name+' '+W('(du)'),...L.map(p=>p.name)].join(', '):W('Nur du bist gerade im Plan')}
+$('#b-lang').textContent=EN?'EN':'DE';$('#b-lang').title=EN?'Language: English – switch to German':'Sprache: Deutsch – auf Englisch umschalten';$('#b-lang').setAttribute('aria-label',EN?'Switch to German':'Auf Englisch umschalten');$('#b-lang').setAttribute('translate','no');
+$('#b-lang').onclick=async()=>{await waitSaved();I18.set(EN?'de':'en')};
 $('#people').addEventListener('click',e=>{if(!e.target.closest('#pme')||LV.auth||store.kind!=='server')return;
   modal(`<form class="mbox" id="nmf" role="dialog" aria-modal="true" aria-labelledby="m-t"><div class="mh"><h2 id="m-t">Dein Name</h2>${closeBtn}</div><p>So sehen dich die anderen an deinem Mauszeiger.</p><label class="fld"><span>Name</span><input id="m-nm" maxlength="30" value="${esc(LV.me.name)}" required></label><div class="mf"><button type="submit" class="btn pri">Übernehmen</button></div></form>`);
   $('#m-nm').select();$('#nmf').onsubmit=ev=>{ev.preventDefault();const n=$('#m-nm').value.trim().slice(0,30);if(!n)return;try{localStorage.setItem(LSN,n)}catch(_){}LV.me.name=n;LV.me.color=colorFor(n);lvSet({n,c:LV.me.color});closeModal();renderPeople()}});
 function liveServer(me){
   LV.auth=!!me.auth;let n='';try{n=localStorage.getItem(LSN)||''}catch(_){}
-  const name=me.user||n||'Gast '+SY.cid.slice(0,3).toUpperCase();LV.me={name,color:colorFor(name),self:true};
+  const name=me.user||n||W('Gast')+' '+SY.cid.slice(0,3).toUpperCase();LV.me={name,color:colorFor(name),self:true};
   if(!LV.auth)Object.assign(LV.mine,{n:name,c:LV.me.color});
   LV.send=p=>fetch('api/presence',{method:'POST',cache:'no-store',headers:{'Content-Type':'application/json'},body:JSON.stringify({cid:SY.cid,p})}).then(r=>{if(r.status===404)LV.ready=false}).catch(()=>{});
   const from=x=>{const p=x.p&&typeof x.p==='object'?x.p:{},nm=(x.user||(typeof p.n==='string'?p.n:'')||'Gast').slice(0,40);return {name:nm,color:x.user?colorFor(x.user):(/^#[0-9a-f]{6}$/i.test(p.c)?p.c:colorFor(nm)),p}};
   let es;try{es=new EventSource('api/live?cid='+encodeURIComponent(SY.cid))}catch(_){return}LV.es=es;
   es.addEventListener('hello',e=>{let h;try{h=JSON.parse(e.data)}catch(_){return}LV.peers=new Map((h.peers||[]).map(x=>[x.cid,from(x)]));LV.ready=true;LV.last=Date.now();LV.send({...LV.mine});peersChanged();
     const id=PL.cur,rv=h.revs&&id&&h.revs[id];if(rv&&rv!==SY.rev&&SY.rev!=null&&!store.busy)api('GET',null,id).then(b=>{if(PL.cur===id&&b&&+b.updated!==SY.rev)onRemote({json:b.json,updated:+b.updated,rev:+b.updated})}).catch(()=>{});loadPlanList()});
-  es.addEventListener('plans',e=>{let x;try{x=JSON.parse(e.data)}catch(_){return}if(Array.isArray(x.list)){PL.list=x.list;renderPlans()}if(x.deleted&&x.deleted===PL.cur)planGone(PL.cur,x.user||'Jemand')});
+  es.addEventListener('plans',e=>{let x;try{x=JSON.parse(e.data)}catch(_){return}if(Array.isArray(x.list)){PL.list=x.list;renderPlans()}if(x.deleted&&x.deleted===PL.cur)planGone(PL.cur,x.user||W('Jemand'))});
   es.addEventListener('presence',e=>{try{const x=JSON.parse(e.data);if(x.cid!==SY.cid){LV.peers.set(x.cid,from(x));peersChanged()}}catch(_){}});
   es.addEventListener('leave',e=>{try{LV.peers.delete(JSON.parse(e.data).cid);peersChanged()}catch(_){}});
   es.addEventListener('plan',e=>{let x;try{x=JSON.parse(e.data)}catch(_){return}if(x.cid===SY.cid||x.id!==PL.cur||SY.rev==null)return;onRemote({json:x.json,updated:+x.updated,rev:+x.updated})});
@@ -2430,7 +2435,7 @@ function initRoom(room,user){
   LV.send=p=>{try{room.presence({x:null,y:null,d:null,s:null,m:null,...p}).catch(()=>{})}catch(_){}};
   user.me().then(m=>{LV.me={name:m.name||'Du',color:m.color||PCOL[0],self:true};try{room.presence({who:{c:LV.me.color,t:Date.now()}}).catch(()=>{})}catch(_){}renderPeople()}).catch(()=>{});
   try{room.onPeers(ch=>{const L=ch.peers.filter(p=>!p.sameTab&&p.kind==='viewer'),ids=[...new Set(L.map(p=>p.by).filter(Boolean))];
-    Promise.resolve(ids.length?user.profiles(ids):{}).catch(()=>({})).then(ps=>{LV.peers=new Map(L.map(p=>{const pr=p.by&&ps[p.by];return [p.peer,{name:((pr&&pr.name)||'Jemand')+(p.isMe?' (anderer Tab)':''),color:(pr&&pr.color)||colorFor(p.peer),p:p.presence||{}}]}));peersChanged()})},()=>{})}catch(_){}
+    Promise.resolve(ids.length?user.profiles(ids):{}).catch(()=>({})).then(ps=>{LV.peers=new Map(L.map(p=>{const pr=p.by&&ps[p.by];return [p.peer,{name:((pr&&pr.name)||W('Jemand'))+(p.isMe?' '+W('(anderer Tab)'):''),color:(pr&&pr.color)||colorFor(p.peer),p:p.presence||{}}]}));peersChanged()})},()=>{})}catch(_){}
   peersChanged();
 }
 /* Präsenz der anderen im Plan zeichnen – in Weltkoordinaten, Beschriftungen in Bildschirmgröße */
@@ -2444,12 +2449,12 @@ function renderPeers(){const g=$('#l-peer');if(!g)return;if(mode!=='plan'||!LV.p
     const D=p.d&&typeof p.d==='object'?p.d:null,busy=new Set();
     try{
       if(D&&D.k==='dev'&&Array.isArray(D.l)){D.l.forEach(([id,x,y],i)=>{const b=devBox(id);if(!b||!Number.isFinite(x)||!Number.isFinite(y))return;busy.add(id);
-          s+=box(b.x-3,b.y-3,b.w+6,b.h+6,col,{sw:2,dash:1})+box(x,y,b.w,b.h,col,{fill:.16,sw:3.5});if(!i)act=' verschiebt '+b.d.name+(D.l.length>1?' +'+(D.l.length-1):'')})}
+          s+=box(b.x-3,b.y-3,b.w+6,b.h+6,col,{sw:2,dash:1})+box(x,y,b.w,b.h,col,{fill:.16,sw:3.5});if(!i)act=' '+W('verschiebt')+' '+b.d.name+(D.l.length>1?' +'+(D.l.length-1):'')})}
       else if(D&&D.k==='wire'&&D.f&&dev(D.f.d)&&lay(dev(D.f.d)).by[D.f.p]&&Number.isFinite(D.x)){const A=endPos(D.f),Q=pathD(cpath(A,{x:D.x,y:D.y,dir:0}));
           s+=`<path d="${Q}" fill="none" stroke="#111" stroke-width="${f(8*k)}" stroke-linecap="round" opacity=".35"/><path d="${Q}" fill="none" stroke="${col}" stroke-width="${f(4.5*k)}" stroke-linecap="round" stroke-dasharray="${f(12*k)} ${f(7*k)}"/><circle cx="${f(A.x)}" cy="${f(A.y)}" r="${f(Math.max(A.p.w,A.p.h)/2+5)}" fill="none" stroke="${col}" stroke-width="${f(4*k)}"/>`;
-          act=' zieht ein Kabel von '+pfull(D.f)}
-      else if(D&&D.k==='rack'){const r=rackOf(D.id);if(r){const G=rgeom(r);s+=box(r.x,r.y,G.W,G.H,col,{sw:2,dash:1})+box(D.x,D.y,G.W,G.H,col,{fill:.12,sw:3.5});act=' verschiebt '+r.name;busy.add(r.id)}}
-      else if(D&&D.k==='room'){const r=roomOf(D.id);if(r){s+=box(D.x,D.y,D.w,D.h,col,{fill:.08,sw:3.5,dash:1});act=' bewegt '+r.name;busy.add(r.id)}}
+          act=' '+W('zieht ein Kabel von')+' '+W(pfull(D.f))}
+      else if(D&&D.k==='rack'){const r=rackOf(D.id);if(r){const G=rgeom(r);s+=box(r.x,r.y,G.W,G.H,col,{sw:2,dash:1})+box(D.x,D.y,G.W,G.H,col,{fill:.12,sw:3.5});act=' '+W('verschiebt')+' '+r.name;busy.add(r.id)}}
+      else if(D&&D.k==='room'){const r=roomOf(D.id);if(r){s+=box(D.x,D.y,D.w,D.h,col,{fill:.08,sw:3.5,dash:1});act=' '+W('bewegt')+' '+r.name;busy.add(r.id)}}
       const sk=typeof p.s==='string'?p.s:'',[sk0,...sr]=sk.split(':'),sid=sr.join(':');
       if(sk0==='dev'&&!busy.has(sid)){const b=devBox(sid);if(b){s+=box(b.x-5,b.y-5,b.w+10,b.h+10,col,{sw:3});s+=tag(b.x-5,b.y-5-24*k,P.name,col)}}
       else if(sk0==='multi'){for(const id of sid.split(',')){if(busy.has(id))continue;const b=devBox(id);if(b)s+=box(b.x-5,b.y-5,b.w+10,b.h+10,col,{sw:3})}}
@@ -2462,7 +2467,10 @@ function renderPeers(){const g=$('#l-peer');if(!g)return;if(mode!=='plan'||!LV.p
   }
   g.innerHTML=s}
 /* ================= example ================= */
-function demo(){
+/* englisches Beispiel: gleiche Daten, englische Namen */
+const DEMO_EN={'Beispiel Bürogebäude':'Example office building','EG · Technik & Empfang':'Ground floor · Tech & reception','Serverraum UG':'Server room (basement)','Verteiler EG':'Distribution GF','Access-SW EG':'Access-SW GF','AP Flur EG':'AP hallway GF','LWL-Panel Serverraum':'Fibre panel server room','Patchpanel EG':'Patch panel GF','PC Buchhaltung':'PC accounting','PC Empfang':'PC reception','Telefon Empfang':'Phone reception','USV Serverraum':'UPS server room','Telefonie':'Voice','VM-Daten':'VM data','Backbone EG':'Backbone GF','Backbone OG':'Backbone 1F','Glasfaser-ONT':'Fibre ONT','LTE-Backup':'LTE backup','Mgmt-Netz':'Mgmt network','USV-NMC':'UPS NMC','Technikraum EG':'Tech room GF','Online, 2 HE':'Online, 2 U','1 HE · 2 × QSFP28':'1 U · 2 × QSFP28','Backbone Serverraum → Verteiler EG':'Backbone server room → distribution GF','Buchhaltung (Raum 12), Dose 1 · PC Erika Musterfrau':'Accounting (room 12), outlet 1 · PC Jane Doe','Empfang (Raum 11), Dose 1 · PC Max Mustermann':'Reception (room 11), outlet 1 · PC John Smith','Empfang (Raum 11), Dose 2 · Telefon Max Mustermann':'Reception (room 11), outlet 2 · Phone John Smith','Flur EG (Raum 10) · Deckendose für AP':'Hallway GF (room 10) · ceiling outlet for AP','Max Mustermann':'John Smith','Erika Musterfrau':'Jane Doe','AP Flur':'AP hallway'};
+function demo(){const o=demo_();if(!EN)return o;const map=v=>{if(Array.isArray(v))return v.map(map);if(v&&typeof v==='object'){const r={};for(const [k,x] of Object.entries(v))r[k]=typeof x==='string'&&/^(name|user|label|notes|role|location|model)$/.test(k)&&DEMO_EN[x]?DEMO_EN[x]:map(x);return r}return v};return map(o)}
+function demo_(){
   const D=(k,o)=>mkDev(k,o);
   const devs=[
     D('fiber',{id:'lwl1',name:'LWL-Panel Serverraum',style:'fs',pc:{lc:24},fg:'os2',pol:'UPC',rack:'rA',u:1,ports:{l1:{label:'Backbone EG'},l2:{label:'Backbone OG'}}}),
