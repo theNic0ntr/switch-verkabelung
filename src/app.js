@@ -770,7 +770,7 @@ function renderCanvas(){
   $('#l-pow').innerHTML=powSVG();
   drawCables();
   $('#empty').hidden=state.devices.length+state.racks.length+state.rooms.length>0;
-  lvSel();renderPeers();renderStp();renderSim();
+  lvSel();renderPeers();renderStp();renderComBadges();renderSim();
   $('#hint').textContent=PL.cur==='demo'?'Beispiel zum Ausprobieren – Änderungen werden nicht gespeichert. Oben links legst du einen eigenen Plan an.':'Port anklicken zeigt die ganze Strecke · Port auf Port ziehen steckt ein Kabel · Geräte in Schränke ziehen';
 }
 function powSVG(){if(!SDV)return '';const d=dev(SDV);if(!d||HID.has(d.id))return '';const pairs=[];
@@ -1009,6 +1009,7 @@ function inspDev(d){
   ${fieldsHTML(d,'i')}
   ${fld('f-notes','Notizen',`<textarea id="f-notes" data-f="dev.notes" rows="2" maxlength="500">${esc(d.notes)}</textarea>`)}
   <div class="row"><button type="button" class="btn" data-act="dup">Duplizieren</button><button type="button" class="btn" data-act="tplsave">Als Vorlage</button>${store.kind==='server'?`<button type="button" class="btn" data-act="qr" data-k="dev" data-id="${d.id}">QR-Code</button>`:''}${hideBtn(d.id)}<button type="button" class="btn danger" data-act="deldev">Löschen</button></div>
+  ${comHTML(d)}
   ${netHTML(d,L)}
   ${stpHTML(d)}
   ${pingHTML(d)}
@@ -1323,7 +1324,7 @@ function applyField(el,live){
 
 /* ================= view ================= */
 const stage=$('#stage'),cv=$('#cv'),world=$('#world');
-function applyView(){if(SIM.res||STP.pr.size)simScale();if(LV.peers.size){cancelAnimationFrame(LV.raf);LV.raf=requestAnimationFrame(renderPeers)}world.setAttribute('transform',`translate(${view.x.toFixed(1)} ${view.y.toFixed(1)}) scale(${view.z.toFixed(4)})`);stage.style.backgroundSize=`${20*view.z}px ${20*view.z}px`;stage.style.backgroundPosition=`${view.x}px ${view.y}px`;$('#z-lbl').textContent=Math.round(view.z*100)+' %'}
+function applyView(){if(SIM.res||STP.pr.size||TK.items.length)simScale();if(LV.peers.size){cancelAnimationFrame(LV.raf);LV.raf=requestAnimationFrame(renderPeers)}world.setAttribute('transform',`translate(${view.x.toFixed(1)} ${view.y.toFixed(1)}) scale(${view.z.toFixed(4)})`);stage.style.backgroundSize=`${20*view.z}px ${20*view.z}px`;stage.style.backgroundPosition=`${view.x}px ${view.y}px`;$('#z-lbl').textContent=Math.round(view.z*100)+' %'}
 function bbox(){const B=contentBox(true)||{x1:0,y1:0,x2:400,y2:300};let {x1,y1,x2,y2}=B;
   for(const rt of routes().values()){const ps=rt.pts?rt.pts.map(([x,y])=>({x,y})):[];for(let t=0;t<=1.001;t+=.05)ps.push(rt.at(t));for(const p of ps){x1=Math.min(x1,p.x);y1=Math.min(y1,p.y);x2=Math.max(x2,p.x);y2=Math.max(y2,p.y)}}
   return {x1,y1,x2,y2}}
@@ -1490,6 +1491,7 @@ ic.addEventListener('click',e=>{
   const b=e.target.closest('[data-act]');
   if(b){const a=b.dataset.act;
     if(a==='dup')dupDev(dev(sel.id));else if(a==='deldev')delDev(dev(sel.id));
+    else if(a==='tkcom'){tkShow('com',sel.id)}else if(a==='tkall'){TK.filter='all';tkShow('com')}
     else if(a==='ping'){const t=SIM.pick[sel.id]||($('#f-ping')||{}).value;if(t)simStart(sel.id,t)}else if(a==='pingx')simClear();
     else if(a==='selcab')select({kind:'cable',id:b.dataset.id});else if(a==='delcab')delCable(b.dataset.id);
     else if(a==='seldev'){select({kind:'dev',id:b.dataset.id});centerOn(dev(b.dataset.id))}
@@ -1877,7 +1879,7 @@ function openAdd(kind,target){
     toast(d.rack?`In „${r.name}“ eingebaut – ${heTxt(d)}`:`${KIND[d.kind].n} eingefügt – Ports per Ziehen verbinden`)});
   draw();const n=$('#a-name');n&&n.select();
 }
-function toast(t){const box=$('#toasts'),el=document.createElement('div');el.className='toast';el.textContent=t;box.append(el);setTimeout(()=>el.remove(),3000);while(box.children.length>3)box.firstChild.remove()}
+function toast(t,raw){const box=$('#toasts'),el=document.createElement('div');el.className='toast';if(raw)el.setAttribute('translate','no');el.textContent=t;box.append(el);setTimeout(()=>el.remove(),3000);while(box.children.length>3)box.firstChild.remove()}
 
 /* ================= patch list ================= */
 /* ================= logische Topologie ================= */
@@ -2276,10 +2278,10 @@ async function openPlan(id,force){
   PL.cur=id;try{localStorage.setItem(LSC,id)}catch(_){}setPlanUrl(id);
   H.u=[];H.r=[];H.key=null;sel=null;MS.clear();LC.clear();raidEdit=null;cancelAnimationFrame(SIM.raf);SIM.anim=null;SIM.src=SIM.dst=SIM.res=null;
   if(LV.send)lvSet({pl:id,s:null,d:null});
-  if(id==='demo'){state=sanitize(demo());state.demo=true;auReset();renderAll();fit();renderPlans();peersChanged();setSave('demo');return}
+  if(id==='demo'){state=sanitize(demo());state.demo=true;auReset();renderAll();fit();renderPlans();peersChanged();setSave('demo');tkOpen('demo');return}
   const m=PL.list.find(x=>x.id===id),cached=loadLocal(id);
   state=cached||{...emptyState(),name:(m&&m.name)||'Plan'};state.demo=false;auReset();
-  renderAll();fit();renderPlans();peersChanged();
+  renderAll();fit();renderPlans();peersChanged();tkOpen(id);
   if(PL.be==='local'||!store.ref&&PL.be!=='shared'){setSave('local');return}
   setSave('boot');PL.fit=!cached;
   if(PL.be==='server'){try{const b=await api('GET',null,id);if(g!==PL.gen)return;firstRemote({json:b.json,updated:+b.updated,rev:+b.updated})}
@@ -2439,8 +2441,9 @@ function liveServer(me){
   LV.send=p=>fetch('api/presence',{method:'POST',cache:'no-store',headers:{'Content-Type':'application/json'},body:JSON.stringify({cid:SY.cid,p})}).then(r=>{if(r.status===404)LV.ready=false}).catch(()=>{});
   const from=x=>{const p=x.p&&typeof x.p==='object'?x.p:{},nm=(x.user||(typeof p.n==='string'?p.n:'')||'Gast').slice(0,40);return {name:nm,color:x.user?colorFor(x.user):(/^#[0-9a-f]{6}$/i.test(p.c)?p.c:colorFor(nm)),p}};
   let es;try{es=new EventSource('api/live?cid='+encodeURIComponent(SY.cid))}catch(_){return}LV.es=es;
-  es.addEventListener('hello',e=>{let h;try{h=JSON.parse(e.data)}catch(_){return}LV.peers=new Map((h.peers||[]).map(x=>[x.cid,from(x)]));LV.ready=true;LV.last=Date.now();LV.send({...LV.mine});peersChanged();
+  es.addEventListener('hello',e=>{let h;try{h=JSON.parse(e.data)}catch(_){return}LV.peers=new Map((h.peers||[]).map(x=>[x.cid,from(x)]));LV.ready=true;LV.last=Date.now();LV.send({...LV.mine});peersChanged();if(TK.ready)tkReload();
     const id=PL.cur,rv=h.revs&&id&&h.revs[id];if(rv&&rv!==SY.rev&&SY.rev!=null&&!store.busy)api('GET',null,id).then(b=>{if(PL.cur===id&&b&&+b.updated!==SY.rev)onRemote({json:b.json,updated:+b.updated,rev:+b.updated})}).catch(()=>{});loadPlanList()});
+  es.addEventListener('talk',e=>{try{tkRemote(JSON.parse(e.data))}catch(_){}});
   es.addEventListener('plans',e=>{let x;try{x=JSON.parse(e.data)}catch(_){return}if(Array.isArray(x.list)){PL.list=x.list;renderPlans()}if(x.deleted&&x.deleted===PL.cur)planGone(PL.cur,x.user||W('Jemand'))});
   es.addEventListener('presence',e=>{try{const x=JSON.parse(e.data);if(x.cid!==SY.cid){LV.peers.set(x.cid,from(x));peersChanged()}}catch(_){}});
   es.addEventListener('leave',e=>{try{LV.peers.delete(JSON.parse(e.data).cid);peersChanged()}catch(_){}});
@@ -2885,7 +2888,7 @@ function simShow(){/* den Weg ins Bild holen, falls er nicht zu sehen ist */cons
   for(const it of R.seq){if(it.k==='dev'){const L=lay(it.d);inc(it.d.x,it.d.y);inc(it.d.x+L.W,it.d.y+L.H)}else for(const s of it.L.st){const rt=RTC&&RTC.get(s.c.id);if(rt)for(let t=0;t<=1;t+=.25){const q=rt.at(t);inc(q.x,q.y)}}}
   const sx=v=>v*view.z+view.x,sy=v=>v*view.z+view.y;if(sx(x1)>=0&&sy(y1)>=0&&sx(x2)<=r.width&&sy(y2)<=r.height-40)return;
   const pad=60,bw=x2-x1,bh=y2-y1,z=clamp(Math.min((r.width-pad*2)/bw,(r.height-pad*2-50)/bh),.08,1.1);view.z=z;view.x=(r.width-bw*z)/2-x1*z;view.y=(r.height-50-bh*z)/2-y1*z;applyView()}
-function simScale(){const z=clamp(1/view.z,.8,3.5).toFixed(3),z2=clamp(.7/view.z,1,2.6).toFixed(3);for(const e of document.querySelectorAll('#l-sim .sk'))e.setAttribute('transform',`translate(${e.dataset.x} ${e.dataset.y}) scale(${z})`);for(const e of document.querySelectorAll('#l-stp .sk'))e.setAttribute('transform',`translate(${e.dataset.x} ${e.dataset.y}) scale(${z2})`)}
+function simScale(){const z=clamp(1/view.z,.8,3.5).toFixed(3),z2=clamp(.7/view.z,1,2.6).toFixed(3);for(const e of document.querySelectorAll('#l-sim .sk'))e.setAttribute('transform',`translate(${e.dataset.x} ${e.dataset.y}) scale(${z})`);for(const e of document.querySelectorAll('#l-stp .sk,#l-com .sk'))e.setAttribute('transform',`translate(${e.dataset.x} ${e.dataset.y}) scale(${z2})`)}
 function renderSim(){const g=$('#l-sim'),bar=$('#simbar');if(!g)return;
   if(SIM.src&&(!dev(SIM.src)||!dev(SIM.dst))){SIM.src=SIM.dst=SIM.res=null}
   if(SIM.src&&!SIM.anim)SIM.res=runPing(dev(SIM.src),dev(SIM.dst));
@@ -2901,6 +2904,134 @@ function renderSim(){const g=$('#l-sim'),bar=$('#simbar');if(!g)return;
   g.innerHTML=s;simScale();
   if(bar){const S=R.S,D=R.D,run=!!SIM.anim;bar.hidden=false;bar.className='simbar '+(run?'run':R.ok?(R.warn?'warn':'ok'):'bad');
     bar.innerHTML=`<span class="st">${run?'':R.ok?(R.warn?'!':'✓'):'✕'}</span><span class="tx"><span class="ln"><b>${R.trace?'Route':'Ping'}</b> <button type="button" class="link" data-sim="src" translate="no">${esc(S.name)}</button> → <button type="button" class="link" data-sim="dst" translate="no">${esc(D.name)}</button></span><small${!run&&(!R.ok||R.warn)?` title="${esc(R.warn||R.fail.msg)}"`:''}>${run?'Paket unterwegs …':R.ok?(R.warn?esc(R.warn):R.G&&R.G!==S?`geroutet über „${esc(R.G.name)}“`:R.trace?'Route gefunden':'erfolgreich'):esc(R.fail.msg)}</small></span><button type="button" class="btn sm" data-sim="again">Erneut</button><button type="button" class="ib sm" data-sim="close" aria-label="Verbindungstest schließen" title="Schließen">×</button>`}}
+
+/* ================= Chat und Kommentare =================
+   Je Plan eine Liste von Beiträgen: { id, t:'chat'|'com', by, n, at, text, dev?, dn?, ref?, done?, db?, dt? }
+   Server: /api/plans/<id>/talk, neue Beiträge kommen per Server-Sent Events. Artifact: db-Sammlung talk/<id>/items.
+   Nur im Browser: localStorage (nur auf diesem Gerät). Beispielplan: nur im Speicher. */
+const TK={pid:null,items:[],open:false,tab:'chat',dev:null,pick:false,q:'',filter:'open',seen:{chat:0,com:0},unsub:null,gen:0,ready:false,mem:new Map(),closed:new Set(),compose:false};
+const LST='switch-verkabelung-talk-',LSTS='switch-verkabelung-talkseen-';
+const tkMe=()=>{const n=(LV.me&&LV.me.name)||'';if(PL.be==='shared')return {by:AU.uid?'@'+AU.uid:'',n};const w=auWho()||n;return {by:w,n:n||w}};
+const tkName=it=>it.n||auName(it.by)||((PL.be==='local'||PL.cur==='demo')?W('Du'):W('Unbekannt'));
+const tkMine=it=>{const m=tkMe();return PL.be==='local'||PL.cur==='demo'?true:!!it.by&&it.by===m.by};
+const tkTime=t=>{const d=new Date(t),now=new Date();return d.toDateString()===now.toDateString()?d.toLocaleTimeString(LOC,{hour:'2-digit',minute:'2-digit'}):d.toLocaleString(LOC,{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})};
+const tkLocalKey=pid=>LST+(PL.be==='server'?'srv-':'')+pid;
+function tkSaveLocal(){if(PL.cur==='demo'){TK.mem.set('demo',TK.items);return}if(PL.be!=='local')return;try{localStorage.setItem(tkLocalKey(TK.pid),JSON.stringify(TK.items.slice(-1500)))}catch(_){}}
+function tkSeenLoad(){try{const s=JSON.parse(localStorage.getItem(LSTS+TK.pid)||'{}');TK.seen={chat:+s.chat||0,com:+s.com||0}}catch(_){TK.seen={chat:0,com:0}}}
+function tkSeenSave(){try{localStorage.setItem(LSTS+TK.pid,JSON.stringify(TK.seen))}catch(_){}}
+function tkSet(items){const m=new Map();for(const it of items)if(it&&typeof it.id==='string'&&(it.t==='chat'||it.t==='com')&&typeof it.text==='string')m.set(it.id,it);TK.items=[...m.values()].sort((a,b)=>(a.at||0)-(b.at||0))}
+/* neuer Plan geöffnet: Beiträge laden */
+function tkOpen(pid){if(TK.unsub){try{TK.unsub()}catch(_){}TK.unsub=null}const g=++TK.gen;TK.pid=pid;TK.items=[];TK.ready=false;TK.dev=null;TK.pick=false;TK.compose=false;tkSeenLoad();
+  const done=items=>{if(g!==TK.gen)return;const first=!TK.ready;const before=new Set(TK.items.map(x=>x.id));tkSet(items);TK.ready=true;if(!first)tkNotify(TK.items.filter(x=>!before.has(x.id)));renderTalk();if(sel&&sel.kind==='dev')tkInspRefresh()};
+  if(!pid){renderTalk();return}
+  if(pid==='demo'){done(TK.mem.get('demo')||[]);return}
+  if(PL.be==='server'){fetch('api/plans/'+encodeURIComponent(pid)+'/talk',{cache:'no-store'}).then(r=>r.ok?r.json():{items:[]}).then(b=>done(b&&Array.isArray(b.items)?b.items:[])).catch(()=>done([]));return}
+  if(PL.be==='shared'&&PL.db){try{let first=true;TK.unsub=PL.db.collection('talk/'+pid+'/items').onSnapshot(snap=>{if(g!==TK.gen)return;const L=snap.docs.filter(d=>d.exists).map(d=>({...(d.data()||{}),id:d.id}));if(first&&snap.metadata&&snap.metadata.fromCache&&!L.length)return;first=false;done(L)},()=>done([]))}catch(_){done([])}return}
+  let L=[];try{L=JSON.parse(localStorage.getItem(tkLocalKey(pid))||'[]')}catch(_){}done(Array.isArray(L)?L:[])}
+/* Beiträge, die von anderen kommen (Server-Events) */
+function tkRemote(x){if(!x||x.plan!==TK.pid)return;
+  if(x.add){if(TK.items.some(i=>i.id===x.add.id))return;tkSet([...TK.items,x.add]);tkNotify([x.add])}
+  else if(x.upd){tkSet(TK.items.map(i=>i.id===x.upd.id?x.upd:i))}
+  else if(x.del){tkSet(TK.items.filter(i=>i.id!==x.del))}
+  renderTalk();tkInspRefresh();renderComBadges()}
+function tkNotify(L){for(const it of L){if(tkMine(it))continue;if(TK.open&&TK.tab===(it.t==='chat'?'chat':'com'))continue;
+  toast(it.t==='chat'?`${tkName(it)}: ${trunc(it.text,90)}`:`${tkName(it)} → ${it.dn||''}: ${trunc(it.text,80)}`,true)}}
+async function tkPost(t,text,extra){text=String(text||'').trim().slice(0,2000);if(!text)return false;const me=tkMe();
+  const it={id:rid()+Date.now().toString(36),t,by:me.by,n:me.n,at:Date.now(),text,...(extra||{})};
+  if(PL.cur==='demo'||PL.be==='local'){tkSet([...TK.items,it]);tkSaveLocal()}
+  else if(PL.be==='server'){const r=await fetch('api/plans/'+encodeURIComponent(TK.pid)+'/talk',{method:'POST',cache:'no-store',headers:{'Content-Type':'application/json'},body:JSON.stringify({t,text,n:me.n,cid:SY.cid,...(extra||{})})});if(!r.ok)throw new Error(String(r.status));const x=await r.json();tkSet([...TK.items.filter(i=>i.id!==x.id),x])}
+  else if(PL.be==='shared'){if(SY.ro)throw new Error('ro');await PL.db.doc('talk/'+TK.pid+'/items/'+it.id).set(it);tkSet([...TK.items.filter(i=>i.id!==it.id),it])}
+  return true}
+async function tkDone(id,done){const it=TK.items.find(i=>i.id===id);if(!it)return;const me=tkMe(),p=done?{done:true,db:me.n||me.by,dt:Date.now()}:{done:false,db:'',dt:0};
+  if(PL.be==='server'&&PL.cur!=='demo'){const r=await fetch('api/plans/'+encodeURIComponent(TK.pid)+'/talk',{method:'POST',cache:'no-store',headers:{'Content-Type':'application/json'},body:JSON.stringify({t:'done',id,done,n:me.n,cid:SY.cid})});if(!r.ok)throw new Error(String(r.status));const x=await r.json();tkSet(TK.items.map(i=>i.id===id?x:i))}
+  else if(PL.be==='shared'&&PL.cur!=='demo'){const nx={...it,...p};delete nx.id;await PL.db.doc('talk/'+TK.pid+'/items/'+id).set({...nx,id});tkSet(TK.items.map(i=>i.id===id?{...i,...p}:i))}
+  else{tkSet(TK.items.map(i=>i.id===id?{...i,...p}:i));tkSaveLocal()}}
+async function tkDel(id){
+  if(PL.be==='server'&&PL.cur!=='demo'){const r=await fetch('api/plans/'+encodeURIComponent(TK.pid)+'/talk',{method:'POST',cache:'no-store',headers:{'Content-Type':'application/json'},body:JSON.stringify({t:'del',id,n:tkMe().n,cid:SY.cid})});if(!r.ok&&r.status!==404)throw new Error(String(r.status))}
+  else if(PL.be==='shared'&&PL.cur!=='demo')await PL.db.doc('talk/'+TK.pid+'/items/'+id).delete();
+  tkSet(TK.items.filter(i=>i.id!==id));tkSaveLocal()}
+const tkErr=e=>toast(e&&e.message==='ro'?W('Du kannst diesen Plan nur ansehen – schreiben geht nicht'):W('Senden fehlgeschlagen – bitte noch einmal versuchen'));
+/* ---------- Anzeige ---------- */
+const tkComs=devId=>TK.items.filter(i=>i.t==='com'&&(!devId||i.dev===devId));
+function tkUnread(){let c=0,m=0;for(const i of TK.items){if(tkMine(i))continue;if(i.t==='chat'&&i.at>TK.seen.chat)c++;else if(i.t==='com'&&i.at>TK.seen.com)m++}return {c,m}}
+function tkMarkSeen(){if(!TK.open||!TK.ready)return;const k=TK.tab,last=Math.max(0,...TK.items.filter(i=>i.t===k).map(i=>i.at||0));if(last>TK.seen[k]){TK.seen[k]=last;tkSeenSave()}}
+function tkRefText(it){if(!Array.isArray(it.ref))return '';return `<small class="tkref"><span>zur Änderung von</span> <b translate="no">${esc(auName(it.ref[0])||'?')}</b> · <time>${esc(auWhen(it.ref[1]*1000))}</time></small>`}
+function tkMsgHTML(it){const me=tkMine(it),nm=tkName(it),col=colorFor(nm);
+  return `<li class="tkm${me?' me':''}"><div class="tkh"><i style="background:${col}"></i><b translate="no">${esc(nm)}</b><time title="${esc(new Date(it.at).toLocaleString(LOC))}">${esc(tkTime(it.at))}</time>${me&&PL.cur!=='demo'?`<button type="button" class="tkx" data-tk="del" data-id="${esc(it.id)}" title="Löschen" aria-label="Nachricht löschen">×</button>`:''}</div><p translate="no">${esc(it.text).replace(/\n/g,'<br>')}</p></li>`}
+function tkComHTML(it,inInsp){const me=tkMine(it),nm=tkName(it);
+  return `<li class="tkc${it.done?' done':''}"><div class="tkh"><i style="background:${colorFor(nm)}"></i><b translate="no">${esc(nm)}</b><time title="${esc(new Date(it.at).toLocaleString(LOC))}">${esc(tkTime(it.at))}</time></div>${tkRefText(it)}<p translate="no">${esc(it.text).replace(/\n/g,'<br>')}</p>
+    <div class="tka">${it.done?`<span class="tkok">✓ <span>erledigt von</span> <b translate="no">${esc(it.db||'')}</b></span>`:''}<button type="button" class="link" data-tk="${it.done?'reopen':'done'}" data-id="${esc(it.id)}">${it.done?'Wieder öffnen':'Erledigt'}</button>${me?`<button type="button" class="link danger" data-tk="del" data-id="${esc(it.id)}">Löschen</button>`:''}${inInsp?'':''}</div></li>`}
+function tkPickHTML(){const T=norm(TK.q).split(/\s+/).filter(Boolean),S=T.length>0,groups=new Map();
+  for(const d of state.devices){if(S&&!hit(hay(d),T))continue;const [k,n]=catOf(d);if(!groups.has(k))groups.set(k,{n,list:[]});groups.get(k).list.push(d)}
+  const keys=[...catOrder.filter(k=>groups.has(k)),...[...groups.keys()].filter(k=>!catOrder.includes(k))];
+  if(!keys.length)return `<p class="note">${S?'Kein Gerät gefunden.':'Im Plan gibt es noch keine Geräte.'}</p>`;
+  return keys.map(k=>{const g=groups.get(k),open=S||!TK.closed.has(k),oc=x=>tkComs(x.id).filter(i=>!i.done).length;
+    return `<div class="tkcat"><button type="button" class="cath" data-tkcat="${k}" aria-expanded="${open}"${S?' disabled':''}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg><span>${esc(g.n)}</span><span class="cnt">${g.list.length}</span></button>${open?`<ul>${g.list.sort((a,b)=>a.name.localeCompare(b.name,'de',{numeric:true})).map(d=>{const n=oc(d),w=where(d);return `<li><button type="button" data-tkdev="${d.id}"${TK.dev===d.id?' class="on"':''}><span><b translate="no">${esc(d.name)}</b>${w?`<small>${esc(w)}</small>`:''}</span>${n?`<span class="tkn">${n}</span>`:''}</button></li>`}).join('')}</ul>`:''}</div>`}).join('')}
+function renderTalk(){
+  const btn=$('#b-talk');if(!btn)return;tkMarkSeen();const u=tkUnread(),n=u.c+u.m,badge=$('#talk-n');
+  badge.hidden=!n;badge.textContent=n>99?'99+':String(n);btn.classList.toggle('has',!!n);btn.setAttribute('aria-expanded',String(TK.open));
+  const P=$('#talk');P.hidden=!TK.open;if(!TK.open)return;
+  tkMarkSeen();const u2=tkUnread();
+  for(const b of P.querySelectorAll('[data-tt]')){const on=b.dataset.tt===TK.tab;b.setAttribute('aria-selected',String(on));const c=b.querySelector('.cnt');const k=b.dataset.tt==='chat'?u2.c:u2.m;c.textContent=k?String(k):'';c.hidden=!k}
+  const open=tkComs().filter(i=>!i.done).length;$('#tk-open').textContent=open?String(open):'';
+  $('#tk-chat').hidden=TK.tab!=='chat';$('#tk-com').hidden=TK.tab!=='com';
+  const ro=PL.be==='shared'&&SY.ro,local=PL.be==='local'&&PL.cur!=='demo';
+  const note=$('#tk-note');note.hidden=!(ro||local||PL.cur==='demo');
+  note.textContent=ro?'Du kannst diesen Plan nur ansehen – lesen geht, schreiben nicht.':PL.cur==='demo'?'Im Beispielplan wird nichts gespeichert – auch Chat und Kommentare nicht.':'Ohne Server bleibt alles auf diesem Gerät. Zum gemeinsamen Arbeiten die App über Docker betreiben.';
+  for(const el of P.querySelectorAll('textarea,.tkform .btn'))el.disabled=ro;
+  if(TK.tab==='chat'){const L=$('#tk-cl'),atEnd=L.scrollHeight-L.scrollTop-L.clientHeight<40,ch=TK.items.filter(i=>i.t==='chat');
+    L.innerHTML=ch.length?ch.map(tkMsgHTML).join(''):`<li class="tkempty">${TK.ready?'Noch keine Nachrichten. Schreib die erste!':'Lädt …'}</li>`;if(atEnd||!L.dataset.init){L.scrollTop=L.scrollHeight;L.dataset.init='1'}}
+  else{
+    for(const b of P.querySelectorAll('[data-tkf]'))b.setAttribute('aria-pressed',String(b.dataset.tkf===TK.filter));
+    const nw=$('#tk-new');nw.hidden=!TK.compose;
+    if(TK.compose){const d=TK.dev&&dev(TK.dev);$('#tk-devb').innerHTML=d?`<span><b translate="no">${esc(d.name)}</b><small>${esc(catOf(d)[1])}${where(d)?' · '+esc(where(d)):''}</small></span><span class="mute">ändern</span>`:'<span>Gerät wählen …</span>';
+      $('#tk-pick').hidden=!TK.pick;if(TK.pick)$('#tk-pl').innerHTML=tkPickHTML();$('#tk-mt').hidden=TK.pick;$('#tk-mf').hidden=TK.pick}
+    const L=TK.items.filter(i=>i.t==='com'&&(TK.filter==='all'||!i.done)),by=new Map();for(const it of L){if(!by.has(it.dev))by.set(it.dev,[]);by.get(it.dev).push(it)}
+    const groups=[...by.entries()].sort((a,b)=>Math.max(...b[1].map(i=>i.at))-Math.max(...a[1].map(i=>i.at)));
+    $('#tk-ml').innerHTML=groups.length?groups.map(([id,its])=>{const d=dev(id),nm=d?d.name:(its[its.length-1].dn||'?');
+      return `<section class="tkg"><div class="tkgh">${d?`<button type="button" class="link" data-act="seldev" data-id="${esc(id)}" translate="no">${esc(nm)}</button><small>${esc(catOf(d)[1])}</small>`:`<b translate="no">${esc(nm)}</b><small>Gerät gelöscht</small>`}${d&&!ro?`<button type="button" class="ib sm" data-tk="newfor" data-id="${esc(id)}" title="Kommentar zu diesem Gerät" aria-label="Kommentar zu diesem Gerät">+</button>`:''}</div><ol>${its.map(i=>tkComHTML(i)).join('')}</ol></section>`}).join(''):`<p class="tkempty">${!TK.ready?'Lädt …':TK.filter==='open'&&tkComs().length?'Keine offenen Kommentare – alles erledigt.':'Noch keine Kommentare. Wähle ein Gerät und schreib etwas dazu – z. B. zu einer Änderung.'}</p>`}}
+function tkShow(tab,devId){TK.open=true;if(tab)TK.tab=tab;if(devId!==undefined){TK.dev=devId;TK.compose=true;TK.pick=!devId}renderTalk();
+  requestAnimationFrame(()=>{const f=TK.tab==='chat'?$('#tk-ct'):TK.compose&&!TK.pick?$('#tk-mt'):TK.pick?$('#tk-q'):null;if(f&&!f.disabled)f.focus()})}
+function tkHide(){TK.open=false;renderTalk();$('#b-talk').focus()}
+/* Kommentare im Inspektor eines Geräts */
+function comHTML(d){const L=tkComs(d.id),op=L.filter(i=>!i.done),dn=L.length-op.length;
+  return `<div id="tk-insp"><h3>Kommentare${op.length?` <span class="tkn">${op.length}</span>`:''}</h3>${op.length?`<ol class="tkil">${op.slice(-4).map(i=>tkComHTML(i,1)).join('')}</ol>`:`<p class="note">${L.length?`Alle ${L.length} Kommentare sind erledigt.`:'Noch keine Kommentare zu diesem Gerät.'}</p>`}
+    <div class="row"><button type="button" class="btn" data-act="tkcom">Kommentieren</button>${L.length?`<button type="button" class="btn" data-act="tkall">Alle anzeigen${op.length>4||dn?` (${L.length})`:''}</button>`:''}</div></div>`}
+function tkInspRefresh(){const el=$('#tk-insp');if(!el||!sel||sel.kind!=='dev')return;const d=dev(sel.id);if(d)el.outerHTML=comHTML(d)}
+function renderComBadges(){const g=$('#l-com');if(!g)return;if(mode!=='plan'){g.innerHTML='';return}const cnt=new Map();for(const i of TK.items)if(i.t==='com'&&!i.done)cnt.set(i.dev,(cnt.get(i.dev)||0)+1);
+  let s='';for(const [id,n] of cnt){const d=dev(id);if(!d||HID.has(id))continue;const L=lay(d);
+    s+=`<g class="sk" data-x="${d.x+L.W-2}" data-y="${d.y+L.H-2}"><path d="M-15 -13h30a4 4 0 0 1 4 4v14a4 4 0 0 1-4 4h-16l-7 6v-6h-7a4 4 0 0 1-4-4v-14a4 4 0 0 1 4-4z" fill="#ffe600" stroke="#111" stroke-width="1.8"/><text y="4" text-anchor="middle" font-size="12" font-weight="800" fill="#111">${n}</text></g>`}
+  g.innerHTML=s;simScale()}
+async function tkSend(){const ta=$('#tk-ct'),v=ta.value;if(!v.trim())return;ta.disabled=true;try{if(await tkPost('chat',v)){ta.value='';renderTalk()}}catch(e){tkErr(e)}finally{ta.disabled=false;ta.focus()}}
+async function tkSendCom(){const ta=$('#tk-mt'),v=ta.value,d=TK.dev&&dev(TK.dev);if(!d){TK.pick=true;renderTalk();return}if(!v.trim()){ta.focus();return}
+  const ref=Array.isArray(d._ed)?d._ed:null;ta.disabled=true;
+  try{if(await tkPost('com',v,{dev:d.id,dn:d.name.slice(0,80),...(ref?{ref:[String(ref[0]).slice(0,60),+ref[1]]}:{})})){ta.value='';TK.compose=false;TK.dev=null;renderTalk();tkInspRefresh();renderComBadges()}}catch(e){tkErr(e)}finally{ta.disabled=false}}
+$('#b-talk').addEventListener('click',()=>TK.open?tkHide():tkShow());
+async function tkClick(e){const t=e.target.closest('[data-tt],[data-tk],[data-tkf],[data-tkcat],[data-tkdev],[data-act]');if(!t)return;
+  if(t.dataset.tt){TK.tab=t.dataset.tt;renderTalk();return}
+  if(t.dataset.tkf){TK.filter=t.dataset.tkf;renderTalk();return}
+  if(t.dataset.tkcat){const k=t.dataset.tkcat;TK.closed.has(k)?TK.closed.delete(k):TK.closed.add(k);$('#tk-pl').innerHTML=tkPickHTML();return}
+  if(t.dataset.tkdev){TK.dev=t.dataset.tkdev;TK.pick=false;TK.q='';$('#tk-q').value='';renderTalk();$('#tk-mt').focus();return}
+  if(t.dataset.act==='seldev'){const d=dev(t.dataset.id);if(d){if(mode!=='plan')setMode('plan');select({kind:'dev',id:d.id});centerOn(d)}return}
+  const k=t.dataset.tk,id=t.dataset.id;
+  try{if(k==='close')tkHide();else if(k==='new'){TK.compose=true;TK.pick=!TK.dev;renderTalk();(TK.pick?$('#tk-q'):$('#tk-mt')).focus()}
+  else if(k==='newfor'){TK.compose=true;TK.dev=id;TK.pick=false;renderTalk();$('#tk-mt').focus()}
+  else if(k==='pick'){TK.pick=!TK.pick;renderTalk();if(TK.pick)$('#tk-q').focus()}
+  else if(k==='cancel'){TK.compose=false;TK.pick=false;$('#tk-mt').value='';renderTalk()}
+  else if(k==='sendcom')await tkSendCom();
+  else if(k==='done'||k==='reopen'){await tkDone(id,k==='done');renderTalk();tkInspRefresh();renderComBadges()}
+  else if(k==='del'){if(await ask('Beitrag löschen?','Er verschwindet für alle, die den Plan offen haben.','Löschen',true)){await tkDel(id);renderTalk();tkInspRefresh();renderComBadges()}}}catch(err){tkErr(err)}}
+$('#talk').addEventListener('click',tkClick);
+$('#ic').addEventListener('click',e=>{if(e.target.closest('#tk-insp [data-tk]'))tkClick(e)});
+$('#tk-cf').addEventListener('submit',e=>{e.preventDefault();tkSend()});
+$('#tk-ct').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();tkSend()}});
+$('#tk-mt').addEventListener('keydown',e=>{if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)){e.preventDefault();tkSendCom()}});
+$('#tk-q').addEventListener('input',e=>{TK.q=e.target.value;$('#tk-pl').innerHTML=tkPickHTML()});
+$('#tk-q').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();const b=$('#tk-pl [data-tkdev]');if(b)b.click()}});
+$('#talk').addEventListener('keydown',e=>{if(e.key==='Escape'){e.stopPropagation();if(TK.pick&&TK.compose&&TK.dev){TK.pick=false;renderTalk()}else tkHide()}});
+function tkReload(){if(!TK.pid||TK.pid==='demo'||PL.be!=='server')return;const pid=TK.pid;fetch('api/plans/'+encodeURIComponent(pid)+'/talk',{cache:'no-store'}).then(r=>r.ok?r.json():null).then(b=>{if(!b||!Array.isArray(b.items)||TK.pid!==pid)return;const before=new Set(TK.items.map(x=>x.id));tkSet(b.items);TK.ready=true;tkNotify(TK.items.filter(x=>!before.has(x.id)));renderTalk();tkInspRefresh();renderComBadges()}).catch(()=>{})}
+/* Handy: der Knopf sitzt über dem Eigenschaften-Bereich */
+try{new ResizeObserver(()=>{const i=$('#insp');document.documentElement.style.setProperty('--ib',(innerWidth<=760&&i?i.offsetHeight:0)+'px')}).observe($('#insp'))}catch(_){}
 
 $('#simbar').addEventListener('click',e=>{const b=e.target.closest('[data-sim]');if(!b||!SIM.res)return;const k=b.dataset.sim;if(k==='close')simClear();else if(k==='again')simStart(SIM.src,SIM.dst);else{const id=k==='src'?SIM.src:SIM.dst;select({kind:'dev',id});centerOn(dev(id))}});
 

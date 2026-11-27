@@ -19,6 +19,7 @@ const OLD_PLAN = path.join(DATA, 'plan.json');           // vor mehreren Plänen
 const PLANS = path.join(DATA, 'plans');                  // je Plan eine Datei <id>.json
 const BKROOT = path.join(DATA, 'backups');               // Sicherungen je Plan unter backups/<id>/
 const TRASH = path.join(DATA, 'papierkorb');             // gelöschte Pläne
+const TALK = path.join(DATA, 'talk');                    // Chat und Kommentare je Plan unter talk/<id>.json
 const PID = /^[a-z0-9]{3,24}$/;
 if (Boolean(USER) !== Boolean(PASS)) {
   console.error('AUTH_USER und AUTH_PASSWORD müssen zusammen gesetzt werden.');
@@ -160,8 +161,11 @@ async function apiPlan(req, res, id) {
   }
   if (req.method === 'DELETE') {
     if (!cur) return send(res, 404, 'Plan nicht gefunden');
-    await (queue = queue.then(() => fsp.rename(path.join(PLANS, id + '.json'), path.join(TRASH, `${id}-${new Date().toISOString().replace(/[:.]/g, '-')}.json`))).catch(() => {}));
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    await (queue = queue.then(() => fsp.rename(path.join(PLANS, id + '.json'), path.join(TRASH, `${id}-${stamp}.json`))).catch(() => {}));
+    await (queue = queue.then(() => fsp.rename(path.join(TALK, id + '.json'), path.join(TRASH, `${id}-${stamp}-talk.json`))).catch(() => {}));
     plans.delete(id);
+    talks.delete(id);
     bcast('plans', { list: planList(), deleted: id, user: req.user || '' });
     return send(res, 200, { ok: true });
   }
@@ -202,7 +206,79 @@ async function apiPlans(req, res, rest) {
   if (!PID.test(id) || extra !== undefined) return send(res, 404, 'Nicht gefunden');
   if (sub === undefined) return apiPlan(req, res, id);
   if (sub === 'versions') return apiVersions(req, res, id, vid || '');
+  if (sub === 'talk' && vid === undefined) return apiTalk(req, res, id);
   return send(res, 404, 'Nicht gefunden');
+}
+
+// ---------- Chat und Kommentare je Plan ----------
+// Ein Beitrag: { id, t: 'chat' | 'com', by, n, at, text, dev?, dn?, ref?, done?, db?, dt? }
+const talks = new Map(); // id -> Beiträge
+const clean = (v, n) => typeof v === 'string' ? v.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '').slice(0, n) : '';
+async function talkOf(id) {
+  if (!talks.has(id)) {
+    let items = [];
+    try { items = JSON.parse(await fsp.readFile(path.join(TALK, id + '.json'), 'utf8')); } catch {}
+    talks.set(id, Array.isArray(items) ? items.filter(x => x && typeof x === 'object' && typeof x.id === 'string') : []);
+  }
+  return talks.get(id);
+}
+function saveTalk(id) {
+  const file = path.join(TALK, id + '.json'), items = talks.get(id) || [];
+  const job = queue.then(async () => {
+    await fsp.mkdir(TALK, { recursive: true });
+    const tmp = `${file}.${process.pid}.tmp`;
+    await fsp.writeFile(tmp, JSON.stringify(items));
+    await fsp.rename(tmp, file);
+  });
+  queue = job.catch(() => {});
+  return job;
+}
+async function apiTalk(req, res, id) {
+  if (!plans.has(id)) return send(res, 404, 'Plan nicht gefunden');
+  const items = await talkOf(id);
+  if (req.method === 'GET') return send(res, 200, { items }, { 'Cache-Control': 'no-store' });
+  if (req.method !== 'POST') return send(res, 405, 'Methode nicht erlaubt', { Allow: 'GET, POST' });
+  let b;
+  try { b = JSON.parse(await readBody(req, 16384)); } catch { return send(res, 400, 'Ungültiges JSON'); }
+  if (!b || typeof b !== 'object') return send(res, 400, 'Ungültige Anfrage');
+  // mit Konten zählt der angemeldete Name, sonst der Gastname bzw. selbst gewählte Name
+  const who = AUTH ? (req.user || '') : (clean(b.n, 40).trim() || 'Gast');
+  const cid = typeof b.cid === 'string' && CID.test(b.cid) ? b.cid : '';
+  if (b.t === 'chat' || b.t === 'com') {
+    const text = clean(b.text, 2000).trim();
+    if (!text) return send(res, 400, 'Text fehlt');
+    const it = { id: crypto.randomBytes(9).toString('base64url'), t: b.t, by: who, n: who, at: Date.now(), text };
+    if (b.t === 'com') {
+      it.dev = clean(b.dev, 40); it.dn = clean(b.dn, 80);
+      if (!it.dev) return send(res, 400, 'Gerät fehlt');
+      if (Array.isArray(b.ref) && typeof b.ref[0] === 'string' && Number.isFinite(+b.ref[1])) it.ref = [clean(b.ref[0], 60), Math.round(+b.ref[1])];
+    }
+    items.push(it);
+    // Obergrenzen: die ältesten Chat-Nachrichten bzw. Kommentare fallen heraus
+    for (const [t, max] of [['chat', 1000], ['com', 3000]]) {
+      let n = items.filter(x => x.t === t).length;
+      while (n-- > max) items.splice(items.findIndex(x => x.t === t), 1);
+    }
+    await saveTalk(id);
+    bcast('talk', { plan: id, add: it }, cid);
+    return send(res, 201, it);
+  }
+  const it = items.find(x => x.id === b.id);
+  if (!it) return send(res, 404, 'Beitrag nicht gefunden');
+  if (b.t === 'done' && it.t === 'com') {
+    if (b.done) { it.done = true; it.db = who; it.dt = Date.now(); } else { delete it.done; delete it.db; delete it.dt; }
+    await saveTalk(id);
+    bcast('talk', { plan: id, upd: it }, cid);
+    return send(res, 200, it);
+  }
+  if (b.t === 'del') {
+    if (it.by !== who) return send(res, 403, 'Nur eigene Beiträge lassen sich löschen');
+    items.splice(items.indexOf(it), 1);
+    await saveTalk(id);
+    bcast('talk', { plan: id, del: it.id }, cid);
+    return send(res, 204, null);
+  }
+  return send(res, 400, 'Unbekannte Aktion');
 }
 
 // ---------- Live: Server-Sent Events für Planänderungen und Präsenz ----------

@@ -46,7 +46,7 @@
   <div class="stage" id="stage">
     <svg id="cv" aria-label="Verkabelungsplan">
       <defs id="defs"></defs>
-      <g id="world"><g id="l-room"></g><g id="l-rack"></g><g id="l-hit"></g><g id="l-dev"></g><g id="l-cab"></g><g id="l-plug"></g><g id="l-lab"></g><g id="l-pow"></g><g id="l-num"></g><g id="tmpw" style="display:none"><path id="tmpE" fill="none" stroke="#111" stroke-width="8" stroke-linecap="round"/><path id="tmp" fill="none" stroke="#ffe600" stroke-width="4.5" stroke-linecap="round"/></g><rect id="band" fill="#ffe600" fill-opacity=".12" stroke="#111" stroke-width="2" stroke-dasharray="8 6" style="display:none"/><rect id="snap" rx="6" fill="#ffe600" fill-opacity=".18" stroke="#ffe600" stroke-width="6" stroke-dasharray="16 10" style="display:none"/><g id="l-stp" pointer-events="none"></g><g id="l-sim" pointer-events="none"></g><g id="l-peer" pointer-events="none"></g></g>
+      <g id="world"><g id="l-room"></g><g id="l-rack"></g><g id="l-hit"></g><g id="l-dev"></g><g id="l-cab"></g><g id="l-plug"></g><g id="l-lab"></g><g id="l-pow"></g><g id="l-num"></g><g id="tmpw" style="display:none"><path id="tmpE" fill="none" stroke="#111" stroke-width="8" stroke-linecap="round"/><path id="tmp" fill="none" stroke="#ffe600" stroke-width="4.5" stroke-linecap="round"/></g><rect id="band" fill="#ffe600" fill-opacity=".12" stroke="#111" stroke-width="2" stroke-dasharray="8 6" style="display:none"/><rect id="snap" rx="6" fill="#ffe600" fill-opacity=".18" stroke="#ffe600" stroke-width="6" stroke-dasharray="16 10" style="display:none"/><g id="l-stp" pointer-events="none"></g><g id="l-com" pointer-events="none"></g><g id="l-sim" pointer-events="none"></g><g id="l-peer" pointer-events="none"></g></g>
     </svg>
     <div class="empty" id="empty" hidden><div class="box"><h2>Noch nichts im Plan</h2><p>Lege Räume, Schränke und Geräte an – Switches, Patchpanels, Server, USVs, Access Points oder Hosts – und verbinde ihre Ports per Ziehen.</p><button type="button" class="btn pri" id="b-add2">Hinzufügen</button></div></div>
     <p class="hint" id="hint"></p>
@@ -77,5 +77,24 @@
 </div>
 <div class="tip" id="tip" hidden></div>
 <div class="modal" id="modal" hidden></div>
+<button type="button" class="talkbtn" id="b-talk" aria-expanded="false" aria-controls="talk" title="Chat und Kommentare" aria-label="Chat und Kommentare"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.4 8.4 0 0 1-12.2 7.5L3 20.5l1.6-5.2A8.5 8.5 0 1 1 21 11.5z"/></svg><span class="tb" id="talk-n" hidden></span></button>
+<section class="talk" id="talk" hidden aria-label="Chat und Kommentare">
+  <header class="tkt"><div class="tktabs" role="tablist"><button type="button" role="tab" data-tt="chat" aria-selected="true">Chat<span class="cnt" hidden></span></button><button type="button" role="tab" data-tt="com" aria-selected="false">Kommentare<span class="tko" id="tk-open"></span><span class="cnt" hidden></span></button></div><button type="button" class="ib sm" data-tk="close" aria-label="Schließen" title="Schließen">×</button></header>
+  <p class="tknote" id="tk-note" hidden></p>
+  <div class="tkbody" id="tk-chat">
+    <ol class="tklist" id="tk-cl" aria-live="polite"></ol>
+    <form class="tkform" id="tk-cf"><textarea id="tk-ct" rows="2" maxlength="2000" placeholder="Nachricht schreiben … (Enter sendet)" aria-label="Nachricht"></textarea><button type="submit" class="btn pri">Senden</button></form>
+  </div>
+  <div class="tkbody" id="tk-com" hidden>
+    <div class="tkbar"><div class="seg2" role="group" aria-label="Filter"><button type="button" data-tkf="open" aria-pressed="true">Offen</button><button type="button" data-tkf="all" aria-pressed="false">Alle</button></div><button type="button" class="btn pri sm" data-tk="new">+ Kommentar</button></div>
+    <div class="tknew" id="tk-new" hidden>
+      <button type="button" class="tkdev" id="tk-devb" data-tk="pick"></button>
+      <div class="tkpick" id="tk-pick" hidden><input id="tk-q" type="search" placeholder="Gerät suchen: Name, IP, Raum …" aria-label="Gerät suchen" autocomplete="off"><div class="tkpl" id="tk-pl"></div></div>
+      <textarea id="tk-mt" rows="3" maxlength="2000" placeholder="Kommentar zum Gerät … (Strg + Enter sendet)" aria-label="Kommentar"></textarea>
+      <div class="row" id="tk-mf"><button type="button" class="btn" data-tk="cancel">Abbrechen</button><button type="button" class="btn pri" data-tk="sendcom">Kommentar senden</button></div>
+    </div>
+    <div class="tklist" id="tk-ml"></div>
+  </div>
+</section>
 <div class="toasts" id="toasts" aria-live="polite"></div>
 <input type="file" id="file" accept=".json,application/json" hidden>

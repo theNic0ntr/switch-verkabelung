@@ -451,6 +451,25 @@ EN.update({
 "Schickt ein simuliertes Ping-Paket los und zeigt im Plan, über welche Kabel, Patchpanels, Switches und Gateways es läuft – und wo es hängen bleibt. Ohne IP-Adressen wird nur die Route verfolgt.": "Sends a simulated ping packet and shows on the plan which cables, patch panels, switches and gateways it passes – and where it gets stuck. Without IP addresses, only the route is traced.",
 "Simuliert anhand der Doku: Kabel, Link, Port-Status, Spanning Tree, VLANs und Gateways. Firewall-Regeln und Routing-Tabellen werden nicht geprüft.": "Simulated from the documentation: cables, link, port status, spanning tree, VLANs and gateways. Firewall rules and routing tables are not checked."
 })
+EN.update({
+"Chat und Kommentare": "Chat and comments", "Chat": "Chat", "Kommentare": "Comments", "Kommentar": "Comment", "Nachricht": "Message", "Filter": "Filter",
+"Nachricht schreiben … (Enter sendet)": "Write a message … (Enter sends)", "Offen": "Open", "Alle": "All", "+ Kommentar": "+ Comment",
+"Gerät suchen: Name, IP, Raum …": "Search device: name, IP, room …", "Gerät suchen": "Search device",
+"Kommentar zum Gerät … (Strg + Enter sendet)": "Comment on the device … (Ctrl + Enter sends)", "Kommentar senden": "Send comment",
+"Gerät wählen …": "Choose device …", "ändern": "change", "Kein Gerät gefunden.": "No device found.", "Im Plan gibt es noch keine Geräte.": "There are no devices in the plan yet.",
+"Noch keine Nachrichten. Schreib die erste!": "No messages yet. Write the first one!", "Keine offenen Kommentare – alles erledigt.": "No open comments – all resolved.",
+"Noch keine Kommentare. Wähle ein Gerät und schreib etwas dazu – z. B. zu einer Änderung.": "No comments yet. Pick a device and write something about it – e.g. about a change.",
+"Gerät gelöscht": "Device deleted", "Kommentar zu diesem Gerät": "Comment on this device", "zur Änderung von": "on the change by", "erledigt von": "resolved by",
+"Erledigt": "Resolve", "Wieder öffnen": "Reopen", "Nachricht löschen": "Delete message", "Beitrag löschen?": "Delete post?",
+"Er verschwindet für alle, die den Plan offen haben.": "It disappears for everyone who has the plan open.",
+"Du kannst diesen Plan nur ansehen – schreiben geht nicht": "You can only view this plan – writing is not possible",
+"Senden fehlgeschlagen – bitte noch einmal versuchen": "Sending failed – please try again",
+"Du kannst diesen Plan nur ansehen – lesen geht, schreiben nicht.": "You can only view this plan – reading works, writing doesn't.",
+"Im Beispielplan wird nichts gespeichert – auch Chat und Kommentare nicht.": "Nothing is saved in the example plan – including chat and comments.",
+"Ohne Server bleibt alles auf diesem Gerät. Zum gemeinsamen Arbeiten die App über Docker betreiben.": "Without a server everything stays on this device. Run the app with Docker to work together.",
+"Alle {n} Kommentare sind erledigt.": "All {n} comments are resolved.", "Noch keine Kommentare zu diesem Gerät.": "No comments on this device yet.", "Kommentieren": "Comment",
+"Alle anzeigen": "Show all", "Alle anzeigen ({n})": "Show all ({n})"
+})
 import json, os
 root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 out = '/* Englische Übersetzung – erzeugt aus scripts/i18n_en.py, nicht von Hand ändern. */\nwindow.I18N_EN=' + json.dumps(EN, ensure_ascii=False, separators=(',', ':')) + ';\n'

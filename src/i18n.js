@@ -47,14 +47,16 @@ function tr(s){
 }
 const ATTR=['title','placeholder','aria-label','data-l','alt','label'];
 const skip=el=>!el||el.closest&&el.closest('script,style,textarea,[translate="no"],[contenteditable="true"]');
+/* Elemente selbst: Textfelder dürfen übersetzte Platzhalter bekommen, ihr Inhalt bleibt unberührt */
+const skipEl=el=>!el||el.closest&&el.closest('script,style,[translate="no"],[contenteditable="true"]');
 function node(n){
   if(n.nodeType===3){const p=n.parentElement;if(!p||/^(SCRIPT|STYLE|TEXTAREA)$/.test(p.tagName)||skip(p))return;const v=n.nodeValue,t=tr(v);if(t!==v)n.nodeValue=t;return}
-  if(n.nodeType!==1||skip(n))return;
+  if(n.nodeType!==1||skipEl(n))return;
   for(const a of ATTR){const v=n.getAttribute(a);if(v){const t=tr(v);if(t!==v)n.setAttribute(a,t)}}
   if(n.tagName==='INPUT'&&(n.type==='button'||n.type==='submit')&&n.value){const t=tr(n.value);if(t!==n.value)n.value=t}
 }
 function walk(root){if(!root)return;if(root.nodeType===3){node(root);return}if(root.nodeType!==1)return;if(skip(root))return;node(root);
-  const w=document.createTreeWalker(root,5/*ELEMENT|TEXT*/,{acceptNode:x=>x.nodeType===1&&(x.getAttribute('translate')==='no'||/^(SCRIPT|STYLE|TEXTAREA)$/.test(x.tagName))?2:1});
+  const w=document.createTreeWalker(root,5/*ELEMENT|TEXT*/,{acceptNode:x=>x.nodeType===1&&(x.getAttribute('translate')==='no'||/^(SCRIPT|STYLE)$/.test(x.tagName))?2:1});
   for(let x=w.nextNode();x;x=w.nextNode())node(x)}
 /* Markup (z. B. SVG für Export und PDF) übersetzen */
 function markup(str,type){if(lang!=='en'||!str)return str;try{const d=new DOMParser().parseFromString(str,type||'image/svg+xml');if(d.querySelector('parsererror'))return str;walk(d.documentElement);return new XMLSerializer().serializeToString(d)}catch(_){return str}}
