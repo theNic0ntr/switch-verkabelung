@@ -1,4 +1,4 @@
-# Switch-Verkabelungstool - Dokutool
+# Networkdoc_
 
 Netzwerk-Verkabelung im Browser planen und dokumentieren. Switches, Firewalls, Patchpanels, LWL-Panels, Server, USVs, Access Points und Hosts legst du in Schränken und Räumen an. Ihre Ports verbindest du per Drag & Drop.
 
@@ -67,8 +67,8 @@ Alle Bilder zeigen das Beispielprojekt, das beim ersten Start geladen wird.
 Voraussetzung sind Docker und Docker Compose.
 
 ```bash
-git clone https://github.com/theNic0ntr/Networkdoc_.git
-cd Networkdoc_
+git clone https://github.com/theNic0ntr/switch-verkabelung.git
+cd switch-verkabelung
 docker compose up -d --build
 ```
 
