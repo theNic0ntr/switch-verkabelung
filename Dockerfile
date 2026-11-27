@@ -1,4 +1,4 @@
-# Networkdoc_ – App und kleiner Speicher-Server in einem Container
+# Networkdoc – App und kleiner Speicher-Server in einem Container
 FROM node:22-alpine
 
 WORKDIR /app

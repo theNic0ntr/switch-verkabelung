@@ -392,7 +392,7 @@ const server = http.createServer(async (req, res) => {
   try {
     if (pathname === '/healthz') return send(res, 200, 'ok', { 'Cache-Control': 'no-store' });
     const user = login(req);
-    if (user === null) return send(res, 401, 'Anmeldung erforderlich', { 'WWW-Authenticate': 'Basic realm="Networkdoc_", charset="UTF-8"' });
+    if (user === null) return send(res, 401, 'Anmeldung erforderlich', { 'WWW-Authenticate': 'Basic realm="Networkdoc", charset="UTF-8"' });
     req.user = user;
     if (pathname === '/api/plans' || pathname.startsWith('/api/plans/')) return await apiPlans(req, res, pathname.slice('/api/plans'.length).replace(/^\//, ''));
     // ältere Adressen (ein einziger Plan) zeigen auf „main“
@@ -410,7 +410,7 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, HOST, () => {
-  console.log(`Networkdoc_ läuft auf http://${HOST}:${PORT} – Daten in ${DATA}${AUTH ? ` – Anmeldung aktiv (${ACCOUNTS.size} ${ACCOUNTS.size === 1 ? 'Konto' : 'Konten'})` : ''}`);
+  console.log(`Networkdoc läuft auf http://${HOST}:${PORT} – Daten in ${DATA}${AUTH ? ` – Anmeldung aktiv (${ACCOUNTS.size} ${ACCOUNTS.size === 1 ? 'Konto' : 'Konten'})` : ''}`);
 });
 for (const sig of ['SIGTERM', 'SIGINT']) {
   process.on(sig, () => {
