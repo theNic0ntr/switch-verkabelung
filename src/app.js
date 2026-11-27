@@ -80,16 +80,51 @@ const STY={
  opnsense:{key:'opnsense',n:'OPNsense-Stil',g:['#2b2b2d','#141415'],stroke:'#070708',ear:'#1f1f21',earHole:'#09090a',hi:.12,text:'#ffffff',sub:'#a7a7ab',num:'#dedee2',jack:'#aeb2b7',jackEdge:'#5b6168',hole:'#0b0c0e',cage:'#b8bcc1',offJ:'#6d7177',offC:'#2f3135',frame:'#5a5a5f',fm:'line',ks:'#1c1c1e',gc2:4,gc1:4,led:'corner',mg:'MGMT',acc:'#e3591e',fa:'stripe'},
  host:{key:'host',n:'Host',g:['#fbfbf9','#ecece8'],jack:'#c9cdd2',jackEdge:'#8d949c',hole:'#1f2226',cage:'#c4c9cf',offJ:'#8d949c',offC:'#c6cbd1',num:'#5b626b',gc2:99,gc1:99,led:'corner'}
 };
+/* weitere Hersteller-Optiken: dunkle und helle Grundfarben, je Marke Front, Akzent und Kennzeichnung */
+{const D={stroke:'#0c0d0f',ear:'#26292d',earHole:'#0f1012',hi:.14,text:'#ffffff',sub:'#a3abb4',num:'#d9dde2',jack:'#aab0b7',jackEdge:'#5b6168',hole:'#0b0c0e',cage:'#b3b9bf',offJ:'#6b7178',offC:'#30343a',ks:'#1e2124',gc2:4,gc1:4,led:'corner',bay:'#2f3236',bayLed:'#3ddc6a',lcd:'#0e1a24',lcdT:'#9fd8ff',grille:'#34373b',mg:'MGMT'},
+  Lt={stroke:'#8b9198',ear:'#d0d4d9',earHole:'#8f959c',hi:.85,text:'#1b1e22',sub:'#4f565e',num:'#2a3036',jack:'#c6cace',jackEdge:'#7b8188',hole:'#1d2024',cage:'#c9cdd2',offJ:'#8d949c',offC:'#a3a9b0',ks:'#2a2d31',gc2:4,gc1:4,led:'corner',bay:'#25282c',bayLed:'#3ddc6a',lcd:'#10202c',lcdT:'#a6e3ff',grille:'#9aa0a7',mg:'MGMT'},
+  W={g:['#ffffff','#eceff2']},
+  S=(key,n,base,o)=>STY[key]={key,n:n+'-Stil',...base,...o};
+  S('cisco','Cisco',D,{g:['#3a3f45','#23272c'],acc:'#049fd9',fa:'bar',frame:'#4a5058',fm:'fill',ap:{sh:'s',rx:22,led:'dot',lc:'#049fd9'}});
+  S('aruba','Aruba',Lt,{g:['#f4f5f7','#dcdfe3'],acc:'#ff8300',fa:'stripe',ap:{sh:'s',rx:30,led:'dot',lc:'#3ddc6a'}});
+  S('juniper','Juniper',D,{g:['#36393e','#1d1f22'],acc:'#84b135',fa:'dot',ap:{sh:'c',led:'ring',lc:'#84b135'}});
+  S('netgear','Netgear',D,{g:['#3f4752','#262c34'],acc:'#8a5cf6',fa:'stripe'});
+  S('tplink','TP-Link',D,{g:['#3b4047','#24282d'],acc:'#4acbd6',fa:'dot',ap:{sh:'c',led:'ring',lc:'#3ddc6a'}});
+  S('zyxel','Zyxel',D,{g:['#2f3338','#1a1c1f'],acc:'#2f8fff',fa:'bar',ap:{sh:'s',rx:20,led:'dot',lc:'#2f8fff'}});
+  S('mikrotik','MikroTik',Lt,{g:['#eceef0','#d2d6da'],acc:'#2f3b45',fa:'bar'});
+  S('dlink','D-Link',D,{g:['#2c2f33','#17191b'],acc:'#00a5b5',fa:'dot'});
+  S('meraki','Meraki',Lt,{g:['#f1f3f4','#d6dade'],acc:'#67b346',fa:'dot',ap:{sh:'s',rx:24,led:'dot',lc:'#67b346'}});
+  S('extreme','Extreme',D,{g:['#26282c','#111214'],acc:'#8b5cf6',fa:'bar'});
+  S('arista','Arista',D,{g:['#2b2d30','#141517'],acc:'#c7ccd2',fa:'bar'});
+  S('checkpoint','Check Point',Lt,{g:['#f3f4f6','#d9dce1'],acc:'#e2007a',fa:'bar'});
+  S('sonicwall','SonicWall',D,{g:['#2a2d31','#141618'],acc:'#ff7a1a',fa:'bar'});
+  S('netgate','Netgate',D,{g:['#25282c','#101113'],acc:'#2a80d2',fa:'dot'});
+  S('securepoint','Securepoint',D,{g:['#2e3136','#18191c'],acc:'#f28c00',fa:'bar'});
+  S('barracuda','Barracuda',D,{g:['#2c3440','#161b22'],acc:'#0083ca',fa:'dot'});
+  S('lenovo','Lenovo',D,{g:['#2a2c2f','#131415'],acc:'#e2231a',mg:'XCC'});
+  S('fujitsu','Fujitsu',Lt,{g:['#d4d7db','#b4b8be'],acc:'#e60012',mg:'iRMC'});
+  S('ucs','Cisco-UCS',Lt,{g:['#dde0e3','#bdc2c7'],acc:'#049fd9',bayLed:'#4d9dff',mg:'CIMC'});
+  S('vertiv','Vertiv',D,{g:['#202225','#0d0e0f'],acc:'#ff6a13',lcdT:'#ffb27a',mg:'Web'});
+  S('riello','Riello',D,{g:['#3a3f46','#23272c'],acc:'#00a0e3',grille:'#4b5058',mg:'NetMan'});
+  S('rittal','Rittal',Lt,{g:['#dcdcd6','#c4c4be'],acc:'#e30613',mg:'LAN'});
+  S('raritan','Raritan',D,{g:['#1f2124','#0c0d0e'],acc:'#0097d7',mg:'LAN'});
+  S('bachmann','Bachmann',Lt,{g:['#d2d5d9','#b0b4b9'],acc:'#e2001a',mg:'LAN'});
+  S('panduit','Panduit',D,{g:['#24262a','#111214'],ks:'#1a1b1e'});
+  S('telegaertner','Telegärtner',Lt,{g:['#d9dcdf','#bfc3c8']});
+  S('ruckus','Ruckus',W,{ap:{sh:'s',rx:26,led:'bar',lc:'#ff7f2a'}});
+  S('mist','Juniper-Mist',W,{ap:{sh:'c',led:'ring',lc:'#43b02a'}});
+  STY.unifi.ap={sh:'c',led:'ring',lc:'#4aa8ff'};STY.lancom.ap={sh:'s',rx:16,led:'bar',lc:'#4d9dff'};STY.fortinet.ap={sh:'s',rx:14,led:'dot',lc:'#e1251b'};
+}
 const KIND={
- switch:{n:'Switch',rack:1,types:['rj45','sfp','sfpp','sfp28','qsfpp','qsfp28'],styles:['lancom','unifi','hp','fs'],info:172,infoMin:118,maxHe:2},
- fw:{n:'Firewall',rack:1,types:['mgmt','rj45','sfp','sfpp','sfp28','qsfp28'],styles:['sophos','fortinet','paloalto','watchguard','lancom','opnsense'],info:182,infoMin:126,maxHe:2},
- net:{n:'Netzwerkgerät',rack:1,types:['rj45','sfp','sfpp','sfp28','qsfpp','qsfp28'],styles:['lancom','unifi','hp','fs'],info:172,infoMin:118,maxHe:2},
- patch:{n:'Patchpanel',rack:1,types:['kj'],styles:['fs','unifi','hp','lancom'],info:150,infoMin:104,maxHe:2},
- fiber:{n:'LWL-Panel',rack:1,types:['lc','sc','mpo'],styles:['fs','unifi','hp','lancom'],info:150,infoMin:104,maxHe:4},
- server:{n:'Server',rack:1,types:['mgmt','rj45','sfpp','sfp28','qsfp28'],styles:['hpe','dell','smc'],info:150,infoMin:112,maxHe:4},
- ups:{n:'USV',rack:1,types:['mgmt'],styles:['apc','eaton','cp'],info:210,infoMin:170,maxHe:4},
- pdu:{n:'PDU',rack:1,types:['mgmt'],styles:['apc','eaton','cp'],info:176,infoMin:132,maxHe:2},
- ap:{n:'Access Point',rack:0,types:['rj45'],styles:['unifi','lancom','aruba']},
+ switch:{n:'Switch',rack:1,types:['rj45','sfp','sfpp','sfp28','qsfpp','qsfp28'],styles:['lancom','unifi','hp','fs','cisco','aruba','juniper','netgear','tplink','zyxel','mikrotik','dlink','meraki','extreme','arista','hpe','dell'],info:172,infoMin:118,maxHe:2},
+ fw:{n:'Firewall',rack:1,types:['mgmt','rj45','sfp','sfpp','sfp28','qsfp28'],styles:['sophos','fortinet','paloalto','watchguard','lancom','opnsense','cisco','checkpoint','sonicwall','juniper','netgate','securepoint','barracuda','zyxel','mikrotik'],info:182,infoMin:126,maxHe:2},
+ net:{n:'Netzwerkgerät',rack:1,types:['rj45','sfp','sfpp','sfp28','qsfpp','qsfp28'],styles:['lancom','unifi','hp','fs','cisco','aruba','juniper','mikrotik','tplink','zyxel','netgear','dlink','meraki'],info:172,infoMin:118,maxHe:2},
+ patch:{n:'Patchpanel',rack:1,types:['kj'],styles:['fs','unifi','hp','lancom','panduit','telegaertner','rittal'],info:150,infoMin:104,maxHe:2},
+ fiber:{n:'LWL-Panel',rack:1,types:['lc','sc','mpo'],styles:['fs','unifi','hp','lancom','panduit','telegaertner','rittal'],info:150,infoMin:104,maxHe:4},
+ server:{n:'Server',rack:1,types:['mgmt','rj45','sfpp','sfp28','qsfp28'],styles:['hpe','dell','smc','lenovo','fujitsu','ucs'],info:150,infoMin:112,maxHe:4},
+ ups:{n:'USV',rack:1,types:['mgmt'],styles:['apc','eaton','cp','vertiv','riello'],info:210,infoMin:170,maxHe:4},
+ pdu:{n:'PDU',rack:1,types:['mgmt'],styles:['apc','eaton','cp','vertiv','rittal','raritan','bachmann'],info:176,infoMin:132,maxHe:2},
+ ap:{n:'Access Point',rack:0,types:['rj45'],styles:['unifi','lancom','aruba','cisco','meraki','tplink','zyxel','ruckus','fortinet','juniper','mist']},
  host:{n:'Host',rack:0,types:['rj45','sfpp'],styles:['host']}
 };
 const OBJ={rack:{n:'Schrank'},room:{n:'Raum'}};
@@ -100,15 +135,15 @@ const F={
  name:{l:'Name',t:'text',max:40},
  model:{l:'Modell / Typ',t:'text',max:40,ph:'z. B. 24G + 4SFP+ L2+'},
  role:{l:'Rolle / Betriebssystem',t:'text',max:40,ph:'z. B. Hypervisor, NAS'},
- style:{l:'Optik',t:'seg',o:d=>KIND[d.kind].styles.map(s=>[s,STY[s].n])},
- size:{l:'Bauform',t:'seg',o:d=>d.kind==='ups'?[['frei','Tower'],['19','19″-Rack']]:[['frei','Frei'],['10','10″-Rack'],['19','19″-Rack']]},
+ style:{l:'Optik',t:'sel',o:d=>KIND[d.kind].styles.map(s=>[s,STY[s].n.replace(/-Stil$/,'')]).sort((a,b)=>a[1].localeCompare(b[1],'de'))},
+ size:{l:'Bauform',t:'sel',o:d=>d.kind==='ups'?[['frei','Tower'],['19','19″-Rack']]:[['frei','Frei'],['10','10″-Rack'],['19','19″-Rack']]},
  rack:{l:'Einbauort',t:'sel',o:()=>[['','Kein Schrank – frei im Plan'],...state.racks.map(r=>[r.id,'Schrank „'+r.name+'“ ('+r.rsize+'″)'])],show:d=>!!KIND[d.kind]&&!!KIND[d.kind].rack&&state.racks.length>0},
  u:{l:'Position ab HE',t:'num',min:1,max:99,show:d=>!!d.rack&&d.id!=='preview'},
  he:{l:'Höhe',t:'sel',o:d=>Array.from({length:KIND[d.kind].maxHe},(_,i)=>[String(i+1),(i+1)+' HE']),show:d=>d.size!=='frei'},
  bays:{l:'Festplatten-Slots',t:'num',min:0,max:48},
  baysUsed:{l:'davon befüllt',t:'num',min:0,max:48,show:d=>d.bays>0},
- bayForm:{l:'Slot-Größe',t:'seg',o:[['2.5','2,5″'],['3.5','3,5″']],show:d=>d.bays>0},
- bayDir:{l:'Anordnung der Slots',t:'seg',o:[['v','Vertikal (stehend)'],['h','Horizontal (liegend)']],show:d=>d.bays>0},
+ bayForm:{l:'Slot-Größe',t:'sel',o:[['2.5','2,5″'],['3.5','3,5″']],show:d=>d.bays>0},
+ bayDir:{l:'Anordnung der Slots',t:'sel',o:[['v','Vertikal (stehend)'],['h','Horizontal (liegend)']],show:d=>d.bays>0},
  bayRows:{l:'Reihen',t:'sel',o:[['1','1 Reihe'],['2','2 Reihen'],['3','3 Reihen'],['4','4 Reihen']],show:d=>d.bays>0&&d.bayDir==='h'},
  rows:{l:'Portreihen',t:'sel',o:[['auto','Automatisch'],['1','Einreihig'],['2','Zweireihig']]},
  pnum:{l:'Nummerierung',t:'sel',o:[['col','Spaltenweise – 1 oben, 2 unten'],['colr','Spaltenweise – 2 oben, 1 unten'],['row','Nebeneinander – oben 1, 2, 3 …'],['rowr','Nebeneinander – unten 1, 2, 3 …']],show:d=>!!KIND[d.kind]&&(d.rows==='2'||(d.rows==='auto'&&autoRows(d)===2))},
@@ -131,11 +166,11 @@ const F={
  ptag:{l:'Kürzel (Patchlegung)',t:'text',max:12,ph:d=>'automatisch: '+panelTag({...d,ptag:''})},
  ip:{l:'IP-Adresse',t:'text',max:40,ph:'10.0.0.2'},
  mac:{l:'MAC-Adresse',t:'text',max:20,ph:'aa:bb:cc:dd:ee:ff'},
- stp:{l:'Spanning Tree',t:'seg',o:[['','RSTP'],['off','Aus']]},
+ stp:{l:'Spanning Tree',t:'sel',o:[['','RSTP'],['off','Aus']]},
  bprio:{l:'Bridge-Priorität',t:'sel',o:()=>[['','32768 (Standard)'],...BPRIO.filter(v=>v!==32768).map(v=>[String(v),String(v)+(v===0?' (immer Root)':v===4096?' (Core)':v===8192?' (zweiter Core)':'')])]},
  notes:{l:'Notizen',t:'text',max:500},
  watt:{l:'Leistungsaufnahme (W)',t:'num',min:0,max:20000,opt:1,ph:d=>'geschätzt ca. '+estW(d)+' W'},
- psu:{l:'Netzteile',t:'seg',o:[['1','1 Netzteil'],['2','2 (redundant)']]},
+ psu:{l:'Netzteile',t:'sel',o:[['1','1 Netzteil'],['2','2 (redundant)']]},
  pa:{l:'Netzteil A an',t:'sel',o:d=>srcOpts(d)},
  pb:{l:'Netzteil B an',t:'sel',o:d=>srcOpts(d),show:d=>d.psu==='2'},
  uw:{l:'Wirkleistung (W)',t:'num',min:100,max:200000,opt:1,ph:d=>'Standard '+upsCap(d)+' W'},
@@ -146,26 +181,26 @@ const F={
  year:{l:'Kaufjahr',t:'num',min:1980,max:2100,opt:1,ph:'z. B. 2021'},
  lifeOld:{l:'Veraltet nach (Jahren)',t:'num',min:1,max:50,opt:1,ph:()=>'Standard: '+state.life.old},
  lifeEol:{l:'EOL nach (Jahren)',t:'num',min:1,max:60,opt:1,ph:()=>'Standard: '+state.life.eol},
- rsize:{l:'Breite',t:'seg',o:[['19','19″-Schrank'],['10','10″-Schrank']]},
+ rsize:{l:'Breite',t:'sel',o:[['19','19″-Schrank'],['10','10″-Schrank']]},
  minHe:{l:'Höhe',t:'sel',o:[['0','Automatisch – wächst mit'],...[6,9,12,15,18,22,24,27,32,36,42,47].map(n=>[String(n),n+' HE fest'])]},
- rcolor:{l:'Farbe',t:'seg',o:[['schwarz','Schwarz'],['grau','Lichtgrau']]},
- roomc:{l:'Farbe',t:'seg',o:Object.entries(RCOL).map(([k,v])=>[k,v.n])},
+ rcolor:{l:'Farbe',t:'col',o:[['schwarz','Schwarz',RPAL.schwarz.f],['grau','Lichtgrau',RPAL.grau.f]]},
+ roomc:{l:'Farbe',t:'col',o:Object.entries(RCOL).map(([k,v])=>[k,v.n,v.c])},
  w:{l:'Breite',t:'num',min:300,max:30000,step:10},
  h:{l:'Höhe',t:'num',min:200,max:30000,step:10},
- place:{l:'Position',t:'seg',o:[['right','Rechts neben den Plan'],['around','Um den ganzen Plan']],show:d=>d.id==='preview'}
+ place:{l:'Position',t:'sel',o:[['right','Rechts neben den Plan'],['around','Um den ganzen Plan']],show:d=>d.id==='preview'}
 };
 const FORM={
- switch:['name','model','style','size','rack',['he','rows'],'pnum','u','pc',['rj45Speed'],'poe',['ip','mac'],'location'],
- fw:['name','model','style','size','rack',['he','rows'],'pnum','u','pc',['rj45Speed','wan'],['location','ip']],
- net:['name','sub','model','style','size','rack',['he','rows'],'pnum','u','pc',['rj45Speed','wan'],['location','ip']],
- patch:['name','model','style','size','rack',['he','rows'],'pnum','u','pc',['cat'],'shield',['ptag','location']],
- fiber:['name','model','style','size','rack',['he','rows'],'pnum','u','pc',['fg','pol'],['ptag','location']],
- server:['name','role','style','size','rack',['he','rows'],'pnum','u','pc',['bays','baysUsed'],'bayForm','bayDir','bayRows',['rj45Speed'],['model','ip'],'location'],
- ups:['name','model','style','size','rack',['he','va'],'u','topo','pc',['location','ip']],
- pdu:['name','model','style','size','rack',['he'],'u','pc',['o13','o19'],'amp',['location','ip']],
+ switch:['name','model',['style','size'],'rack',['he','rows'],'pnum','u','pc',['rj45Speed'],'poe',['ip','mac'],'location'],
+ fw:['name','model',['style','size'],'rack',['he','rows'],'pnum','u','pc',['rj45Speed','wan'],['location','ip']],
+ net:['name','sub','model',['style','size'],'rack',['he','rows'],'pnum','u','pc',['rj45Speed','wan'],['location','ip']],
+ patch:['name','model',['style','size'],'rack',['he','rows'],'pnum','u','pc',['cat'],'shield',['ptag','location']],
+ fiber:['name','model',['style','size'],'rack',['he','rows'],'pnum','u','pc',['fg','pol'],['ptag','location']],
+ server:['name','role',['style','size'],'rack',['he','rows'],'pnum','u','pc',['bays','baysUsed'],['bayForm','bayDir'],'bayRows',['rj45Speed'],['model','ip'],'location'],
+ ups:['name','model',['style','size'],'rack',['he','va'],'u','topo','pc',['location','ip']],
+ pdu:['name','model',['style','size'],'rack',['he'],'u','pc',['o13','o19'],'amp',['location','ip']],
  ap:['name','model','style','pc',['rj45Speed','wifi'],['poeStd'],['location','ip']],
  host:['name','sub','pc',['rj45Speed'],'pd',['ip','mac'],'user'],
- rack:['name','rsize',['minHe'],'rcolor','location'],
+ rack:['name',['rsize','minHe'],'rcolor','location'],
  room:['name','roomc',['w','h'],'place']
 };
 for(const k of Object.keys(KIND))FORM[k].push('year',['lifeOld','lifeEol']);
@@ -403,7 +438,7 @@ function infoSVG(d,st,L){
   else if(d.kind==='switch'||d.kind==='net'){
     if(st.key==='hp')s+=[['Pwr','#3ddc6a'],['Flt',''],[d.kind==='net'?'WAN':'PoE',d.kind==='net'?'#3ddc6a':d.poe?'#f59e0b':'']].map(([t,c],i)=>`<rect x="${x+14+i*44}" y="${ly-3}" width="9" height="5" rx="1" fill="${c||st.offC}"/><text x="${x+27+i*44}" y="${ly+2}" font-size="9.5" fill="${st.sub}">${t}</text>`).join('');
     else if(st.key==='fs'){if(big)s+=['CON','MGMT'].map((t,i)=>`<rect x="${x+14+i*34}" y="${ly-15}" width="24" height="17" rx="1.5" fill="${st.jack}" stroke="${st.jackEdge}" stroke-width=".8"/><rect x="${x+18+i*34}" y="${ly-11}" width="16" height="10" rx="1" fill="${st.hole}"/><text x="${x+26+i*34}" y="${ly+10}" text-anchor="middle" font-size="8.5" fill="${st.sub}">${t}</text>`).join('')+`<circle cx="${x+92}" cy="${ly-7}" r="2.8" fill="#3ddc6a"/><text x="${x+98}" y="${ly-4}" font-size="8.5" fill="${st.sub}">SYS</text>`;else s+=`<circle cx="${x+19}" cy="${ly}" r="3" fill="#3ddc6a"/><text x="${x+27}" y="${ly+3.4}" font-size="9.5" fill="${st.sub}">SYS</text>`}
-    else s+=`<circle cx="${x+19}" cy="${ly}" r="3" fill="#4d9dff"/><text x="${x+27}" y="${ly+3.4}" font-size="9.5" fill="${st.sub}">Power</text><circle cx="${x+70}" cy="${ly}" r="3" fill="${used?'#2fd06b':st.offC}"/><text x="${x+78}" y="${ly+3.4}" font-size="9.5" fill="${st.sub}">${d.kind==='net'?'VPN':'Online'}</text>`;
+    else s+=`<circle cx="${x+19}" cy="${ly}" r="3" fill="${st.acc||'#4d9dff'}"/><text x="${x+27}" y="${ly+3.4}" font-size="9.5" fill="${st.sub}">Power</text><circle cx="${x+70}" cy="${ly}" r="3" fill="${used?'#2fd06b':st.offC}"/><text x="${x+78}" y="${ly+3.4}" font-size="9.5" fill="${st.sub}">${d.kind==='net'?'VPN':'Online'}</text>`;
   }
   else if(d.kind==='fw'){
     const ac=st.acc||'#4d9dff';
@@ -411,6 +446,7 @@ function infoSVG(d,st,L){
     if(st.fa==='bar')s+=`<rect x="${x+4}" y="12" width="4" height="${Hh-24}" rx="2" fill="${ac}"/>`;
     if(st.fa==='dot')s+=`<rect x="${x+L.info-28}" y="12" width="14" height="14" rx="2" fill="${ac}"/>`;
   }
+  if((d.kind==='switch'||d.kind==='net')&&st.acc){if(st.fa==='bar')s+=`<rect x="${x+4}" y="12" width="4" height="${Hh-24}" rx="2" fill="${st.acc}"/>`;if(st.fa==='dot')s+=`<rect x="${x+L.info-28}" y="12" width="14" height="14" rx="2" fill="${st.acc}"/>`}
   if(st.key==='lancom'||st.key==='fs')s+=`<rect x="${x+L.info-8}" y="12" width="1" height="${Hh-24}" fill="#fff" opacity=".08"/>`;
   return s;
 }
@@ -442,7 +478,7 @@ function rackSVG(d,st,L){
   const W=L.W,Hh=L.H,E=L.ear;let s='';
   if(E)for(const ex of [0,W-E]){s+=`<rect x="${ex}" y="0" width="${E}" height="${Hh}" rx="3" fill="${st.ear}" stroke="${st.stroke}"/>`;for(let i=0;i<(L.rack?d.he:1);i++)s+=`<rect x="${ex+E/2-3.5}" y="${i*U+13}" width="7" height="13" rx="3.5" fill="${st.earHole}"/><rect x="${ex+E/2-3.5}" y="${i*U+U-26}" width="7" height="13" rx="3.5" fill="${st.earHole}"/>`}
   s+=`<rect x="${E-.5}" y="0" width="${W-2*E+1}" height="${Hh}" rx="${E?2:7}" fill="url(#g-${st.key})" stroke="${st.stroke}"/><rect x="${E+2}" y="1" width="${W-2*E-4}" height="1.4" fill="#fff" opacity="${st.hi}"/><rect x="${E+2}" y="${Hh-2.4}" width="${W-2*E-4}" height="1.4" fill="#000" opacity=".2"/>`;
-  if(d.kind==='fw'&&st.fa==='stripe')s+=`<rect x="${E+2}" y="2.4" width="${W-2*E-4}" height="4" fill="${st.acc}"/>`;
+  if((d.kind==='fw'||d.kind==='switch'||d.kind==='net')&&st.fa==='stripe')s+=`<rect x="${E+2}" y="2.4" width="${W-2*E-4}" height="4" fill="${st.acc}"/>`;
   s+=infoSVG(d,st,L);
   if(d.kind==='server'||d.kind==='ups'||d.kind==='pdu')s+=baysSVG(d,st,L);
   if(d.kind==='server'&&L.ports.length){const x1=Math.min(...L.ports.map(p=>p.x))-10,x2=Math.max(...L.ports.map(p=>p.x+p.w))+10,y1=L.c[0]-34,y2=L.rows===2?L.c[1]+34:L.c[0]+24;s+=`<rect x="${x1}" y="${y1}" width="${x2-x1}" height="${y2-y1}" rx="5" fill="#000" opacity=".24"/>`}
@@ -461,12 +497,13 @@ function towerSVG(d,st,L){
 }
 function linked(d){return lay(d).ports.some(p=>{const c=cabOf(d.id,p.id,'f');if(!c)return false;const i=AN.get(c.id);return i&&!i.nolink&&i.speed})}
 function apSVG(d,L){
-  const cx=L.W/2,cy=L.cy,on=linked(d),sq=d.style!=='unifi',rx=d.style==='aruba'?30:16;
+  const cx=L.W/2,cy=L.cy,on=linked(d),A={sh:'s',rx:16,led:'dot',lc:'#3ddc6a',...((STY[d.style]||{}).ap||{})},sq=A.sh!=='c',rx=A.rx;
   let s=`<rect x="${cx-6}" y="40" width="12" height="${cy-66-36}" fill="#2b2f36"/><rect x="${L.sx}" y="4" width="${L.sw}" height="40" rx="8" fill="#2b2f36" stroke="#15181c"/>`;
   s+=sq?`<rect x="${cx-59}" y="${cy-56}" width="128" height="128" rx="${rx}" fill="#000" opacity=".14"/><rect x="${cx-64}" y="${cy-64}" width="128" height="128" rx="${rx}" fill="url(#g-apw)" stroke="#b9bfc6"/>`:`<circle cx="${cx+5}" cy="${cy+8}" r="66" fill="#000" opacity=".14"/><circle cx="${cx}" cy="${cy}" r="66" fill="url(#g-apw)" stroke="#b9bfc6"/>`;
-  if(d.style==='unifi')s+=`<circle cx="${cx}" cy="${cy}" r="55" fill="none" stroke="${on?'#4aa8ff':'#d3d8de'}" stroke-width="3"/>`;
-  else if(d.style==='lancom')s+=`<rect x="${cx-16}" y="${cy+46}" width="32" height="4" rx="2" fill="${on?'#4d9dff':'#d3d8de'}"/>`;
-  else s+=`<circle cx="${cx+38}" cy="${cy-38}" r="4.5" fill="${on?'#3ddc6a':'#d3d8de'}"/>`;
+  const lc=on?A.lc:'#d3d8de';
+  if(A.led==='ring')s+=sq?`<rect x="${cx-55}" y="${cy-55}" width="110" height="110" rx="${Math.max(6,rx-8)}" fill="none" stroke="${lc}" stroke-width="3"/>`:`<circle cx="${cx}" cy="${cy}" r="55" fill="none" stroke="${lc}" stroke-width="3"/>`;
+  else if(A.led==='bar')s+=`<rect x="${cx-16}" y="${cy+46}" width="32" height="4" rx="2" fill="${lc}"/>`;
+  else s+=`<circle cx="${cx+38}" cy="${cy-38}" r="4.5" fill="${lc}"/>`;
   s+=`<text x="${cx}" y="${cy-4}" text-anchor="middle" font-size="13" font-weight="700" fill="#1d2126">${esc(trunc(d.name,15))}</text><text x="${cx}" y="${cy+13}" text-anchor="middle" font-size="11" fill="#5b626b">${esc(d.wifi)} · PoE${d.poeStd==='af'?'':d.poeStd==='at'?'+':'++'}</text>${d.ip?`<text x="${cx}" y="${cy+28}" text-anchor="middle" font-size="10.5" fill="#6b7280">${esc(trunc(d.ip,18))}</text>`:''}`;
   return s;
 }
@@ -854,7 +891,8 @@ function fieldsHTML(d,m,part,scope,rowsO){
   const one=k=>{const f=F[k];if(!f||(f.show&&!f.show(d)))return '';const id=ID(k);
     if(f.t==='text')return fld(id,f.l,`<input id="${id}" ${A(k)} value="${esc(d[k]??'')}" maxlength="${f.max}"${f.ph?` placeholder="${esc(typeof f.ph==='function'?f.ph(d):f.ph)}"`:''}>`);
     if(f.t==='num')return fld(id,f.l,`<input id="${id}" ${A(k)} type="number" min="${f.min}" max="${f.max}" step="${f.step||1}" inputmode="numeric" value="${esc(d[k]??'')}"${f.ph?` placeholder="${esc(typeof f.ph==='function'?f.ph(d):f.ph)}"`:''}>`);
-    if(f.t==='sel')return fld(id,f.l,`<select id="${id}" ${A(k)}>${opts(fo(f,d),d[k]??'')}</select>`);
+    if(f.t==='sel'){const se=`<select id="${id}" ${A(k)}>${opts(fo(f,d),d[k]??'')}</select>`;if(k!=='style'||!STY[d.style])return fld(id,f.l,se);const g=STY[d.style].g;return fld(id,f.l,`<span class="stysel"><i class="stysw" style="background:linear-gradient(${g[0]},${g[1]})" aria-hidden="true"></i>${se}</span>`)}
+    if(f.t==='col'){const o=fo(f,d);return `<fieldset class="sw"><legend>${f.l}</legend>${o.map(([v,t,c])=>`<label title="${esc(t)}"><input type="radio" name="${m}-${k}" ${A(k)} value="${esc(v)}" aria-label="${esc(t)}"${String(d[k])===String(v)?' checked':''}><span style="--c:${c}"></span></label>`).join('')}</fieldset>`}
     if(f.t==='chk')return `<label class="chk"><input type="checkbox" id="${id}" ${A(k)}${d[k]?' checked':''}> ${f.l}</label>`;
     if(f.t==='seg'){const o=fo(f,d);return `<fieldset class="seg" style="grid-template-columns:repeat(${o.length>3?(o.length%3===0?3:2):o.length},minmax(0,1fr))"><legend>${f.l}</legend>${o.map(([v,t])=>`<label><input type="radio" name="${m}-${k}" ${A(k)} value="${esc(v)}"${String(d[k])===String(v)?' checked':''}><span>${esc(t)}</span></label>`).join('')}</fieldset>`}
     if(f.t==='pc')return `<fieldset class="pcs-f"><legend>Ports</legend><div class="pcs">${KIND[d.kind].types.map(t=>{const lab=t==='mgmt'?(STY[d.style].mg||'Mgmt')+'-Port':t==='kj'?'Buchsen':PT[t].n,mx=maxc(d,t),v=d.pc[t]||0,iid=id+'-'+t,at=m==='a'?`data-k="pc.${t}"`:`data-f="${scope}.pc.${t}"`;
@@ -1069,7 +1107,7 @@ function farSummary(d,pid){
   const fd=dev(far.d);return `<div class="far"><span>Gegenstelle</span><b>${esc(fd.name)} · ${esc(pname(fd,far.p))}</b>${where(fd)?`<small>${esc(where(fd))}</small>`:''}<button type="button" class="btn" data-act="goport" data-d="${far.d}" data-p="${far.p}">Hinspringen</button></div>`;
 }
 function vlanUI(d,pid,cf){const tr=cf.vm==='trunk',vo=[['','– kein VLAN –'],...state.vlans.map(v=>[String(v.id),vshort(v.id)])];
-  let h=`<fieldset class="seg" style="grid-template-columns:repeat(2,minmax(0,1fr))"><legend>VLAN-Modus</legend><label><input type="radio" name="pvm" data-f="port.vm" value="access"${tr?'':' checked'}><span>Access (untagged)</span></label><label><input type="radio" name="pvm" data-f="port.vm" value="trunk"${tr?' checked':''}><span>Trunk (tagged)</span></label></fieldset>`;
+  let h=fld('f-pvm','VLAN-Modus',selx('f-pvm','port.vm',[['access','Access (untagged)'],['trunk','Trunk (tagged)']],tr?'trunk':'access'));
   h+=fld('f-pvl',tr?'Native VLAN (untagged)':'VLAN',`<select id="f-pvl" data-f="port.vlan">${opts(vo,cf.vlan?String(cf.vlan):'')}</select>`);
   if(tr)h+=`<div class="fld"><span>Getaggte VLANs</span><div class="vchips">${state.vlans.map(v=>{const on=(cf.tv||[]).includes(v.id);return `<button type="button" class="vchip${on?' on':''}" style="--vc:${v.color}" data-act="vtag" data-v="${v.id}" aria-pressed="${on}">${esc(vshort(v.id))}</button>`}).join('')||'<span class="note">Noch keine VLANs angelegt.</span>'}${state.vlans.length?'<button type="button" class="link" data-act="vtagall">alle</button>':''}</div></div>`;
   return h+`<p class="note"><button type="button" class="link" data-act="vlanlist">VLANs verwalten</button></p>`}
@@ -1097,11 +1135,11 @@ const reachTxt=tr=>tr.m==='cu'?`bis ${tr.r.cu} m`:Object.entries(tr.r).map(([k,v
 function inspCab(c){
   const inf=AN.get(c.id),col=ccolor(c,inf);
   const end=k=>{const e=c[k],d=dev(e.d),t=ptype(e.p),l=pconf(d,e.p).label;return `<button type="button" data-act="goport" data-d="${e.d}" data-p="${e.p}"><i>${k.toUpperCase()}</i><span><b>${esc(d.name)} · ${esc(pname(d,e.p))}${e.s==='r'?' (Rückseite)':''}</b><small>${PT[t].n}${isPas(t)?'':' · '+SP[pspeed(d,e.p)].n}${l?' · '+esc(l):''}${where(d)?' · '+esc(where(d)):''}</small></span></button>`};
-  const side=k=>{const e=c[k];if(!isPas(ptype(e.p)))return '';return `<fieldset class="seg" style="grid-template-columns:repeat(2,minmax(0,1fr))"><legend>Ende ${k.toUpperCase()} am Panel</legend><label><input type="radio" name="side${k}" data-f="cab.s${k}" value="f"${e.s!=='r'?' checked':''}><span>Vorderseite</span></label><label><input type="radio" name="side${k}" data-f="cab.s${k}" value="r"${e.s==='r'?' checked':''}><span>Rückseite</span></label></fieldset>`};
+  const side=k=>{const e=c[k];if(!isPas(ptype(e.p)))return '';return fld('f-cs'+k,`Ende ${k.toUpperCase()} am Panel`,selx('f-cs'+k,'cab.s'+k,[['f','Vorderseite'],['r','Rückseite']],e.s==='r'?'r':'f'))};
   let h=`<div class="ih"><span class="kind">Kabel</span><h2 id="ih-t">${esc(c.label||'Kabel')}</h2><p class="sub"><i class="dot" style="--c:${col}"></i>${inf.nolink?'Kein Link':inf.speed?'Link mit '+SP[inf.speed].n:'Passive Verbindung'} · ${esc(cspec(c))}</p></div>`;
-  h+=`<div class="ends">${end('a')}${end('b')}</div>${side('a')}${side('b')}`;
+  h+=`<div class="ends">${end('a')}${end('b')}</div>${side('a')&&side('b')?`<div class="grid2">${side('a')}${side('b')}</div>`:side('a')+side('b')}`;
   h+=fld('f-clabel','Beschriftung',inp('f-clabel','cab.label',c.label,'maxlength="40" placeholder="z. B. K-012"'));
-  h+=`<fieldset class="seg" style="grid-template-columns:repeat(4,minmax(0,1fr))"><legend>Medium</legend>${Object.entries(MED).map(([k,v])=>`<label><input type="radio" name="cmed" data-f="cab.med" value="${k}"${c.med===k?' checked':''}><span>${v.n}</span></label>`).join('')}</fieldset>`;
+  h+=fld('f-cmed','Medium',selx('f-cmed','cab.med',Object.entries(MED).map(([k,v])=>[k,v.n]),c.med));
   if(c.med==='cu')h+=`<div class="grid2">${fld('f-ccat','Kategorie',selx('f-ccat','cab.cat',Object.entries(CAT).map(([k,v])=>[k,v.n]),c.cat))}${fld('f-csh','Schirmung',selx('f-csh','cab.shield',SHIELD.map(s=>[s,s]),c.shield))}</div>`;
   if(c.med==='fi')h+=`<div class="grid2">${fld('f-cfg','Fasertyp',selx('f-cfg','cab.fg',Object.entries(FG).map(([k,v])=>[k,v.n+(v.m==='sm'?' (SM)':' (MM)')]),c.fg))}${fld('f-cpol','Schliff',selx('f-cpol','cab.pol',[['UPC','UPC'],['APC','APC (8°)']],c.pol))}</div><div class="grid2">${fld('f-cca','Stecker A',selx('f-cca','cab.ca',CONS.map(x=>[x,x==='MPO'?'MPO-12':x]),c.ca))}${fld('f-ccb','Stecker B',selx('f-ccb','cab.cb',CONS.map(x=>[x,x==='MPO'?'MPO-12':x]),c.cb))}</div>`;
   if(c.med==='dac')h+=fld('f-cdac','Ausführung',selx('f-cdac','cab.dac',[['passiv','Passiv (Twinax, kurz)'],['aktiv','Aktiv (bis ca. 15 m)']],c.dac));
@@ -1268,7 +1306,7 @@ function applyField(el,live){
     if(k==='he'||k==='wan')v=parseInt(v,10)||0;
     if(k==='he')v=clamp(v,1,KIND[d.kind].maxHe);
     if(fd.t==='text')v=String(v).slice(0,fd.max);
-    if((fd.t==='sel'||fd.t==='seg')&&!fo(fd,d).some(([x])=>String(x)===String(v)))return;
+    if((fd.t==='sel'||fd.t==='seg'||fd.t==='col')&&!fo(fd,d).some(([x])=>String(x)===String(v)))return;
     if(d[k]===v)return;ck('dev'+k+d.id);const gr=d.rack&&rackOf(d.rack),gh=gr?rgeom(gr).H:0;const ov=d[k];d[k]=v;
     if(k==='poe')for(const pc of Object.values(d.ports))delete pc.poe;
     if(k==='bays'&&(d.baysUsed>v||d.baysUsed===ov))d.baysUsed=v;
@@ -1849,7 +1887,7 @@ function openAdd(kind,target){
   const autoName=()=>{if(!auto)return;const n=state.devices.filter(x=>x.kind===D.kind).length+1;if(D.kind==='host'||D.kind==='net')D.name=subLbl(D)+' '+n};
   const read=el=>{const k=el.dataset.k;if(!k)return;
     if(k.startsWith('pc.')){const t=k.slice(3);D.pc[t]=clamp(parseInt(el.value,10)||0,0,maxc(D,t));return}
-    const f=F[k];if(f.t==='seg'&&!el.checked)return;
+    const f=F[k];if((f.t==='seg'||f.t==='col')&&!el.checked)return;
     let v=f.t==='chk'?el.checked:el.value;
     if(k==='he')v=clamp(parseInt(v,10)||1,1,KIND[D.kind].maxHe);if(k==='wan'||k==='minHe')v=parseInt(v,10)||0;if(f.t==='num')v=f.opt&&String(v).trim()===''?'':clamp(parseInt(v,10)||0,f.min,f.max);if(f.t==='text')v=String(v).slice(0,f.max);
     if(k==='name')auto=false;
@@ -2111,13 +2149,13 @@ function openLabels(){
   if(store.kind==='server'&&!o.base)o.base=location.origin+location.pathname;
   const pdev=state.devices.filter(d=>lay(d).ports.length);
   const draw=()=>{const n=labelItems(o).length,F=LFMT[o.fmt],per=F.cols*F.rows,pages=per>1?Math.ceil((n+(+o.start||1)-1)/per):n;
-    $('#lbody').innerHTML=`<fieldset class="seg" style="grid-template-columns:repeat(3,minmax(0,1fr))"><legend>Was</legend>${[['cab','Kabel'],['port','Ports'],['dev','Geräte']].map(([k,t])=>`<label><input type="radio" name="lw" data-lo="what" value="${k}"${o.what===k?' checked':''}><span>${t}</span></label>`).join('')}</fieldset>
+    $('#lbody').innerHTML=`${fld('lb-what','Was',`<select id="lb-what" data-lo="what">${opts([['cab','Kabel'],['port','Ports'],['dev','Geräte']],o.what)}</select>`)}
     ${o.what==='cab'?`<label class="chk"><input type="checkbox" data-lo="both"${o.both?' checked':''}> Zwei Etiketten je Kabel (beide Enden)</label><label class="chk"><input type="checkbox" data-lo="only"${o.only?' checked':''}> Nur Kabel mit Nummer</label>`:''}
     ${o.what==='port'?fld('lb-dev','Gerät',`<select id="lb-dev" data-lo="dev">${opts([['','Alle Geräte'],...pdev.map(d=>[d.id,d.name])],o.dev)}</select>`)+`<label class="chk"><input type="checkbox" data-lo="only"${o.only?' checked':''}> Nur beschriftete Ports (sonst alle belegten)</label>`:''}
     ${o.what==='dev'?fld('lb-cat','Kategorie',`<select id="lb-cat" data-lo="cat">${opts([['','Alle Kategorien'],...catOrder.filter(k=>state.devices.some(d=>catOf(d)[0]===k)).map(k=>[k,(state.devices.find(d=>catOf(d)[0]===k)&&catOf(state.devices.find(d=>catOf(d)[0]===k))[1])||k])],o.cat)}</select>`)+((MS.size||sel&&sel.kind==='dev')?`<label class="chk"><input type="checkbox" data-lo="sel"${o.sel?' checked':''}> Nur ausgewählte Geräte</label>`:''):''}
     ${fld('lb-fmt','Format',`<select id="lb-fmt" data-lo="fmt">${opts(Object.entries(LFMT).map(([k,v])=>[k,v.n]),o.fmt)}</select>`)}
     ${per>1?`<div class="grid2">${fld('lb-start','Erstes freies Etikett auf dem Bogen',`<input id="lb-start" data-lo="start" type="number" min="1" max="${per}" value="${o.start}">`)}<label class="chk" style="align-self:end"><input type="checkbox" data-lo="frame"${o.frame?' checked':''}> Schnittlinien</label></div>`:''}
-    <fieldset class="seg" style="grid-template-columns:repeat(3,minmax(0,1fr))"><legend>QR-Code</legend>${[['none','Ohne'],['text','Mit Angaben'],['link','Mit Link']].map(([k,t])=>`<label><input type="radio" name="lq" data-lo="qr" value="${k}"${o.qr===k?' checked':''}><span>${t}</span></label>`).join('')}</fieldset>
+    ${fld('lb-qr','QR-Code',`<select id="lb-qr" data-lo="qr">${opts([['none','Ohne'],['text','Mit Angaben'],['link','Mit Link']],o.qr)}</select>`)}
     ${o.qr==='link'?fld('lb-base','Adresse deiner Server-Installation',`<input id="lb-base" data-lo="base" value="${esc(o.base)}" placeholder="https://netz.example.de/">`)+'<p class="note">Der QR-Code öffnet dann direkt das Kabel, den Port oder das Gerät in der App.</p>':o.qr==='text'?'<p class="note">Der QR-Code enthält Nummer und beide Enden als Text – lesbar mit jeder Kamera-App, auch ohne Netz.</p>':''}
     <p class="lcount"><b>${pl(n,'Etikett','Etiketten')}</b>${per>1?` auf ${pl(pages,'Bogen','Bögen')}`:''}</p>`};
   modal(`<form class="mbox" id="lform" role="dialog" aria-modal="true" aria-labelledby="m-t"><div class="mh"><h2 id="m-t">Etiketten drucken</h2>${closeBtn}</div><div id="lbody"></div><div class="mf"><button type="button" class="btn" data-close>Abbrechen</button><button type="submit" class="btn pri">PDF erstellen</button></div></form>`);
@@ -3033,6 +3071,8 @@ function tkReload(){if(!TK.pid||TK.pid==='demo'||PL.be!=='server')return;const p
 /* Handy: der Knopf sitzt über dem Eigenschaften-Bereich */
 try{new ResizeObserver(()=>{const i=$('#insp');document.documentElement.style.setProperty('--ib',(innerWidth<=760&&i?i.offsetHeight:0)+'px')}).observe($('#insp'))}catch(_){}
 
+/* Optik-Vorschau neben der Auswahl mitziehen */
+document.addEventListener('change',e=>{const el=e.target;if(el.tagName!=='SELECT'||!el.closest('.stysel'))return;const st=STY[el.value],sw=el.parentElement.querySelector('.stysw');if(st&&sw)sw.style.background=`linear-gradient(${st.g[0]},${st.g[1]})`});
 $('#simbar').addEventListener('click',e=>{const b=e.target.closest('[data-sim]');if(!b||!SIM.res)return;const k=b.dataset.sim;if(k==='close')simClear();else if(k==='again')simStart(SIM.src,SIM.dst);else{const id=k==='src'?SIM.src:SIM.dst;select({kind:'dev',id});centerOn(dev(id))}});
 
 /* ================= start ================= */

@@ -4,7 +4,13 @@ Netzwerk-Verkabelung im Browser planen und dokumentieren. Switches, Firewalls, P
 
 ![Gesamtplan des Beispielprojekts: zwei Räume mit je einem Schrank, Switches, Patchpanel, Server, USV und Hosts](docs/screenshots/plan.png)
 
-- **Geräte im Stil gängiger Hersteller:** Lancom, UniFi, HP/HPE, FS, Dell, Supermicro, APC, Eaton, CyberPower, Aruba. Bei Firewalls zusätzlich Sophos, Fortinet, Palo Alto, WatchGuard und OPNsense.
+- **Geräte im Stil gängiger Hersteller:** Die Optik wählst du in den Eigenschaften aus einer Liste mit Farbvorschau. Nachgebildet werden nur Farben und Aufbau, keine Logos.
+  - Switches und Netzwerkgeräte: Lancom, UniFi, HP, HPE, FS, Cisco, Aruba, Juniper, Netgear, TP-Link, Zyxel, MikroTik, D-Link, Meraki, Extreme, Arista, Dell
+  - Firewalls: Sophos, Fortinet, Palo Alto, WatchGuard, OPNsense, Lancom, Cisco, Check Point, SonicWall, Juniper, Netgate, Securepoint, Barracuda, Zyxel, MikroTik
+  - Server: HPE, Dell, Supermicro, Lenovo, Fujitsu, Cisco UCS
+  - USVs: APC, Eaton, CyberPower, Vertiv, Riello · PDUs zusätzlich Rittal, Raritan, Bachmann
+  - Patch- und LWL-Panels: FS, UniFi, HP, Lancom, Panduit, Telegärtner, Rittal
+  - Access Points: UniFi, Lancom, Aruba, Cisco, Meraki, TP-Link, Zyxel, Ruckus, Fortinet, Juniper, Juniper Mist
 - **Ports und Kabel:** RJ45, SFP, SFP+, SFP28, QSFP+ und QSFP28 sowie Patchpanels mit Vorder- und Rückseite. Kabel nach Cat-Standard, Glasfaser (OM1–OM5, OS2), DAC oder AOC, dazu die Transceiver.
 - **Port-Nummerierung:** Bei zweireihigen Geräten wählbar: spaltenweise (1 oben, 2 unten oder 2 oben, 1 unten) oder nebeneinander (oben bzw. unten 1, 2, 3 …). Nummern und Beschriftungsfelder liegen immer über den Kabeln.
 - **Server-Festplatten:** Anzahl der Slots und davon befüllte, 2,5″ oder 3,5″, vertikal (stehend) oder horizontal (liegend) in bis zu 4 Reihen. Je Platte optional Größe (TB/GB) und Typ (HDD/SSD). Die Summe steht neben dem Servernamen. Weicht eine Platte um mehr als 5 TB vom Median der übrigen ab, wird sie gelb markiert und zählt erst nach dem Quittieren mit. RAID-Verbünde (RAID 0/1/5/6/10/50/60, RAID-Z1–Z3, JBOD) mit Farbe, nutzbarer Kapazität und Prüfungen.

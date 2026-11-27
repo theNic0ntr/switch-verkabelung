@@ -470,6 +470,7 @@ EN.update({
 "Alle {n} Kommentare sind erledigt.": "All {n} comments are resolved.", "Noch keine Kommentare zu diesem Gerät.": "No comments on this device yet.", "Kommentieren": "Comment",
 "Alle anzeigen": "Show all", "Alle anzeigen ({n})": "Show all ({n})"
 })
+EN.update({"Was": "What"})
 import json, os
 root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 out = '/* Englische Übersetzung – erzeugt aus scripts/i18n_en.py, nicht von Hand ändern. */\nwindow.I18N_EN=' + json.dumps(EN, ensure_ascii=False, separators=(',', ':')) + ';\n'
