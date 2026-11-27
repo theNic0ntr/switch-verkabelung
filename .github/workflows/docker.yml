@@ -29,6 +29,7 @@ jobs:
           images: ghcr.io/thenic0ntr/switch-verkabelung
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
+            type=ref,event=tag
             type=semver,pattern={{version}}
             type=sha,format=short
       - uses: docker/build-push-action@v6
