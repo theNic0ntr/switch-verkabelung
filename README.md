@@ -65,9 +65,9 @@ Alle Bilder zeigen das Beispielprojekt, das beim ersten Start geladen wird.
 </tr>
 </table>
 
-![Drei Seiten der PDF-Dokumentation: Deckblatt, Schrankansicht und Patchlegung](docs/screenshots/pdf.png)
+![Drei Seiten der PDF-Dokumentation: Deckblatt, Inhaltsverzeichnis und Patchlegung](docs/screenshots/pdf.png)
 
-**PDF-Dokumentation:** Deckblatt mit Kennzahlen, Gesamtplan, jeder Schrank, Topologie und alle Listen in einem Dokument.
+**PDF-Dokumentation:** schlichtes Deckblatt mit dem Namen des Plans und allen, die daran gearbeitet haben, ein eigenes Inhaltsverzeichnis mit Seitenzahlen (Einträge sind anklickbar), danach Gesamtplan, jeder Schrank, Topologie und alle Listen in einem Dokument.
 
 ## Auf einem Server betreiben (Docker)
 

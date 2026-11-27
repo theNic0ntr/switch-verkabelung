@@ -2074,24 +2074,35 @@ function svgToJpeg(svg,w,h,maxPx){return new Promise((ok,no)=>{const sc=Math.min
   img.onerror=e=>{URL.revokeObjectURL(url);no(e)};img.src=url})}
 function drawQR(doc,QR,text,x,y,size){const q=QR(0,'M');q.addData(text,'Byte');q.make();const n=q.getModuleCount(),c=size/n;doc.setFillColor(0,0,0);
   for(let r=0;r<n;r++){let s=-1;for(let k=0;k<=n;k++){const on=k<n&&q.isDark(r,k);if(on&&s<0)s=k;else if(!on&&s>=0){doc.rect(x+s*c,y+r*c,(k-s)*c+.02,c+.02,'F');s=-1}}}}
+/* wer am Plan gearbeitet hat: Namen aus „angelegt von“ und „zuletzt bearbeitet von“ */
+async function planEditors(){const set=new Set();for(const L of [state.devices,state.cables,state.racks,state.rooms])for(const o of L)for(const a of [o._cr,o._ed])if(Array.isArray(a)&&a[0]&&a[0]!=='~')set.add(a[0]);
+  const meN=()=>(LV.me&&LV.me.name)||AU.names.get(AU.uid)||'';
+  const ids=[...set].filter(w=>store.kind==='shared'&&w[0]==='@').map(w=>w.slice(1)).filter(id=>id===AU.uid?!meN():!AU.names.get(id));
+  if(ids.length&&PL.user&&typeof PL.user.profiles==='function'){try{const ps=await PL.user.profiles(ids);for(const id of ids){const p=ps&&ps[id];if(p&&p.name)AU.names.set(id,p.name)}}catch(_){}}
+  return [...new Set([...set].map(w=>{const n=store.kind==='shared'&&w==='@'+AU.uid?meN():auName(w);return n&&n!=='…'&&n!==W('Unbekannt')?n:''}).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'de'))}
 async function makeDoc(){
   if(!DL&&!window.claude)DL=fileSaver();if(!DL){toast('Speichern ist in dieser Ansicht nicht möglich');return}
   toast('PDF wird erstellt …');let JS;try{JS=await needPDF()}catch(_){toast('PDF-Bibliothek konnte nicht geladen werden');return}
   analyze();
   const doc=new JS({orientation:'landscape',unit:'mm',format:'a4',compress:true}),PW_=297,PH_=210,M=12,date=new Date().toLocaleDateString(LOC);
-  const AT=(o)=>{const f=window.autoTable||(doc.autoTable&&((d,op)=>d.autoTable(op)));f(doc,{theme:'striped',styles:{font:'helvetica',fontSize:7.6,cellPadding:1.4,overflow:'linebreak'},headStyles:{fillColor:[17,17,17],textColor:255,fontStyle:'bold'},alternateRowStyles:{fillColor:[243,243,240]},margin:{top:22,left:M,right:M,bottom:14},...o,head:o.head.map(r=>r.map(c=>c&&typeof c==='object'?{...c,content:pT(c.content)}:pT(c))),body:o.body.map(r=>r.map(c=>c&&typeof c==='object'?{...c,content:pT(c.content)}:pT(c)))})};
+  const AT=(o)=>{const f=window.autoTable||(doc.autoTable&&((d,op)=>d.autoTable(op)));f(doc,{theme:'striped',styles:{font:'helvetica',fontSize:7.6,cellPadding:1.4,overflow:'linebreak',textColor:[30,30,30]},headStyles:{fillColor:[226,226,221],textColor:[17,17,17],fontStyle:'bold'},alternateRowStyles:{fillColor:[246,246,243]},margin:{top:22,left:M,right:M,bottom:14},...o,head:o.head.map(r=>r.map(c=>c&&typeof c==='object'?{...c,content:pT(c.content)}:pT(c))),body:o.body.map(r=>r.map(c=>c&&typeof c==='object'?{...c,content:pT(c.content)}:pT(c)))})};
   const H=(t,sub)=>{doc.setFont('helvetica','bold');doc.setFontSize(16);doc.setTextColor(17);doc.text(pT(t),M,17);if(sub){doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(100);doc.text(pT(sub),PW_-M,17,{align:'right'})}};
-  const toc=[];const page=(t,sub)=>{doc.addPage();toc.push([t,doc.getNumberOfPages()]);H(t,sub)};
-  // Deckblatt
-  doc.setFillColor(17,17,17);doc.rect(0,0,PW_,62,'F');doc.setFillColor(255,230,0);doc.rect(0,62,PW_,3,'F');
-  doc.setTextColor(255);doc.setFont('helvetica','bold');doc.setFontSize(30);doc.text(pT(state.name),M+4,32);doc.setFont('helvetica','normal');doc.setFontSize(13);doc.text(pT('Netzwerkdokumentation · Stand '+date),M+4,46);
-  const used=state.devices.reduce((a,d)=>a+usedPorts(d),0),tot=state.devices.reduce((a,d)=>a+total(d),0),nE=state.devices.filter(d=>(lcs(d)||{}).s==='eol').length,nO=state.devices.filter(d=>(lcs(d)||{}).s==='old').length;
-  const K=[['Geräte',state.devices.length],['Kabel',state.cables.length],['Strecken',CH.length],['Ports belegt',used+'/'+tot],['Schränke',state.racks.length],['Räume',state.rooms.length],['VLANs',state.vlans.length],['Hinweise',ISS.filter(i=>i.s!=='info').length],['EOL / veraltet',nE+' / '+nO]];
-  K.forEach(([k,v],i)=>{const x=M+4+(i%5)*54,y=82+Math.floor(i/5)*30;doc.setDrawColor(210);doc.setFillColor(246,246,243);doc.roundedRect(x,y,50,24,2,2,'F');doc.setTextColor(17);doc.setFont('helvetica','bold');doc.setFontSize(17);doc.text(pT(String(v)),x+4,y+12);doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.setTextColor(100);doc.text(pT(k),x+4,y+19)});
+  const toc=[];const page=(t,sub,lvl)=>{doc.addPage();toc.push([t,doc.getNumberOfPages(),lvl||0]);H(t,sub)};
+  // Deckblatt: nur der Name des Plans und wer daran gearbeitet hat
+  const who=await planEditors();
+  doc.setFillColor(246,246,243);doc.rect(0,PH_-26,PW_,26,'F');doc.setDrawColor(226,226,221);doc.setLineWidth(.3);doc.line(0,PH_-26,PW_,PH_-26);
+  {const title=pT(W('Netzwerkplan')+': '+state.name);let fs=30;doc.setFont('helvetica','bold');doc.setFontSize(fs);while(fs>18&&doc.getTextWidth(title)>PW_-60){fs-=1;doc.setFontSize(fs)}
+    const lines=doc.splitTextToSize(title,PW_-60),lh=fs*.42,y0=PH_/2-12-(lines.length-1)*lh/2;doc.setTextColor(17);lines.forEach((l,i)=>doc.text(l,PW_/2,y0+i*lh,{align:'center'}));
+    const yl=y0+(lines.length-1)*lh+9;doc.setDrawColor(200,200,195);doc.setLineWidth(.6);doc.line(PW_/2-30,yl,PW_/2+30,yl);
+    if(who.length){doc.setFont('helvetica','normal');doc.setFontSize(13);doc.setTextColor(95);const t=pT(W('Bearbeitet von')+' '+who.join(', '));doc.splitTextToSize(t,PW_-80).forEach((l,i)=>doc.text(l,PW_/2,yl+11+i*6,{align:'center'}))}
+    doc.setFont('helvetica','normal');doc.setFontSize(9.5);doc.setTextColor(120);doc.text(pT(W('Stand')+' '+date),PW_/2,PH_-11,{align:'center'})}
+  // Inhaltsverzeichnis bekommt eine eigene Seite (wird am Ende gefüllt)
+  doc.addPage();const tocAt=doc.getNumberOfPages();
   // Gesamtplan
   try{const P=buildSVG();page('Gesamtplan',`${state.devices.length} Geräte · ${state.cables.length} Kabel`);const I=await svgToJpeg(P.svg,P.w,P.h,7000);const s=Math.min((PW_-2*M)/P.w,(PH_-32)/P.h);doc.addImage(I.data,'JPEG',M+((PW_-2*M)-P.w*s)/2,24,P.w*s,P.h*s)}catch(_){}
   // Schränke
-  for(const r of state.racks){const G=rgeom(r),crop={x1:r.x-12,y1:r.y-12,x2:r.x+G.W+12,y2:r.y+G.H+12};try{const P=buildSVG(crop);page('Schrank '+r.name,`${r.rsize}″ · ${G.n} HE · ${G.heUsed} HE belegt${rackRoom(r)?' · '+rackRoom(r).name:''}`);const I=await svgToJpeg(P.svg,P.w,P.h,3600);const iw=150,s=Math.min(iw/P.w,(PH_-32)/P.h);doc.addImage(I.data,'JPEG',M,24,P.w*s,P.h*s);
+  if(state.racks.length)toc.push(['Schränke',doc.getNumberOfPages()+1,0,1]);
+  for(const r of state.racks){const G=rgeom(r),crop={x1:r.x-12,y1:r.y-12,x2:r.x+G.W+12,y2:r.y+G.H+12};try{const P=buildSVG(crop);page('Schrank '+r.name,`${r.rsize}″ · ${G.n} HE · ${G.heUsed} HE belegt${rackRoom(r)?' · '+rackRoom(r).name:''}`,1);toc[toc.length-1][0]=r.name;const I=await svgToJpeg(P.svg,P.w,P.h,3600);const iw=150,s=Math.min(iw/P.w,(PH_-32)/P.h);doc.addImage(I.data,'JPEG',M,24,P.w*s,P.h*s);
       const occ=G.devs.map(d=>[heTxt(d).replace('HE ',''),d.name,d.kind==='net'?subLbl(d):KIND[d.kind].n,d.model||d.role||'',d.ip||'',d.year?String(d.year):'']);AT({startY:24,margin:{top:22,left:M+P.w*s+8,right:M,bottom:14},head:[['HE','Gerät','Art','Modell','IP','Kauf']],body:occ.length?occ:[['–','leer','','','','']]})}catch(_){}}
   // Topologie
   {const R=topoSVG();if(R){let b=R.box,svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${Math.ceil(b.w)}" height="${Math.ceil(b.h)}" viewBox="${b.x} ${b.y} ${b.w} ${b.h}" font-family="Arial, sans-serif"><rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" fill="#fff"/>${R.svg}</svg>`;svg=I18.markup(svg);try{page('Logische Topologie',`${R.M.nodes.size} Geräte · ${R.M.E.size} Verbindungen`);const I=await svgToJpeg(svg,b.w,b.h,5000);const s=Math.min((PW_-2*M)/b.w,(PH_-32)/b.h);doc.addImage(I.data,'JPEG',M+((PW_-2*M)-b.w*s)/2,24,b.w*s,b.h*s)}catch(_){}}}
@@ -2108,10 +2119,17 @@ async function makeDoc(){
   {const srv=state.devices.filter(d=>d.kind==='server'&&d.bays);if(srv.length){page('Laufwerke & RAID',pl(srv.length,'Server','Server'));const body=[];for(const d of srv){const DI=diskInfo(d);for(const x of DI.list){const r=raidOf(d,x.i);body.push([d.name,'Slot '+(x.i+1),d.bayForm.replace('.',',')+'″',x.t,x.o.c?fmtCap(x.o):'',r?r.name+' ('+RAIDL[r.lvl].n+')':'',x.out&&!x.ok?'prüfen':''])}}AT({startY:24,head:[['Server','Slot','Form','Typ','Größe','RAID','Hinweis']],body})}}
   tbl('Materialliste',matRows());
   if(ISS.length){page('Hinweise',`${ISS.length} Einträge`);AT({startY:24,head:[['Art','Hinweis']],body:ISS.map(i=>[i.s==='err'?'Fehler':i.s==='warn'?'Warnung':'Info',(i.c?(state.cables.find(c=>c.id===i.c)||{}).label+': ':'')+i.m]),columnStyles:{0:{cellWidth:22}}})}
-  // Inhaltsverzeichnis auf dem Deckblatt, Kopf/Fuß auf allen Seiten
-  doc.setPage(1);doc.setTextColor(17);doc.setFont('helvetica','bold');doc.setFontSize(12);doc.text(pT('Inhalt'),M+4,152);doc.setFont('helvetica','normal');doc.setFontSize(9.5);
-  toc.forEach(([t,p],i)=>{const col=Math.floor(i/9),y=160+(i%9)*5.2,x=M+4+col*90;doc.text(pT(t),x,y);doc.text(String(p),x+78,y,{align:'right'})});
-  const n=doc.getNumberOfPages();for(let i=2;i<=n;i++){doc.setPage(i);doc.setDrawColor(17);doc.setLineWidth(.4);doc.line(M,20,PW_-M,20);doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(120);doc.text(pT(state.name)+' · '+pT('Netzwerkdokumentation')+' · '+date,M,PH_-7);doc.text(pT(`Seite ${i} von ${n}`),PW_-M,PH_-7,{align:'right'})}
+  // Inhaltsverzeichnis: eine eigene Seite, bei vielen Einträgen weitere direkt dahinter
+  {const per=24,need=Math.max(1,Math.ceil(toc.length/per));for(let k=1;k<need;k++)doc.insertPage(tocAt+1);if(need>1)for(const e of toc)e[1]+=need-1;
+    const x0=48,x1=PW_-48;
+    for(let k=0;k<need;k++){doc.setPage(tocAt+k);H(k?'Inhalt (Fortsetzung)':'Inhalt');let y=36;
+      for(const [t,p,lvl,grp] of toc.slice(k*per,(k+1)*per)){const x=x0+(lvl?8:0),txt=pT(t);doc.setFont('helvetica',lvl?'normal':'bold');doc.setFontSize(lvl?10.5:11.5);doc.setTextColor(lvl?60:17);
+        if(grp&&y>36)y+=1.5;doc.text(txt,x,y);const pn=String(p),wT=doc.getTextWidth(txt),wP=doc.getTextWidth(pn);
+        doc.setFont('helvetica','normal');doc.setTextColor(170);const dw=doc.getTextWidth('.'),from=x+wT+2,to=x1-wP-2;if(to>from){doc.text('.'.repeat(Math.floor((to-from)/dw)),from,y)}
+        doc.setTextColor(lvl?60:17);doc.setFont('helvetica',lvl?'normal':'bold');doc.text(pn,x1,y,{align:'right'});
+        try{doc.link(x,y-4.2,x1-x,5.6,{pageNumber:p})}catch(_){}y+=lvl?6.4:7.4}}}
+  // Kopf- und Fußzeile auf allen Seiten außer dem Deckblatt
+  const n=doc.getNumberOfPages();for(let i=2;i<=n;i++){doc.setPage(i);doc.setDrawColor(200,200,195);doc.setLineWidth(.4);doc.line(M,20,PW_-M,20);doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(120);doc.text(pT(W('Netzwerkplan')+': '+state.name)+' · '+pT(W('Stand')+' '+date),M,PH_-7);doc.text(pT(`Seite ${i} von ${n}`),PW_-M,PH_-7,{align:'right'})}
   await save(slug()+'-dokumentation.pdf',doc.output('blob'))}
 /* Etiketten */
 const LFMT={'a4-44':{n:'A4-Bogen 48,5 × 25,4 mm (44 Stück)',page:[210,297],w:48.5,h:25.4,cols:4,rows:11,gx:0,gy:0},'a4-65':{n:'A4-Bogen 38,1 × 21,2 mm (65 Stück)',page:[210,297],w:38.1,h:21.2,cols:5,rows:13,gx:2.5,gy:0},'roll62':{n:'Etikettendrucker 62 × 29 mm',page:[62,29],w:62,h:29,cols:1,rows:1,gx:0,gy:0},'tape12':{n:'Kabelfahne 12-mm-Band (70 mm)',page:[70,12],w:70,h:12,cols:1,rows:1,gx:0,gy:0,flag:1}};
