@@ -68,7 +68,8 @@
   </section>
   <section class="topo" id="topo" hidden>
     <div class="tbar"><h2>Logische Topologie</h2><p class="sub" id="tp-sub"></p>
-      <div class="vt" role="group" aria-label="Hosts"><button type="button" data-th="single">Hosts einzeln</button><button type="button" data-th="group">gruppiert</button><button type="button" data-th="off">aus</button></div>
+      <div class="vt" role="group" aria-label="Geräte"><button type="button" data-tn="all">Alle Geräte</button><button type="button" data-tn="net">Nur Netzwerk</button></div>
+      <div class="vt" role="group" aria-label="Hosts" id="tp-hosts"><button type="button" data-th="single">Hosts einzeln</button><button type="button" data-th="group">gruppiert</button><button type="button" data-th="off">aus</button></div>
       <div class="vt" role="group" aria-label="Färben"><button type="button" data-tc="speed">Tempo</button><button type="button" data-tc="vlan">VLAN</button></div>
       <button type="button" class="btn" id="tp-fit">Einpassen</button><button type="button" class="btn" id="tp-svg">Als SVG</button></div>
     <div class="tstage" id="tstage"><svg id="tsvg" aria-label="Logische Topologie"><g id="tworld"></g></svg><p class="note tp-empty" id="tp-empty" hidden>Noch keine Verbindungen zwischen aktiven Geräten – verbinde Switches, Firewalls und Endgeräte im Plan.</p></div>

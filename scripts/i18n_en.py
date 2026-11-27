@@ -472,6 +472,7 @@ EN.update({
 })
 EN.update({"Was": "What"})
 EN.update({"Netzwerkplan": "Network plan", "Bearbeitet von": "Edited by", "Stand": "As of", "Inhalt (Fortsetzung)": "Contents (continued)"})
+EN.update({"Nur Netzwerk": "Network only", "Netzwerktopologie": "Network topology", "nur Switches, Router und Firewalls": "switches, routers and firewalls only"})
 import json, os
 root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 out = '/* Englische Übersetzung – erzeugt aus scripts/i18n_en.py, nicht von Hand ändern. */\nwindow.I18N_EN=' + json.dumps(EN, ensure_ascii=False, separators=(',', ':')) + ';\n'

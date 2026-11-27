@@ -19,13 +19,13 @@ Netzwerk-Verkabelung im Browser planen und dokumentieren. Switches, Firewalls, P
 - **Lebenszyklus:** Für jedes Gerät lässt sich ein Kaufjahr eintragen. Veraltete Geräte werden orange markiert (Standard: ab 5 Jahren), Geräte am Lebensende (EOL) rot (Standard: ab 10 Jahren). Die Schwellen sind fürs ganze Projekt und pro Gerät einstellbar.
 - **Suche und Kategorien:** Die Suche findet Geräte, Personen, IPs und Port-Beschriftungen. Über „Ansicht“ lassen sich ganze Kategorien oder einzelne Räume, Schränke, Geräte und Hosts ausblenden.
 - **VLANs und IP-Adressen:** VLANs mit Farbe, Subnetz und Gateway; Ports als Access oder Trunk (Native + getaggt), auch für ganze Portbereiche. Prüfungen entlang der Strecke, doppelte IPs, falsches Subnetz, nächste freie IP. Hosts erscheinen dauerhaft in ihrer VLAN-Farbe, Port-VLANs und RAID-Farben nur am ausgewählten Gerät.
-- **Logische Topologie:** automatisch erzeugtes L2-Diagramm ohne Patchpanels, Hosts einzeln, gruppiert oder ausgeblendet, eingefärbt nach Tempo oder VLAN.
+- **Logische Topologie:** automatisch erzeugtes L2-Diagramm ohne Patchpanels, Hosts einzeln, gruppiert oder ausgeblendet, eingefärbt nach Tempo oder VLAN. Mit **Nur Netzwerk** zeigt sie die reine Netzwerktopologie: nur Switches, Router (auch Gateway und Modem/ONT) und Firewalls, Medienkonverter werden dabei überbrückt.
 - **Stromversorgung:** PDUs, Leistungsaufnahme je Gerät (sonst geschätzt, inkl. PoE), Netzteile A/B an USV oder PDU, Last und Laufzeit der USV, Hinweise bei Überlast oder fehlender Redundanz.
 - **Listen:** Kabel, Patchlegung, Geräte, VLANs & IPs, Strom und Materialliste (Patchkabel, Verlegekabel in Metern, Transceiver, Module, Platten) – jeweils als CSV.
 - **Mehrfachauswahl:** Umschalt + Klick, Auswahlrahmen, Auswahlmodus für Touch; gemeinsam verschieben, ausrichten, duplizieren, löschen.
 - **Vorlagen:** konfigurierte Geräte als eigene Vorlage speichern und wiederverwenden.
 - **Versionsverlauf:** benannte Stände, automatische Sicherungen, Vergleich mit dem aktuellen Stand, Wiederherstellen.
-- **PDF und Etiketten:** komplette Dokumentation als PDF (Plan, Schränke, Topologie, alle Listen); Etiketten für Kabel, Ports und Geräte auf A4-Bögen, für Etikettendrucker oder als Kabelfahne, wahlweise mit QR-Code. In der Server-Version öffnet der QR-Code das Objekt direkt (`#dev-…`, `#cab-…`, `#port-…`).
+- **PDF und Etiketten:** komplette Dokumentation als PDF (Plan, Schränke, Netzwerktopologie, alle Listen); Etiketten für Kabel, Ports und Geräte auf A4-Bögen, für Etikettendrucker oder als Kabelfahne, wahlweise mit QR-Code. In der Server-Version öffnet der QR-Code das Objekt direkt (`#dev-…`, `#cab-…`, `#port-…`).
 - **Patchlegung:** wird automatisch aus dem Plan erzeugt – nach Raum und Schrank gegliedert, je Switch eine Tabelle mit Port, Patch (Kürzel des Patchpanels + Port, z. B. 11.6), VLAN, Geräteklasse und Nutzer. Hat ein Patchpanel-Port eine eigene Beschriftung, steht genau diese in der Spalte Patch; sonst wird sie aus Kürzel und Port gebildet. Das Kürzel lässt sich am Patchpanel festlegen, sonst wird je Schrank von oben durchnummeriert.
 - **Export:** Patchliste und Patchlegung als CSV, der Plan als SVG oder PNG, das Projekt als JSON.
 - **Deutsch und Englisch:** Der Knopf **DE/EN** oben rechts schaltet die Sprache um. Übersetzt werden Oberfläche, Hinweise, Listen, CSV, PDF-Dokumentation und Etiketten; eigene Namen von Geräten, Räumen oder Plänen bleiben, wie sie sind. Beim ersten Aufruf richtet sich die Sprache nach dem Browser. Die Übersetzungen stehen in `scripts/i18n_en.py`, daraus erzeugt `python3 scripts/i18n_en.py` die Datei `src/i18n-en.js`.
@@ -67,7 +67,7 @@ Alle Bilder zeigen das Beispielprojekt, das beim ersten Start geladen wird.
 
 ![Drei Seiten der PDF-Dokumentation: Deckblatt, Inhaltsverzeichnis und Patchlegung](docs/screenshots/pdf.png)
 
-**PDF-Dokumentation:** schlichtes Deckblatt mit dem Namen des Plans und allen, die daran gearbeitet haben, ein eigenes Inhaltsverzeichnis mit Seitenzahlen (Einträge sind anklickbar), danach Gesamtplan, jeder Schrank, Topologie und alle Listen in einem Dokument.
+**PDF-Dokumentation:** schlichtes Deckblatt mit dem Namen des Plans und allen, die daran gearbeitet haben, ein eigenes Inhaltsverzeichnis mit Seitenzahlen (Einträge sind anklickbar), danach Gesamtplan, jeder Schrank, die reine Netzwerktopologie (nur Switches, Router, Firewalls) und alle Listen in einem Dokument.
 
 ## Auf einem Server betreiben (Docker)
 
