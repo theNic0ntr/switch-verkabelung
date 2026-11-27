@@ -25,7 +25,8 @@ jobs:
       - id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository }}
+          # fester Image-Name: der Repo-Name „Networkdoc_“ endet auf „_“, das ist als Image-Name nicht erlaubt
+          images: ghcr.io/thenic0ntr/switch-verkabelung
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=semver,pattern={{version}}

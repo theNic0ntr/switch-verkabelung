@@ -67,8 +67,8 @@ Alle Bilder zeigen das Beispielprojekt, das beim ersten Start geladen wird.
 Voraussetzung sind Docker und Docker Compose.
 
 ```bash
-git clone https://github.com/theNic0ntr/switch-verkabelung.git
-cd switch-verkabelung
+git clone https://github.com/theNic0ntr/Networkdoc_.git
+cd Networkdoc_
 docker compose up -d --build
 ```
 
